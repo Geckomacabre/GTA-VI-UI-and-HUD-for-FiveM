@@ -1,13 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import InventorySlot from './InventorySlot';
 import { Inventory, Slot, SlotWithItem } from '../../typings';
-import { isSlotWithItem, getItemUrl } from '../../helpers';
+import { isSlotWithItem } from '../../helpers';
 import { Items } from '../../store/items';
 import { Locale } from '../../store/locale';
 import { useCurrentWeaponSlot } from '../../store/currentWeapon';
 import { onUse } from '../../dnd/onUse';
 import { onDisarm } from '../../dnd/onDisarm';
-import { isMeleeItem, isHandheldItem } from '../../store/wheelCategories';
+import { isMeleeItem, isHandheldItem, isWeaponItem } from '../../store/wheelCategories';
 
 /*
  * GTA6-style weapon wheel.
@@ -27,16 +27,20 @@ import { isMeleeItem, isHandheldItem } from '../../store/wheelCategories';
  *
  * Cell roles:
  *  - 'free'     any item, including weapons — the original behaviour.
+ *  - 'weapon'   only accepts items in wheelCategories.isWeaponItem (top, 12
+ *               o'clock). A real inventory slot like any other cell — you can
+ *               drag a gun in, click it to equip, etc. When its item IS the
+ *               currently equipped weapon it also grows the ammo readout and
+ *               glow underneath (see isTopEquipped below); when it isn't, it
+ *               just sits there like an unequipped melee/handheld cell does.
  *  - 'melee'    only accepts items in wheelCategories.isMeleeItem (~8 o'clock).
  *  - 'handheld' only accepts items in wheelCategories.isHandheldItem (~4 o'clock,
  *               flashlight/binoculars/similar tools).
  *  - 'fist'     not backed by an inventory slot at all — a fixed button that
  *               always shows the fist icon and holsters whatever is equipped
  *               (middle-right / 3 o'clock).
- * The "top" position isn't a ring cell — it's the separate equipped-weapon
- * readout below, which already always mirrors what's actually in your hand.
  */
-type WheelRole = 'free' | 'melee' | 'handheld' | 'fist';
+type WheelRole = 'free' | 'weapon' | 'melee' | 'handheld' | 'fist';
 
 interface WheelCell {
   role: WheelRole;
@@ -52,6 +56,7 @@ interface WheelCell {
 // five — check them against a real screen before trusting them
 // pixel-for-pixel.
 const WHEEL_CELLS: WheelCell[] = [
+  { role: 'weapon', position: { left: '50.35%', top: '23.35%' } }, // 12 o'clock — always weapon
   { role: 'free', position: { left: '35.08%', top: '48.49%' } }, // ~10 o'clock
   { role: 'fist', position: { left: '65.5%', top: '48.49%' } }, // 3 o'clock — always fist
   { role: 'melee', position: { left: '38.33%', top: '63.61%' } }, // ~8 o'clock
@@ -61,7 +66,7 @@ const WHEEL_CELLS: WheelCell[] = [
   { role: 'free', position: { left: '62.45%', top: '33.37%' } }, // mirrors handheld across the middle row
 ];
 
-// Maps each non-fist cell, in order, onto inventory slots 1-6. The fist cell
+// Maps each non-fist cell, in order, onto inventory slots 1-7. The fist cell
 // has no entry (`null`) because it isn't backed by an inventory slot.
 let nextWheelSlot = 0;
 const CELL_SLOTS: Array<number | null> = WHEEL_CELLS.map((cell) =>
@@ -110,6 +115,7 @@ const getCategory = (slot: SlotWithItem | undefined, isEquipped: boolean): strin
 };
 
 const ACCEPTS_BY_ROLE: Partial<Record<WheelRole, (name: string) => boolean>> = {
+  weapon: isWeaponItem,
   melee: isMeleeItem,
   handheld: isHandheldItem,
 };
@@ -228,37 +234,17 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
     <>
       <div className="gta6-wheel-dot" />
 
-      {/*
-        The equipped card is a READ-ONLY readout of what is in your hands, not a
-        wheel cell. It used to render an InventorySlot for whatever happened to
-        be first in the inventory, which made it both a drop target and a lie.
-        Ring cells below are where things are put; this shows the result of
-        picking one. It doubles as the wheel's "top = weapon" position: nothing
-        but a weapon ever produces a meaningful ammo readout here, and melee/
-        handheld items each have their own dedicated ring cell instead.
-      */}
-      <div className="gta6-equipped-slot">
-        {equipped && (
-          <div
-            className="inventory-slot gta6-equipped-readout"
-            style={{ backgroundImage: `url(${getItemUrl(equipped)})` }}
-          />
-        )}
-        <div className="gta6-equipped-glow" />
-        {equipped && (magazineAmmo !== undefined || reserveAmmo !== undefined) && (
-          <div className="gta6-equipped-ammo">
-            {magazineAmmo !== undefined && <span className="gta6-ammo-mag">{magazineAmmo}</span>}
-            {reserveAmmo !== undefined && <span className="gta6-ammo-reserve">{reserveAmmo}</span>}
-          </div>
-        )}
-        {equipped && hasBadge(equipped) && <span className="gta6-slot-badge" />}
-      </div>
-
       {WHEEL_CELLS.map((cell, index) => {
         const slotNumber = CELL_SLOTS[index];
         const item = slotNumber !== null ? bySlot.get(slotNumber) : undefined;
         const isEquipped = cell.role !== 'fist' && !!item && !!equipped && item.slot === equipped.slot;
         const isFistEquipped = cell.role === 'fist' && currentWeaponSlot == null;
+        // Ammo readout + glow only grow under the weapon cell, and only while
+        // it's genuinely holding the equipped weapon -- a gun sitting there
+        // unequipped looks like any other unequipped wheel cell, same as
+        // melee/handheld already do.
+        const showAmmoChrome =
+          cell.role === 'weapon' && isEquipped && (magazineAmmo !== undefined || reserveAmmo !== undefined);
 
         return (
           <div
@@ -280,6 +266,13 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
               <>
                 {item && renderSlot(item, ACCEPTS_BY_ROLE[cell.role])}
                 {item && isSlotWithItem(item) && hasBadge(item) && <span className="gta6-slot-badge" />}
+                {cell.role === 'weapon' && isEquipped && <div className="gta6-equipped-glow" />}
+                {showAmmoChrome && (
+                  <div className="gta6-equipped-ammo">
+                    {magazineAmmo !== undefined && <span className="gta6-ammo-mag">{magazineAmmo}</span>}
+                    {reserveAmmo !== undefined && <span className="gta6-ammo-reserve">{reserveAmmo}</span>}
+                  </div>
+                )}
               </>
             )}
           </div>

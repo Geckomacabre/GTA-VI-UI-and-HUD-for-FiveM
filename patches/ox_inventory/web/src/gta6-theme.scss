@@ -240,27 +240,15 @@ $gta6-ref-aspect: 1.77936; // 2000 / 1124
   }
 }
 
-// Equipped weapon — separate slot pinned top-centre, NOT part of the ring.
-// 9.85% x 11.12% of the viewport. Art box: pw(5.6) wide, 62% of slot height.
+// Weapon cell (12 o'clock) sizing — 9.85% x 11.12% of the viewport, a touch
+// taller than the other ring slots since it's the hero position. Art box:
+// pw(5.6) wide, 62% of slot height. Position now comes from WHEEL_CELLS'
+// inline style like every other cell, not hardcoded here -- this used to be
+// a separate .gta6-equipped-slot outside the ring entirely, before the top
+// became a real, drag-into-able wheel cell instead of a read-only readout.
 $gta6-eq-w: pw(9.85);
 $gta6-eq-h: ph(11.12);
 $gta6-art-w: pw(5.6);
-
-.gta6-equipped-slot {
-  @include gta6-slot-shell(
-    calc((#{$gta6-eq-w} - #{$gta6-art-w}) / 2),
-    ph(1),
-    calc(#{$gta6-eq-h} - #{ph(1)} - (#{$gta6-eq-h} * 0.62))
-  );
-
-  left: 50.35%;
-  top: 23.35%;
-  transform: translate(-50%, -50%);
-  width: $gta6-eq-w;
-  height: $gta6-eq-h;
-  background: var(--gta6-slot-equipped-bg);
-  border-color: var(--gta6-slot-equipped-border);
-}
 
 // Teal/cyan elliptical glow arc under the weapon art.
 .gta6-equipped-glow {
@@ -337,11 +325,25 @@ $gta6-ws-h: ph(10.68);
   background-repeat: no-repeat;
   background-position: center;
   background-origin: content-box;
-  // Matches every other slot's art box ($gta6-art-w, same convention
-  // .gta6-equipped-readout uses) instead of `contain`, which scaled the
-  // tightly-cropped fist.png to fill more of the box than a properly-padded
-  // item icon does and made it look oversized next to the others.
+  // Matches every other slot's art box ($gta6-art-w) instead of `contain`,
+  // which scaled the tightly-cropped fist.png to fill more of the box than
+  // a properly-padded item icon does and made it look oversized next to
+  // the others.
   background-size: $gta6-art-w auto;
+}
+
+// Weapon cell (12 o'clock) is a touch taller than the rest of the ring — see
+// $gta6-eq-w/$gta6-eq-h above. Source order matters: this must come after
+// .gta6-wheel-slot so its width/height/padding win at equal specificity.
+.gta6-wheel-slot-weapon {
+  @include gta6-slot-shell(
+    calc((#{$gta6-eq-w} - #{$gta6-art-w}) / 2),
+    ph(1),
+    calc(#{$gta6-eq-h} - #{ph(1)} - (#{$gta6-eq-h} * 0.62))
+  );
+
+  width: $gta6-eq-w;
+  height: $gta6-eq-h;
 }
 
 .gta6-wheel-slot-selected {

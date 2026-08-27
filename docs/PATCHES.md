@@ -191,14 +191,28 @@ networking logic is touched — `WeaponWheel.tsx` wraps the same
 alt+click use all keep working.
 
 The hotbar is a curved wheel (`WeaponWheel.tsx`) of 8 cells mapped onto
-inventory slots 1-6, not an evenly-spaced circle. Fixed layout: top is
-always the equipped-weapon readout (not a ring cell), middle-right is
-always `fist`, 8 o'clock is always `melee`, 4 o'clock is always `handheld`,
-and the remaining four cells are `free` (any item, including weapons).
-Being a `free` cell — same as any inventory slot — the wheel is only gated
-on a *keybind* for slots 1-5; slots 5 and 6 still accept drag-and-drop from
-the inventory and right-click/alt-click same as any other slot, there's
-just no default number key wired to them.
+inventory slots 1-7, not an evenly-spaced circle. Fixed layout: top (12
+o'clock) is always `weapon`, middle-right is always `fist`, 8 o'clock is
+always `melee`, 4 o'clock is always `handheld`, and the remaining four
+cells are `free` (any item, including weapons). Every non-fist cell is a
+real `InventorySlot` — including the top one, which used to be a read-only
+image that only ever mirrored whatever was equipped elsewhere. Because it's
+a real slot, the wheel is only gated on a *keybind* for slots 1-5; slots
+5-7 still accept drag-and-drop from the inventory and right-click/alt-click
+same as any other slot, there's just no default number key wired to them,
+and clicking a cell equips/uses it (`onCellClick` → the same `onUse` call
+the number keys make) regardless.
+
+The top cell keeps the old readout's ammo strip and teal glow, but they
+only render now while the item actually sitting in that cell is the
+genuinely equipped weapon (`item.slot === equipped.slot`, the same check
+every other cell already used for its own equipped-ring highlight) — a gun
+sitting there unequipped just looks like an idle wheel cell, the same as an
+idle melee/handheld cell does. `wheelCategories.isWeaponItem` accepts it:
+any `weapon_`-prefixed item that isn't already claimed by the melee or
+handheld lists (both of those are also `weapon_`-prefixed, e.g.
+`weapon_bat`, `weapon_flashlight` — a bare prefix check can't tell them
+apart from a real firearm).
 
 Five cell positions were measured off reference art; the other two mirror
 the melee/handheld row across the pistol/fist row — same x (38.33% /

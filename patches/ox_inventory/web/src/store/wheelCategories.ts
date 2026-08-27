@@ -59,3 +59,11 @@ const MEDICAL_ITEMS = new Set([
 export const isMeleeItem = (name: string): boolean => MELEE_ITEMS.has(name);
 export const isHandheldItem = (name: string): boolean => HANDHELD_ITEMS.has(name);
 export const isMedicalItem = (name: string): boolean => MEDICAL_ITEMS.has(name);
+
+// Every melee AND handheld item is also `weapon_`-prefixed (weapon_bat,
+// weapon_flashlight, ...), so a bare prefix check can't tell a firearm apart
+// from those. This is what the top wheel cell restricts to -- excludes
+// anything already claimed by the melee/handheld cells so the same item
+// can't visually belong in two ring slots at once.
+export const isWeaponItem = (name: string): boolean =>
+  name.toLowerCase().startsWith('weapon_') && !isMeleeItem(name) && !isHandheldItem(name);
