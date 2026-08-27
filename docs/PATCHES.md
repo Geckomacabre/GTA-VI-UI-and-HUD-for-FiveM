@@ -191,31 +191,42 @@ networking logic is touched — `WeaponWheel.tsx` wraps the same
 alt+click use all keep working.
 
 The hotbar is a curved wheel (`WeaponWheel.tsx`) of 8 cells mapped onto
-inventory slots 1-6, not an evenly-spaced circle — five cell positions were
-measured off reference art; the other two were originally guessed and landed
-well outside that ring entirely (their offset from centre was ~2x the fitted
-radius). They've been replaced with positions solved from the ellipse the
-five measured points define (centre 50.33%/47.33%, radii 15.26%/26.34%), at
-±45° either side of the empty top slot — still worth checking against real
-reference art rather than trusting pixel-for-pixel, same as before, but
-they're at least on the ring now. Cells have **roles**: `free` (any item,
-the original behaviour), `melee`, `handheld`, and a `fist` cell that isn't
-backed by an inventory slot at all — it's a fixed button that always shows
-the fist icon (`web/images/fist.png`) and holsters whatever's equipped
-(`onDisarm.ts`). `wheelCategories.ts` defines what counts as melee/handheld/
-medical. The bottom-left quickslots are now medical-items-only (2 slots).
+inventory slots 1-6, not an evenly-spaced circle. Fixed layout: top is
+always the equipped-weapon readout (not a ring cell), middle-right is
+always `fist`, 8 o'clock is always `melee`, 4 o'clock is always `handheld`,
+and the remaining four cells are `free` (any item, including weapons).
+Being a `free` cell — same as any inventory slot — the wheel is only gated
+on a *keybind* for slots 1-5; slots 5 and 6 still accept drag-and-drop from
+the inventory and right-click/alt-click same as any other slot, there's
+just no default number key wired to them.
 
-`fist.png` is padded onto a 1000x1000 transparent canvas (fist content at
-85%/55% width/height) rather than the original 851x548 canvas with zero
+Five cell positions were measured off reference art; the other two mirror
+the melee/handheld row across the pistol/fist row — same x (38.33% /
+62.45%), and as far above the middle row (48.49%) as melee/handheld sit
+below it (63.61% − 48.49% = 15.12%, so 48.49% − 15.12% = 33.37%). Still
+worth checking against a real screen rather than trusting pixel-for-pixel,
+same as the five measured ones.
+
+`fist.png` is padded onto a 1418x1418 transparent canvas (fist content at
+60%/38.6% width/height) rather than the original 851x548 canvas with zero
 internal margin — every other item icon has a several-percent transparent
-border baked in, and the fist rendered oversized next to them at matching
-`background-size` until it had the same kind of margin.
+border baked in, and the fist read oversized next to them at matching
+`background-size` until it had a comparable margin. If it's still visibly
+off after this, check for an NUI image cache first — `fist.png` is loaded
+by a fixed path, not a content-hashed filename like the JS/CSS, so a client
+that already loaded the page once may be showing stale cached bytes even
+after the file on disk changes; a full reconnect clears it.
 
-There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`
-over a `setHonor` NUI message — see `store/honor.ts`. **This half isn't
-wired up yet**: `qbx_honor/client/main.lua`'s `qbx_honor:client:syncHonor`
-handler currently only seeds `vice_hud`, it never forwards to ox_inventory's
-NUI page, so the badge will never render until that's added.
+There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`.
+**This is wired up in `ox_inventory/client.lua` itself**, not in
+`qbx_honor` — FiveM only lets a resource `SendNUIMessage` its own page, so
+`qbx_honor` can't push to ox_inventory's NUI directly. Instead
+`ox_inventory/client.lua` listens for the same `qbx_honor:client:syncHonor`
+event `qbx_honor` fires for `vice_hud`'s toast, reads
+`exports.qbx_honor:GetHonor()` / `GetBadgeTier()`, and relays a `setHonor`
+NUI message — guarded so a server without `qbx_honor` just never shows the
+badge. Seeded on the NUI's `uiLoaded` callback, not just on change, so it
+has a value the moment the page opens. See `client.lua` below.
 
 Source files (for reference / future edits — editing these does nothing on
 their own, ox_inventory's web UI is a Vite/React build):
@@ -241,11 +252,63 @@ New image asset the fist cell needs (already covered by ox_inventory's own
 patches/ox_inventory/web/images/fist.png
 ```
 
+`client.lua` (the Lua entry point, not the web UI) also carries two small
+hand-edits, not shipped as a full file here since the rest of it is
+unmodified stock `ox_inventory` (2000+ lines). Add these two blocks
+yourself — no manifest edit needed, `client.lua` is already declared.
+
+Near the top, after `local currentWeapon`:
+
+```lua
+-- Tell the NUI which slot is actually in hand.
+--
+-- Nothing used to send this, so the weapon wheel had no way to know what was
+-- equipped -- it fell back to "the first weapon in the inventory" and labelled
+-- that IN HAND whether it was or not. Hooking the event instead of each call
+-- site covers Weapon.Equip, Weapon.Disarm and the bare TriggerEvent()s further
+-- down this file in one place.
+AddEventHandler('ox_inventory:currentWeapon', function(weapon)
+    SendNUIMessage({
+        action = 'setCurrentWeapon',
+        data = weapon and weapon.slot or false,
+    })
+end)
+
+-- Honor badge (bottom-right of the wheel, see LeftInventory.tsx / store/honor.ts).
+--
+-- qbx_honor owns the value; this resource only relays it. Guarded so a server
+-- without qbx_honor installed just never shows the badge instead of erroring.
+local function pushHonor()
+	if GetResourceState('qbx_honor') ~= 'started' then return end
+
+	local ok, value = pcall(exports.qbx_honor.GetHonor, exports.qbx_honor)
+	if not ok or type(value) ~= 'number' then return end
+
+	local _, tier = pcall(exports.qbx_honor.GetBadgeTier, exports.qbx_honor, value)
+
+	SendNUIMessage({ action = 'setHonor', data = { value = value, tier = tier } })
+end
+
+AddEventHandler('qbx_honor:client:syncHonor', pushHonor)
+```
+
+In the existing `RegisterNUICallback('uiLoaded', ...)` handler, add the
+`pushHonor()` call (seeds the badge the moment the page loads, not just on
+the next honor change):
+
+```lua
+RegisterNUICallback('uiLoaded', function(_, cb)
+	client.uiLoaded = true
+	pushHonor()
+	cb(1)
+end)
+```
+
 Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-070efbd5.js
+patches/ox_inventory/web/build/assets/index-6ad2a2f4.js
 patches/ox_inventory/web/build/assets/index-613ba0e8.css
 patches/ox_inventory/web/build/index.html
 ```
