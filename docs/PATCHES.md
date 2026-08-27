@@ -185,12 +185,26 @@ runtime, always after this one):
 
 This one is a separate, unrelated visual — a GTA VI-inspired reskin of both
 the F2 inventory screen and the in-world hotbar, not part of the vice_hud
-glass/theme system above. The hotbar becomes a curved five-slot weapon wheel
-(`WeaponWheel.tsx`) pinned to inventory slots 1-5, positioned and sized off
-measured reference art rather than an evenly-spaced circle. It's
-presentation-only: no drag/drop, slot, or networking logic is touched —
-`WeaponWheel.tsx` wraps the same `InventorySlot` components, so dnd,
-right-click, ctrl+click drop, and alt+click use all keep working.
+glass/theme system above. It's presentation-only: no drag/drop, slot, or
+networking logic is touched — `WeaponWheel.tsx` wraps the same
+`InventorySlot` components, so dnd, right-click, ctrl+click drop, and
+alt+click use all keep working.
+
+The hotbar is a curved wheel (`WeaponWheel.tsx`) of 8 cells mapped onto
+inventory slots 1-6, not an evenly-spaced circle — each cell's position was
+measured off reference art (two of the eight are flagged in the source as
+unverified placements). Cells now have **roles**: `free` (any item, the
+original behaviour), `melee`, `handheld`, and a `fist` cell that isn't
+backed by an inventory slot at all — it's a fixed button that always shows
+the fist icon (`web/images/fist.png`) and holsters whatever's equipped
+(`onDisarm.ts`). `wheelCategories.ts` defines what counts as melee/handheld/
+medical. The bottom-left quickslots are now medical-items-only (2 slots).
+
+There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`
+over a `setHonor` NUI message — see `store/honor.ts`. **This half isn't
+wired up yet**: `qbx_honor/client/main.lua`'s `qbx_honor:client:syncHonor`
+handler currently only seeds `vice_hud`, it never forwards to ox_inventory's
+NUI page, so the badge will never render until that's added.
 
 Source files (for reference / future edits — editing these does nothing on
 their own, ox_inventory's web UI is a Vite/React build):
@@ -201,16 +215,27 @@ patches/ox_inventory/web/src/index.scss
 patches/ox_inventory/web/src/components/inventory/InventoryTabs.tsx
 patches/ox_inventory/web/src/components/inventory/LeftInventory.tsx
 patches/ox_inventory/web/src/components/inventory/WeaponWheel.tsx
+patches/ox_inventory/web/src/components/inventory/InventorySlot.tsx
 patches/ox_inventory/web/src/components/inventory/PromptGlyph.tsx
 patches/ox_inventory/web/src/components/inventory/PlayerStatusBars.tsx
+patches/ox_inventory/web/src/dnd/onDisarm.ts
+patches/ox_inventory/web/src/store/honor.ts
+patches/ox_inventory/web/src/store/wheelCategories.ts
+```
+
+New image asset the fist cell needs (already covered by ox_inventory's own
+`'web/images/*.png'` manifest glob, no manifest edit needed):
+
+```
+patches/ox_inventory/web/images/fist.png
 ```
 
 Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-4d9c5d34.js
-patches/ox_inventory/web/build/assets/index-ed184ded.css
+patches/ox_inventory/web/build/assets/index-dfcb990c.js
+patches/ox_inventory/web/build/assets/index-bcccb513.css
 patches/ox_inventory/web/build/index.html
 ```
 

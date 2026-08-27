@@ -6,6 +6,8 @@ import { Items } from '../../store/items';
 import { Locale } from '../../store/locale';
 import { useCurrentWeaponSlot } from '../../store/currentWeapon';
 import { onUse } from '../../dnd/onUse';
+import { onDisarm } from '../../dnd/onDisarm';
+import { isMeleeItem, isHandheldItem } from '../../store/wheelCategories';
 
 /*
  * GTA6-style weapon wheel.
@@ -22,33 +24,47 @@ import { onUse } from '../../dnd/onUse';
  * right-click context menu, ctrl+click drop, alt+click use and the hover
  * tooltip all keep working untouched. The teal glow, ammo strip and badges are
  * pointer-events:none overlays painted on top of the slot.
+ *
+ * Cell roles:
+ *  - 'free'     any item, including weapons — the original behaviour.
+ *  - 'melee'    only accepts items in wheelCategories.isMeleeItem (~8 o'clock).
+ *  - 'handheld' only accepts items in wheelCategories.isHandheldItem (~4 o'clock,
+ *               flashlight/binoculars/similar tools).
+ *  - 'fist'     not backed by an inventory slot at all — a fixed button that
+ *               always shows the fist icon and holsters whatever is equipped
+ *               (middle-right / 3 o'clock).
+ * The "top" position isn't a ring cell — it's the separate equipped-weapon
+ * readout below, which already always mirrors what's actually in your hand.
  */
+type WheelRole = 'free' | 'melee' | 'handheld' | 'fist';
 
-// Deliberately *not* evenly spaced on a circle — these are the measured
-// centres from the reference art.
-const WHEEL_POSITIONS: Array<React.CSSProperties> = [
-  { left: '35.08%', top: '48.49%' },
-  { left: '65.5%', top: '48.49%' },
-  { left: '38.33%', top: '63.61%' },
-  { left: '62.45%', top: '63.61%' },
-  { left: '50.33%', top: '73.67%' },
+interface WheelCell {
+  role: WheelRole;
+  position: React.CSSProperties;
+}
+
+// Deliberately *not* evenly spaced on a circle — five of these are the
+// measured centres from the reference art. The two flagged below were added
+// to reach 8 total wheel slots and were NOT measured off reference art —
+// check them against a real screen before trusting them pixel-for-pixel.
+const WHEEL_CELLS: WheelCell[] = [
+  { role: 'free', position: { left: '35.08%', top: '48.49%' } }, // ~10 o'clock
+  { role: 'fist', position: { left: '65.5%', top: '48.49%' } }, // 3 o'clock — always fist
+  { role: 'melee', position: { left: '38.33%', top: '63.61%' } }, // ~8 o'clock
+  { role: 'handheld', position: { left: '62.45%', top: '63.61%' } }, // ~4 o'clock
+  { role: 'free', position: { left: '50.33%', top: '73.67%' } }, // 6 o'clock
+  { role: 'free', position: { left: '20%', top: '38%' } }, // ~10:30 — UNVERIFIED placement
+  { role: 'free', position: { left: '80.5%', top: '38%' } }, // ~1:30 — UNVERIFIED placement
 ];
 
-/*
- * The wheel is PINNED to inventory slots 1-5, in order.
- *
- * It used to list whatever weapons you happened to own, in inventory order,
- * which meant a given gun moved around the ring as you picked things up and
- * dropped them. A wheel is only faster than a menu because your hand learns
- * where things are, so that undermined the whole point — and it meant the ring
- * and the 1-5 hotkeys could disagree about what "slot 3" was.
- *
- * Pinning them makes the two the same thing: cell N *is* hotbar slot N, the
- * number keys and the wheel always agree, and choosing what is on the wheel is
- * just dragging items into the first five slots.
- */
-export const WHEEL_SLOTS = [1, 2, 3, 4, 5];
-export const MAX_WHEEL_SLOTS = WHEEL_POSITIONS.length;
+// Maps each non-fist cell, in order, onto inventory slots 1-6. The fist cell
+// has no entry (`null`) because it isn't backed by an inventory slot.
+let nextWheelSlot = 0;
+const CELL_SLOTS: Array<number | null> = WHEEL_CELLS.map((cell) =>
+  cell.role === 'fist' ? null : ++nextWheelSlot
+);
+
+export const WHEEL_SLOTS = CELL_SLOTS.filter((slot): slot is number => slot !== null);
 
 const getLabel = (slot: SlotWithItem) => slot.metadata?.label || Items[slot.name]?.label || slot.name;
 
@@ -89,6 +105,11 @@ const getCategory = (slot: SlotWithItem | undefined, isEquipped: boolean): strin
   return `${slot.count}x`;
 };
 
+const ACCEPTS_BY_ROLE: Partial<Record<WheelRole, (name: string) => boolean>> = {
+  melee: isMeleeItem,
+  handheld: isHandheldItem,
+};
+
 interface Props {
   inventory: Inventory;
 }
@@ -96,14 +117,14 @@ interface Props {
 const WeaponWheel: React.FC<Props> = ({ inventory }) => {
   const currentWeaponSlot = useCurrentWeaponSlot();
 
-  // Slots 1-5 exactly, looked up by slot NUMBER rather than by array position:
-  // an inventory array is not guaranteed to be dense or ordered, and indexing
-  // it blindly is how a wheel ends up showing the wrong item under the right
-  // key.
-  const wheelItems = useMemo(() => {
-    const bySlot = new Map<number, Slot>();
-    for (const item of inventory.items) bySlot.set(item.slot, item);
-    return WHEEL_SLOTS.map((slot) => bySlot.get(slot));
+  // Real wheel slots only (fist excluded), looked up by slot NUMBER rather
+  // than by array position: an inventory array is not guaranteed to be dense
+  // or ordered, and indexing it blindly is how a wheel ends up showing the
+  // wrong item under the right key.
+  const bySlot = useMemo(() => {
+    const map = new Map<number, Slot>();
+    for (const item of inventory.items) map.set(item.slot, item);
+    return map;
   }, [inventory.items]);
 
   /*
@@ -130,19 +151,26 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
   const onLeave = useCallback(() => setHovered(null), []);
 
   /*
-   * Click a cell to equip it.
+   * Click a cell to equip it (or, for the fist cell, to holster whatever's
+   * equipped).
    *
    * `onUse` is fetchNui('useItem', slot) -> useSlot() in Lua: the same call
-   * the 1-5 hotkeys and alt+click already make, so this inherits every check
-   * and animation they get rather than being a second, divergent equip path.
+   * the 1-5(-7) hotkeys and alt+click already make, so this inherits every
+   * check and animation they get rather than being a second, divergent equip
+   * path. This is also what makes it possible to equip a wheel slot that has
+   * no keybind at all — clicking has never depended on one.
    *
    * ctrl and alt are left alone deliberately — InventorySlot's own handler
    * already binds those to drop and use, and firing here as well would run
    * both on one click (ctrl+click would drop the item AND try to equip it).
    */
   const onCellClick = useCallback(
-    (item: Slot | undefined) => (event: React.MouseEvent<HTMLDivElement>) => {
+    (role: WheelRole, item: Slot | undefined) => (event: React.MouseEvent<HTMLDivElement>) => {
       if (event.ctrlKey || event.altKey) return;
+      if (role === 'fist') {
+        onDisarm();
+        return;
+      }
       if (!item || !isSlotWithItem(item)) return;
       onUse(item);
     },
@@ -168,20 +196,27 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
 
   // Wheel cells can be empty (they double as drop targets), so the caption only
   // reads a hovered cell when it actually holds something — hovering an empty
-  // cell falls back to the equipped weapon rather than blanking out.
-  const hoveredSlot = hovered !== null ? wheelItems[hovered] : undefined;
-  const captionSlot = hoveredSlot && isSlotWithItem(hoveredSlot) ? hoveredSlot : equipped;
-  const captionIsEquipped = !!captionSlot && !!equipped && captionSlot.slot === equipped.slot;
+  // cell falls back to the equipped weapon rather than blanking out. Hovering
+  // the fist cell always reads UNARMED, since it never holds an item.
+  const hoveredCell = hovered !== null ? WHEEL_CELLS[hovered] : undefined;
+  const hoveredSlotNumber = hovered !== null ? CELL_SLOTS[hovered] : null;
+  const hoveredItem = hoveredSlotNumber !== null ? bySlot.get(hoveredSlotNumber) : undefined;
+  const hoveringFist = hoveredCell?.role === 'fist';
+
+  const captionSlot = !hoveringFist && hoveredItem && isSlotWithItem(hoveredItem) ? hoveredItem : equipped;
+  const captionIsEquipped = !hoveringFist && !!captionSlot && !!equipped && captionSlot.slot === equipped.slot;
+  const captionIsUnarmed = hoveringFist || (!captionSlot && currentWeaponSlot == null);
 
   // Takes a plain `Slot`, not `SlotWithItem`: an EMPTY slot still has to render
   // as a real InventorySlot so react-dnd registers it as a drop target. This is
   // the same thing InventoryGrid does for its empty cells.
-  const renderSlot = (item: Slot) => (
+  const renderSlot = (item: Slot, accepts?: (name: string) => boolean) => (
     <InventorySlot
       item={item}
       inventoryId={inventory.id}
       inventoryType={inventory.type}
       inventoryGroups={inventory.groups}
+      accepts={accepts}
     />
   );
 
@@ -191,10 +226,12 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
 
       {/*
         The equipped card is a READ-ONLY readout of what is in your hands, not a
-        sixth wheel slot. It used to render an InventorySlot for whatever
-        happened to be first in the inventory, which made it both a drop target
-        and a lie. Slots 1-5 below are where things are put; this shows the
-        result of picking one.
+        wheel cell. It used to render an InventorySlot for whatever happened to
+        be first in the inventory, which made it both a drop target and a lie.
+        Ring cells below are where things are put; this shows the result of
+        picking one. It doubles as the wheel's "top = weapon" position: nothing
+        but a weapon ever produces a meaningful ammo readout here, and melee/
+        handheld items each have their own dedicated ring cell instead.
       */}
       <div className="gta6-equipped-slot">
         {equipped && (
@@ -213,25 +250,34 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
         {equipped && hasBadge(equipped) && <span className="gta6-slot-badge" />}
       </div>
 
-      {WHEEL_POSITIONS.map((position, index) => {
-        const item = wheelItems[index];
-        const isEquipped = !!item && !!equipped && item.slot === equipped.slot;
+      {WHEEL_CELLS.map((cell, index) => {
+        const slotNumber = CELL_SLOTS[index];
+        const item = slotNumber !== null ? bySlot.get(slotNumber) : undefined;
+        const isEquipped = cell.role !== 'fist' && !!item && !!equipped && item.slot === equipped.slot;
+        const isFistEquipped = cell.role === 'fist' && currentWeaponSlot == null;
 
         return (
           <div
-            key={`gta6-wheel-${inventory.id}-${WHEEL_SLOTS[index]}`}
+            key={`gta6-wheel-${inventory.id}-${cell.role}-${slotNumber ?? 'fist'}`}
             className={
               'gta6-wheel-slot' +
+              ` gta6-wheel-slot-${cell.role}` +
               (hovered === index ? ' gta6-wheel-slot-selected' : '') +
-              (isEquipped ? ' gta6-wheel-slot-equipped' : '')
+              (isEquipped || isFistEquipped ? ' gta6-wheel-slot-equipped' : '')
             }
-            style={position}
+            style={cell.position}
             onMouseEnter={onEnter(index)}
             onMouseLeave={onLeave}
-            onClick={onCellClick(item)}
+            onClick={onCellClick(cell.role, item)}
           >
-            {item && renderSlot(item)}
-            {item && isSlotWithItem(item) && hasBadge(item) && <span className="gta6-slot-badge" />}
+            {cell.role === 'fist' ? (
+              <div className="gta6-wheel-fist" />
+            ) : (
+              <>
+                {item && renderSlot(item, ACCEPTS_BY_ROLE[cell.role])}
+                {item && isSlotWithItem(item) && hasBadge(item) && <span className="gta6-slot-badge" />}
+              </>
+            )}
           </div>
         );
       })}
@@ -239,9 +285,11 @@ const WeaponWheel: React.FC<Props> = ({ inventory }) => {
       {/* Text only — there is deliberately no slot box behind the caption. */}
       <div className="gta6-wheel-caption">
         <span className="gta6-wheel-caption-name">
-          {captionSlot ? getLabel(captionSlot) : Locale.ui_unarmed || 'UNARMED'}
+          {captionIsUnarmed ? Locale.ui_unarmed || 'UNARMED' : captionSlot ? getLabel(captionSlot) : ''}
         </span>
-        <span className="gta6-wheel-caption-sub">{getCategory(captionSlot, captionIsEquipped)}</span>
+        <span className="gta6-wheel-caption-sub">
+          {captionIsUnarmed ? '' : getCategory(captionSlot, captionIsEquipped)}
+        </span>
       </div>
     </>
   );

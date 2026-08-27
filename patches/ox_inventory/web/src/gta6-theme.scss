@@ -321,6 +321,25 @@ $gta6-ws-h: ph(10.68);
   height: $gta6-ws-h;
 }
 
+// Fixed fist cell (middle-right / 3 o'clock) — not an <InventorySlot>, just an
+// icon painted the same size/position as the other ring slots' art.
+.gta6-wheel-fist {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: ph(2) calc((#{$gta6-ws-w} - #{$gta6-art-w}) / 2)
+    calc(#{$gta6-ws-h} - #{ph(2)} - (#{$gta6-ws-h} * 0.62));
+  // nui:// absolute path, same convention every item icon uses via getItemUrl()
+  // (see init.lua's `inventory:imagepath` default) — a plain relative path
+  // here would resolve against wherever Vite happens to emit the CSS file,
+  // not against web/images/ where the PNGs actually live.
+  background-image: url('nui://ox_inventory/web/images/fist.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-origin: content-box;
+  background-size: contain;
+}
+
 .gta6-wheel-slot-selected {
   background: var(--gta6-slot-selected-bg);
   border: pw(0.14) solid var(--gta6-slot-selected-border);
@@ -445,6 +464,43 @@ $gta6-qs-h: ph(12.46);
   height: pw(0.55);
   border-radius: 50%;
   background: var(--gta6-stamina);
+}
+
+// ---------------------------------------------------------------------------
+// Honor standing (bottom-right) — mirrors the quickslot footer's proportions,
+// just a standalone badge rather than a slot footer.
+// ---------------------------------------------------------------------------
+.gta6-honor {
+  position: absolute;
+  right: 1.75%;
+  top: 88.6%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: ph(3.2);
+  min-width: pw(4);
+  padding: 0 pw(1.2);
+  border-radius: 3px;
+  background: var(--gta6-footer-bg);
+  border: 1px solid var(--gta6-slot-border);
+  pointer-events: none;
+}
+
+.gta6-honor-value {
+  font-size: pw(1.1);
+  font-weight: 700;
+  color: var(--gta6-text);
+  line-height: 1;
+}
+
+// Tint the badge toward the reached tier, same colours qbx_honor already uses
+// for its own toast (see GetBadgeTier in qbx_honor/client/main.lua).
+.gta6-honor-angel .gta6-honor-value {
+  color: #ffe9a8;
+}
+
+.gta6-honor-devil .gta6-honor-value {
+  color: #ff6b6b;
 }
 
 // ---------------------------------------------------------------------------

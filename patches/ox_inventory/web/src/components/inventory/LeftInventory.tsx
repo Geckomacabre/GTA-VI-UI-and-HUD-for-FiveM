@@ -8,10 +8,11 @@ import PlayerStatusBars from './PlayerStatusBars';
 import PromptGlyph from './PromptGlyph';
 import { useAppSelector } from '../../store';
 import { selectLeftInventory } from '../../store/inventory';
-import { Items } from '../../store/items';
 import { isSlotWithItem } from '../../helpers';
 import { usePromptGlyphs } from '../../store/promptGlyphs';
 import { SlotWithItem } from '../../typings';
+import { isMedicalItem } from '../../store/wheelCategories';
+import { useHonor } from '../../store/honor';
 
 const MAX_QUICKSLOTS = 2;
 
@@ -21,6 +22,7 @@ const LeftInventory: React.FC = () => {
   // wheel, F2 opens the grid. See store/activeTab.ts.
   const activeTab = useActiveTab();
   const glyphs = usePromptGlyphs();
+  const { honor, tier } = useHonor();
 
   const onWeapons = activeTab === 'weapons';
 
@@ -31,26 +33,30 @@ const LeftInventory: React.FC = () => {
    *
    * The grid deliberately shows the WHOLE inventory now, weapons included. It
    * used to hide them, which made it impossible to put a gun on the wheel:
-   * the wheel is inventory slots 1-5, and the only way to fill those is to
+   * the wheel is inventory slots 1-6, and the only way to fill those is to
    * drag something into them from the grid. Hiding weapons there meant the one
    * thing the wheel is for was the one thing you could not drag onto it.
    */
 
-  // The wheel owns slots 1-5, so the quick-use slots have to live past them or
-  // the two would fight over the same items.
+  // The wheel owns slots 1-6 (see WHEEL_SLOTS in WeaponWheel.tsx — the fist
+  // cell isn't backed by a slot at all), so the quick-use slots have to live
+  // past them or the two would fight over the same items.
   const wheelSlotIds = useMemo(() => new Set(WHEEL_SLOTS), []);
 
-  // Real consumable quick-slots (bottom-left), driven by the `usable` flag on
-  // the item's static definition — not fabricated.
+  // Medical-only quick-slots (bottom-left) — see wheelCategories.ts for the
+  // curated item list this is restricted to. It used to accept any `usable`
+  // item (food, drinks, drugs, bandages alike), which meant a burger could
+  // bump a bandage out of the strip; medical is the one category this corner
+  // is for.
   /*
    * The quick-use slots ALWAYS render, filled or not — the reference shows two
-   * slots with the empty one reading "0" rather than disappearing. Usable items
-   * fill them first; any remaining slots are padded with real EMPTY inventory
-   * slots so they stay valid drop targets.
+   * slots with the empty one reading "0" rather than disappearing. Medical
+   * items fill them first; any remaining slots are padded with real EMPTY
+   * inventory slots so they stay valid drop targets.
    */
   const quickItems = useMemo(() => {
     const usable = leftInventory.items
-      .filter((item): item is SlotWithItem => isSlotWithItem(item) && !!Items[item.name]?.usable)
+      .filter((item): item is SlotWithItem => isSlotWithItem(item) && isMedicalItem(item.name))
       .filter((item) => !wheelSlotIds.has(item.slot))
       .slice(0, MAX_QUICKSLOTS);
 
@@ -94,6 +100,7 @@ const LeftInventory: React.FC = () => {
               inventoryId={leftInventory.id}
               inventoryType={leftInventory.type}
               inventoryGroups={leftInventory.groups}
+              accepts={isMedicalItem}
             />
             <div className="gta6-quickslot-footer">
               <span className="gta6-quickslot-count">{isSlotWithItem(item) ? item.count : 0}</span>
@@ -102,6 +109,17 @@ const LeftInventory: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/*
+        Honor standing (bottom-right), fed by qbx_honor via client.lua's
+        'setHonor' NUI message — see store/honor.ts. Renders nothing until
+        qbx_honor actually reports a value, rather than showing a fake 0.
+      */}
+      {honor !== null && (
+        <div className={'gta6-honor' + (tier ? ` gta6-honor-${tier}` : '')}>
+          <span className="gta6-honor-value">{honor}</span>
+        </div>
+      )}
 
       {/* Live keybind prompts — labels come from client.lua's setPromptGlyphs. */}
       <div className="gta6-prompt gta6-prompt-primary">
