@@ -11,7 +11,16 @@ CyberLeek's videos.
 
 ## Screenshots
 
-_TBD — screenshots to be added here._
+| | |
+| --- | --- |
+| ![vice_hud status bars](docs/screenshots/vice_hud-status-bars.png) | ![vice_hud stamina/oxygen](docs/screenshots/vice_hud-stamina-oxygen.png) |
+| Health / stamina / oxygen bars | Stamina + oxygen, anti-flicker auto-hide |
+| ![vice_hud day drive panel](docs/screenshots/vice_hud-day-drive-panel.png) | ![vice_hud night drive panel](docs/screenshots/vice_hud-night-drive-panel.png) |
+| Vehicle panel, minimap, speed limit sign (day) | Vehicle panel + turn-by-turn (night) |
+| ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
+| `um_gigs` — Ryde Me driver profile | Driver profile, close up |
+
+<img src="docs/screenshots/vice_hud-nav-panel-crop.png" width="260" alt="vice_hud nav panel crop"> <img src="docs/screenshots/rydeme-wordmark-crop.png" width="260" alt="Ryde Me wordmark crop">
 
 ## What's in here
 
