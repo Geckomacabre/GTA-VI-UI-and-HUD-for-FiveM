@@ -647,6 +647,13 @@ Config.RiderMode.npc = {
     approachSpeed = 14.0,   -- m/s driving to collect you
     dropoffSpeed = 18.0,    -- m/s driving to your destination
     driveStyle = 786603,    -- normal traffic-obeying driving style
+    -- What the driver switches to once told to speed up. Avoids vehicles,
+    -- peds, and objects but drives through speed zones and red lights --
+    -- verified against https://vespura.com/fivem/drivingstyle/ (the same
+    -- source [night]/night_ers's npcbackup-config.lua cites for its own
+    -- "runs red lights" style) rather than guessed, since driveStyle is an
+    -- opaque bitmask and a wrong value silently does nothing.
+    rushedDriveStyle = 2900796,
     pickupRadius = 6.0,     -- how close it has to get before you are told to get in
     arriveRadius = 8.0,     -- how close to the destination counts as arrived
     -- Give up waiting on the pathing at this point either way -- GTA's vehicle
@@ -654,6 +661,12 @@ Config.RiderMode.npc = {
     -- end is worse than one that ends early having still gotten you most of
     -- the way there.
     timeoutSeconds = 100,
+    -- How long one drive-to-you attempt gets before it is re-issued. A car
+    -- that reports its task "finished" (or just times out) without actually
+    -- reaching pickupRadius gets re-routed within the overall timeoutSeconds
+    -- budget, rather than the ride quietly boarding you into a car that is
+    -- still blocks away.
+    attemptSeconds = 35,
 }
 
 -- -----------------------------------------------------------------------------

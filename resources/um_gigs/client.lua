@@ -1176,27 +1176,63 @@ local function runNpcRide(dest, destLabel, fare)
     npcRide = { phase = 'approach', driverVeh = veh, dest = dest, destLabel = destLabel, speedBoost = false }
 
     -- ---- leg one: the car comes to you -------------------------------------
-    local speed, boosted = cfg.approachSpeed, false
-    local deadline = GetGameTimer() + cfg.timeoutSeconds * 1000
-    driveAndPark(driver, veh, playerPos, speed, cfg.driveStyle)
+    -- Driven in short attempts rather than one long wait: GTA's vehicle AI
+    -- occasionally reports a drive task "finished" (or just runs out the
+    -- clock) while the car is stuck on scenery or boxed in by traffic, still
+    -- nowhere near pickupRadius. Falling through to TaskEnterVehicle from
+    -- there is what used to warp the player across the map into a car that
+    -- never actually arrived -- so this only ever boards you once the car has
+    -- genuinely pulled up, re-routing it within the overall time budget
+    -- otherwise.
+    local speed, style, boosted = cfg.approachSpeed, cfg.driveStyle, false
+    local overallDeadline = GetGameTimer() + cfg.timeoutSeconds * 1000
+    local arrived = false
 
     lib.showTextUI('Your ride is on the way...')
-    while DoesEntityExist(veh)
-        and not sequenceFinished(driver)
-        and #(GetEntityCoords(veh) - GetEntityCoords(cache.ped)) > cfg.pickupRadius
-        and GetGameTimer() < deadline
-    do
-        if npcRide.speedBoost and not boosted then
-            boosted = true
-            speed = speed * 1.6
-            SetDriverAggressiveness(driver, 1.0)
-            driveAndPark(driver, veh, playerPos, speed, cfg.driveStyle)
+
+    while DoesEntityExist(veh) and not arrived and GetGameTimer() < overallDeadline do
+        driveAndPark(driver, veh, playerPos, speed, style)
+        local attemptDeadline = math.min(overallDeadline, GetGameTimer() + cfg.attemptSeconds * 1000)
+
+        while DoesEntityExist(veh)
+            and not sequenceFinished(driver)
+            and #(GetEntityCoords(veh) - GetEntityCoords(cache.ped)) > cfg.pickupRadius
+            and GetGameTimer() < attemptDeadline
+        do
+            if npcRide.speedBoost and not boosted then
+                boosted = true
+                speed = speed * 1.6
+                style = cfg.rushedDriveStyle
+                SetDriverAggressiveness(driver, 1.0)
+                driveAndPark(driver, veh, playerPos, speed, style)
+            end
+            Wait(250)
         end
-        Wait(250)
+
+        if DoesEntityExist(veh) and #(GetEntityCoords(veh) - GetEntityCoords(cache.ped)) <= cfg.pickupRadius then
+            arrived = true
+        end
     end
     lib.hideTextUI()
 
     if not DoesEntityExist(veh) then npcRide = nil; return end
+
+    if not arrived then
+        -- The car never actually made it. Boarding from here would mean
+        -- teleporting the player to wherever it got stuck, which is worse
+        -- than admitting the driver could not reach them -- refunded the same
+        -- way a failed spawn is, since neither is the player's fault.
+        lib.notify({
+            title = 'rydeme',
+            description = 'Your driver could not reach you. Refunding your fare.',
+            type = 'error',
+        })
+        TriggerServerEvent('um_gigs:server:npcRideFailed', fare)
+        npcRide = nil
+        DeleteEntity(veh)
+        DeleteEntity(driver)
+        return
+    end
 
     -- Hold the car at idle rather than clearing its task outright -- an empty
     -- task list on a ped "sitting in vehicle" is exactly what let ambient AI
@@ -1205,13 +1241,21 @@ local function runNpcRide(dest, destLabel, fare)
     TaskVehicleTempAction(driver, veh, 1, 1000000) -- 1: brake, held
     SetPedKeepTask(driver, true)
 
+    -- A short honk once it has actually pulled up -- the beat a real
+    -- rideshare driver gives you before you walk over, rather than the car
+    -- just sitting there mute.
+    StartVehicleHorn(veh, 350, GetHashKey('NORMAL'), false)
+
     -- ---- get in -------------------------------------------------------------
     -- Auto-walk-and-board, the same idea um_beg uses for a car that pulls up
     -- to give: TaskEnterVehicle handles both the approach and the climb-in as
     -- one task, so ordering a ride does not also mean walking over and
     -- mashing E yourself. ClearPedTasks first for the same reason um_beg
     -- clears before its own TaskGoToEntity -- an idle/ambient task already on
-    -- the ped can otherwise block the new one from taking over.
+    -- the ped can otherwise block the new one from taking over. Only reached
+    -- once `arrived` is true, so the car is always genuinely within
+    -- pickupRadius here -- a short, natural walk-up rather than a long-range
+    -- warp.
     lib.showTextUI('Getting in...')
     ClearPedTasks(cache.ped)
     TaskEnterVehicle(cache.ped, veh, 20000, 0, 1.0, 1, 0)
@@ -1239,33 +1283,60 @@ local function runNpcRide(dest, destLabel, fare)
     npcRide.phase = 'boarded'
 
     -- ---- leg two: the car takes you there ------------------------------------
-    speed, boosted = cfg.dropoffSpeed, false
-    driveAndPark(driver, veh, dest, speed, cfg.driveStyle)
+    -- Same reasoning as leg one's approach: a drive task that reports
+    -- "finished" (or a deadline that just runs out) while the car is still
+    -- nowhere near the destination used to end the fare right there anyway,
+    -- putting you out wherever it got stuck instead of at the actual
+    -- drop-off. This re-routes it within the overall time budget until it
+    -- genuinely gets there, and says so honestly if it never does rather than
+    -- claiming "arrived" at the wrong spot.
+    speed, style, boosted = cfg.dropoffSpeed, cfg.driveStyle, false
+    local dropoffDeadline = GetGameTimer() + cfg.timeoutSeconds * 1000
+    local reachedDest = false
 
-    local arriveDeadline = GetGameTimer() + cfg.timeoutSeconds * 1000
     while DoesEntityExist(veh)
         and GetVehiclePedIsIn(cache.ped, false) == veh
-        and not sequenceFinished(driver)
-        and #(GetEntityCoords(veh) - dest) > cfg.arriveRadius
-        and GetGameTimer() < arriveDeadline
+        and not reachedDest
+        and GetGameTimer() < dropoffDeadline
         and not npcRide.endRequested
     do
-        if npcRide.speedBoost and not boosted then
-            boosted = true
-            speed = speed * 1.6
-            SetDriverAggressiveness(driver, 1.0)
-            driveAndPark(driver, veh, dest, speed, cfg.driveStyle)
-            lib.notify({ title = 'rydeme', description = 'Your driver puts their foot down.', type = 'inform' })
+        driveAndPark(driver, veh, dest, speed, style)
+        local attemptDeadline = math.min(dropoffDeadline, GetGameTimer() + cfg.attemptSeconds * 1000)
+
+        while DoesEntityExist(veh)
+            and GetVehiclePedIsIn(cache.ped, false) == veh
+            and not sequenceFinished(driver)
+            and #(GetEntityCoords(veh) - dest) > cfg.arriveRadius
+            and GetGameTimer() < attemptDeadline
+            and not npcRide.endRequested
+        do
+            if npcRide.speedBoost and not boosted then
+                boosted = true
+                speed = speed * 1.6
+                style = cfg.rushedDriveStyle
+                SetDriverAggressiveness(driver, 1.0)
+                driveAndPark(driver, veh, dest, speed, style)
+                lib.notify({ title = 'rydeme', description = 'Your driver puts their foot down.', type = 'inform' })
+            end
+            Wait(250)
         end
-        Wait(250)
+
+        if DoesEntityExist(veh) and #(GetEntityCoords(veh) - dest) <= cfg.arriveRadius then
+            reachedDest = true
+        end
     end
 
     if DoesEntityExist(veh) and GetVehiclePedIsIn(cache.ped, false) == veh then
-        lib.notify({
-            title = 'rydeme',
-            description = npcRide.endRequested and 'Fare ended early.' or 'You have arrived.',
-            type = 'success',
-        })
+        local message, kind
+        if npcRide.endRequested then
+            message, kind = 'Fare ended early.', 'inform'
+        elseif reachedDest then
+            message, kind = 'You have arrived.', 'success'
+        else
+            message, kind = 'Your driver got stuck short of the address -- this is as close as they could get.', 'inform'
+        end
+
+        lib.notify({ title = 'rydeme', description = message, type = kind })
         TaskLeaveVehicle(cache.ped, veh, 0)
     end
 
@@ -1496,11 +1567,18 @@ local function resolveDestPoint(x, y, fallbackLabel)
     SetFocusPosAndVel(x, y, 300.0, 0.0, 0.0, 0.0)
     RequestCollisionAtCoord(x, y, 300.0)
 
+    -- Polled every frame rather than every 100ms: the whole time this loop
+    -- runs, the world is streaming in around the TAPPED point instead of the
+    -- player, which is what makes their own surroundings visibly drop to LOD
+    -- models while this is up. Checking every tick instead of every 100ms
+    -- means the common case -- a point that resolves in a handful of frames
+    -- -- hands focus back almost immediately instead of always burning
+    -- however many whole 100ms steps it took to line up with a check.
     local found, z = false, 30.0
-    for _ = 1, 30 do
-        Wait(100)
+    local deadline = GetGameTimer() + 3000
+    while not found and GetGameTimer() < deadline do
         found, z = GetGroundZFor_3dCoord(x, y, 1000.0, false)
-        if found then break end
+        if not found then Wait(0) end
     end
 
     if not found then
