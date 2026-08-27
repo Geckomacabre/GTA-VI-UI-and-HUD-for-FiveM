@@ -450,6 +450,9 @@ html, body {
    a tint over a darkened area, not a bar of its own competing with the fill. */
 .scap.hunger { background: rgba(56, 30, 10, 0.62); border-left-color: rgba(240, 178, 92, 0.72); }
 .scap.thirst { background: rgba(12, 30, 52, 0.62); border-left-color: rgba(140, 196, 240, 0.72); }
+/* Flat passive-regen ceiling -- not a hunger/thirst state, so its own neutral
+   red rather than borrowing either tint and implying the wrong cause. */
+.scap.health { background: rgba(48, 12, 14, 0.62); border-left-color: rgba(224, 108, 108, 0.72); }
 
 #s-health  .sfill { background: #f6bcc6; }
 #s-stamina .sfill { background: #a3c6c4; }

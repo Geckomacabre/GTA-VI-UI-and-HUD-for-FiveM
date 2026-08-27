@@ -69,9 +69,12 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Status bars** | Health, armour, stamina. Auto-hide at full, with an anti-flicker hold |
+| **Health regen cap** | Two independent caps on passive healing — hunger/thirst (existing) and an optional flat ceiling (`Config.Needs.regenCeilingPct`) so regen alone never fully heals you; a deliberate heal (a consumable, a medic) still gets through either cap |
 | **Minimap** | Rounded corner mask with 14 baked radii, positioned and resized from the editor |
 | **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route — so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
+| **Waypoint colour** | Recolours the GPS cross and route line (`Config.Nav.waypointColour`) instead of GTA's default yellow |
 | **Wanted** | Star row, plus the "cops are searching for you" notice and its tells |
+| **Wanted search overlay** | Two rings on the native minimap while `fenix-police` is searching for a lost suspect — a tight ring at the last-known position and a lighter one tracking its live, growing search radius. Nothing draws without `fenix-police` running |
 | **Money** | Cash and bank, in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
 | **Police glow** | Directional edge lighting driven by real siren bearing and distance. Three modes, with a live editor |
@@ -90,6 +93,7 @@ on entering                          for the rest of the drive
 | **Optional** | `qbx_core` — the money readout and skill XP persistence |
 | **Optional** | `qbx_honor` — the honor system |
 | **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
+| **Optional** | `fenix-police` — feeds the wanted-search overlay (below); without it the HUD falls back to the plain wanted-star row |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
 the HUD simply leaves that piece out.

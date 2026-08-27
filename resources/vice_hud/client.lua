@@ -1840,9 +1840,17 @@ local function navFormatDist(m)
     return string.format('%d mi', math.floor(mi + 0.5))
 end
 
+local colouredWaypointBlip = nil -- blip handle we've already recoloured, so a fresh waypoint gets recoloured too
+
 local function getWaypointCoords()
     local blip = GetFirstBlipInfoId(8) -- 8 = the player's own waypoint cross
     if blip and blip ~= 0 and DoesBlipExist(blip) then
+        local wc = Config.Nav.waypointColour
+        if wc and blip ~= colouredWaypointBlip then
+            SetBlipColour(blip, 84) -- required so SetBlipSecondaryColour's RGB actually takes
+            SetBlipSecondaryColour(blip, wc.r, wc.g, wc.b) -- recolours the cross AND the route line
+            colouredWaypointBlip = blip
+        end
         return GetBlipInfoIdCoord(blip)
     end
     return nil
@@ -2379,25 +2387,40 @@ local function readNeeds()
     -- first few seconds of every session. One present and one missing is treated
     -- as the missing one being fine, so a half-loaded state caps on what it
     -- actually knows.
-    if type(hunger) ~= 'number' and type(thirst) ~= 'number' then return nil end
+    local haveNeeds = type(hunger) == 'number' or type(thirst) == 'number'
     hunger = type(hunger) == 'number' and math.max(0.0, math.min(100.0, hunger)) or 100.0
     thirst = type(thirst) == 'number' and math.max(0.0, math.min(100.0, thirst)) or 100.0
 
+    -- The hunger/thirst cap, or nil if neither statebag exists yet or neither
+    -- is low enough to bite.
+    local needsCap, needsCause = nil, nil
     local warnAt = cfg.warnAt or 25
-    if warnAt <= 0 then return nil end
+    if haveNeeds and warnAt > 0 then
+        -- Ties go to hunger so the tint is deterministic, rather than depending
+        -- on which of the two statebags happened to replicate last.
+        local low, cause = hunger, 'hunger'
+        if thirst < hunger then low, cause = thirst, 'thirst' end
 
-    -- Ties go to hunger so the tint is deterministic, rather than depending on
-    -- which of the two statebags happened to replicate last.
-    local low, cause = hunger, 'hunger'
-    if thirst < hunger then low, cause = thirst, 'thirst' end
+        if low < warnAt then
+            local floorPct = math.max(0.0, math.min(100.0, cfg.floorPct or 40))
+            local t = (warnAt - low) / warnAt      -- 0 at the threshold, 1 at empty
+            local rawCap = 100.0 - t * (100.0 - floorPct)
+            needsCap, needsCause = math.max(floorPct, math.min(100.0, rawCap)), cause
+        end
+    end
 
-    if low >= warnAt then return nil end
+    -- The flat regen ceiling applies whether or not hunger/thirst are involved
+    -- at all -- it is a separate cap, not one more input into the same cap.
+    -- Whichever of the two is lower is the one that actually limits healing.
+    local ceiling = cfg.regenCeilingPct
+    if ceiling and ceiling < 100.0 then
+        ceiling = math.max(0.0, math.min(100.0, ceiling))
+        if not needsCap or ceiling < needsCap then
+            return ceiling, 'health'
+        end
+    end
 
-    local floorPct = math.max(0.0, math.min(100.0, cfg.floorPct or 40))
-    local t = (warnAt - low) / warnAt          -- 0 at the threshold, 1 at empty
-    local cap = 100.0 - t * (100.0 - floorPct)
-
-    return math.max(floorPct, math.min(100.0, cap)), cause
+    return needsCap, needsCause
 end
 
 -- What health settled at last tick, so a gain can be told from a loss. nil means
@@ -2549,6 +2572,80 @@ local function copsCanSeeMe(ped)
     return false
 end
 local lastCash = nil
+
+-------------------------------------------------------------------------------
+-- Police search-radius overlay (fed by fenix-police's contact model)
+-------------------------------------------------------------------------------
+-- Two AddBlipForRadius rings on the native minimap: an inner one at the fixed
+-- "crime origin" size and an outer one tracking fenix-police's live, growing
+-- search radius. Both are removed the moment fenix-police says contact is
+-- regained (searchRadius drops to 0) or the player isn't wanted at all.
+local searchInnerBlip, searchOuterBlip = nil, nil
+local searchOuterRadius = nil -- radius the current outer blip was actually built with
+
+local function clearSearchBlips()
+    if searchInnerBlip then RemoveBlip(searchInnerBlip); searchInnerBlip = nil end
+    if searchOuterBlip then RemoveBlip(searchOuterBlip); searchOuterBlip = nil end
+    searchOuterRadius = nil
+end
+
+CreateThread(function()
+    local cfgPS = Config.PoliceSearch
+    if not cfgPS or not cfgPS.enable then return end
+
+    local bounds -- { start, max }, fetched once from fenix-police and cached
+
+    while true do
+        Wait(cfgPS.pollMs or 1000)
+
+        if GetResourceState(cfgPS.resource) ~= 'started' then
+            clearSearchBlips()
+            bounds = nil
+            goto continue
+        end
+
+        if not bounds then
+            local ok, b = pcall(function() return exports[cfgPS.resource]:SearchRadiusBounds() end)
+            if ok and type(b) == 'table' then bounds = b end
+        end
+
+        do
+            local ok, centre = pcall(function() return exports[cfgPS.resource]:SearchCentre() end)
+            local okR, radius = pcall(function() return exports[cfgPS.resource]:SearchRadius() end)
+
+            if not ok or type(centre) ~= 'table' or not okR or type(radius) ~= 'number' or radius <= 0 then
+                clearSearchBlips()
+            else
+                -- ADD_BLIP_FOR_RADIUS has no "resize" native, so a moving radius
+                -- means delete-and-recreate. Only bother once it has actually
+                -- moved enough to be visible on the minimap.
+                if (not searchOuterRadius) or (math.abs(radius - searchOuterRadius) > 2.0) then
+                    clearSearchBlips()
+
+                    local innerRadius = math.min((bounds and bounds.start) or radius, radius)
+
+                    searchInnerBlip = AddBlipForRadius(centre.x, centre.y, centre.z, innerRadius)
+                    SetBlipColour(searchInnerBlip, cfgPS.innerColour or 1)
+                    SetBlipAlpha(searchInnerBlip, cfgPS.innerAlpha or 120)
+                    SetBlipAsShortRange(searchInnerBlip, false)
+
+                    searchOuterBlip = AddBlipForRadius(centre.x, centre.y, centre.z, radius)
+                    SetBlipColour(searchOuterBlip, cfgPS.outerColour or 1)
+                    SetBlipAlpha(searchOuterBlip, cfgPS.outerAlpha or 45)
+                    SetBlipAsShortRange(searchOuterBlip, false)
+
+                    searchOuterRadius = radius
+                end
+            end
+        end
+
+        ::continue::
+    end
+end)
+
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() then clearSearchBlips() end
+end)
 
 CreateThread(function()
     loadMinimapPref()

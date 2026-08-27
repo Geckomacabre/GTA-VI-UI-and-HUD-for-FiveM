@@ -221,6 +221,18 @@ Config.Needs = {
     -- HUD that guessed wrong there would be a HUD that stops medics reviving
     -- hungry players. Size needs nobody's cooperation.
     healJumpPct = 10,
+
+    -- A second, FLAT cap that applies regardless of hunger/thirst: passive
+    -- regen never climbs health past this percentage on its own, full belly
+    -- or not. Getting past it takes a deliberate heal -- Zombix, food, or any
+    -- other health_items consumable, which already bypasses this cap the same
+    -- way it bypasses the hunger/thirst one (see healingItemActive/healJumpPct
+    -- above; nothing extra was needed for that).
+    --
+    -- Whichever of this and the hunger/thirst cap is LOWER wins, so a starving
+    -- player at 40% is still capped at 40%, not pulled back up to this. nil or
+    -- 100 disables it and restores the old hunger/thirst-only behaviour.
+    regenCeilingPct = 62,
 }
 
 -- UNUSED as a fallback, and deliberately so - kept only to document that the
@@ -399,6 +411,42 @@ Config.StatusBarShape = 'square'
 Config.MaxStars = 6
 
 -- =============================================================================
+-- Police search-radius overlay
+-- =============================================================================
+-- Two circles drawn on the native minimap while `fenix-police` reports it has
+-- lost contact and is sweeping for the player: an inner ring at the fixed
+-- "crime origin" size, and an outer ring that grows with fenix-police's own
+-- live search radius. No circles show while cops still have eyes on the
+-- player (searchRadius() is 0 during active contact) or while nobody is
+-- wanted at all.
+--
+-- Entirely optional: if `fenix-police` isn't running, this whole block is a
+-- no-op.
+Config.PoliceSearch = {
+    enable = true,
+
+    -- Resource that owns FenixPursuit.isSearching/.searchRadius/.targetCoords
+    -- and exports SearchCentre/SearchRadiusBounds off them.
+    resource = 'fenix-police',
+
+    -- How often (ms) to re-read the exports and, if the radius has moved
+    -- enough to matter, recreate the circle blips. ADD_BLIP_FOR_RADIUS has no
+    -- "resize" native, so a moving radius means delete-and-recreate rather
+    -- than a live update -- this interval is the tradeoff between that cost
+    -- and how stale the ring looks while it grows.
+    pollMs = 1000,
+
+    -- Colour index 1 = red (see SET_BLIP_COLOUR / gtaforums blip colour
+    -- chart). Alpha 0-255. Inner ring stays small and opaque; outer ring
+    -- grows and stays faint, matching "dark red where it happened, a lighter
+    -- red for how far they might be looking".
+    innerColour = 1,
+    innerAlpha  = 120,
+    outerColour = 1,
+    outerAlpha  = 45,
+}
+
+-- =============================================================================
 -- Turn-by-turn navigation popup
 -- =============================================================================
 -- Shown above the minimap whenever the player has a GPS waypoint set. The
@@ -426,6 +474,13 @@ Config.Nav = {
     -- Once shown, stay shown at least this long. Stops a junction taken at
     -- speed from flashing up and vanishing again inside a few hundred ms.
     minHoldMs = 2500,
+
+    -- Recolours the waypoint cross AND the GPS route line drawn on the
+    -- native minimap (both follow the waypoint blip's colour). nil keeps the
+    -- game's default yellow. This RGB is an eyeballed match against a
+    -- reference screenshot, not a sampled pixel value -- nudge it in-game
+    -- and adjust here if it doesn't look right.
+    waypointColour = { r = 255, g = 20, b = 147 },
 }
 
 -- =============================================================================

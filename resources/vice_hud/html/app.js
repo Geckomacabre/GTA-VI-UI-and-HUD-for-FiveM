@@ -95,8 +95,9 @@
         // so it has to stay pinned there as it widens.
         var pct = capped ? Math.max(0, Math.min(100, 100 - cap)) : 0;
         tail.style.transform = 'scaleX(' + (pct / 100).toFixed(4) + ')';
-        tail.classList.toggle('hunger', capped && cause !== 'thirst');
+        tail.classList.toggle('hunger', capped && cause !== 'thirst' && cause !== 'health');
         tail.classList.toggle('thirst', capped && cause === 'thirst');
+        tail.classList.toggle('health', capped && cause === 'health');
     }
 
     function onStatus(d) {

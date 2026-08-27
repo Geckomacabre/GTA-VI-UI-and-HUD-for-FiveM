@@ -9,6 +9,14 @@ Visual direction throughout this set — the HUD layout, the neon/Art Deco
 color language, the general "leaked GTA VI trailer" feel — was inspired by
 CyberLeek's videos.
 
+> [!NOTE]
+> **Work in progress.** This is built and tuned against one live server, not
+> a general-purpose release — some things may not work correctly on a
+> different setup, and configs/paths may assume pieces of that server that
+> aren't documented here yet. If something's broken or missing for you,
+> please [open an issue](../../issues) or send a
+> [pull request](../../pulls) rather than assuming it's intentional.
+
 ## Screenshots
 
 | | |
@@ -122,6 +130,18 @@ An update to any of those patched resources will silently wipe its patch —
 that's expected, and `PATCHES.md` says so per-resource. Re-apply after
 updating.
 
+## Recommended pairings
+
+Not bundled here — separate projects you install yourself, credited rather
+than embedded because neither publishes a license covering redistribution:
+
+- **[FlyBanditMods-iOS_LS_Map-Lite](https://github.com/TheFlyBandit/FlyBanditMods-iOS_LS_Map-Lite)**
+  by TheFlyBandit — an iOS/Google-Maps-styled minimap texture replacement.
+  Drag-and-drop per its own README; `vice_hud`'s rounded minimap mask and
+  wanted-search overlay sit on top of whatever map style is loaded, so the
+  two work together with no extra configuration. Grab it from the link
+  above rather than from a copy in this repo.
+
 ## The arista-pro font
 
 `resources/um_gigs/ui/fonts/arista-pro.pro-trial-regular.ttf` is bundled and
@@ -158,7 +178,10 @@ redistributing patched files from this bundle outside your own server.
 ## Contributing
 
 If you edit any part of this source, please make your fork available on
-GitHub so we can all work together on it.
+GitHub so we can all work together on it. Since this is still a work in
+progress (see the note up top), bug reports and pull requests are both
+welcome — [open an issue](../../issues) if something doesn't work, or
+[send a PR](../../pulls) if you've already fixed it.
 
 ## Notes
 
