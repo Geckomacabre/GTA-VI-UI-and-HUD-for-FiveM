@@ -16,7 +16,7 @@
   /* Fonts are embedded as base64 data URIs, not linked by relative path.
      The relative url('Optien.ttf') version silently failed to load inside
      lb-phone's app iframe (font just never applied, no console error) --
-     the same reason goober.svg's font is base64 too. Optien is the
+     the same reason rydeme.svg's font is base64 too. Optien is the
      logo/wordmark face only, used by ".word" below; everything else in the
      app reads in GTAArtDeco, same as the rest of this server's UI. */
   @font-face {
@@ -90,7 +90,7 @@
        67%  = a thinner lip
        72%+ = invisible, do not go here
 
-     Keep in step with the matching hard stop in goober.svg. */
+     Keep in step with the matching hard stop in rydeme.svg. */
   .word .rtip {
     --r-tip-cut: 65%;
     background-image: linear-gradient(
@@ -680,7 +680,7 @@
   </nav>
 
 <script>
-  window.GIG_APP  = 'goober';
+  window.GIG_APP  = 'rydeme';
   window.GIG_COPY = { name: 'rydeme', tagline: 'Rides from strangers, priced dynamically.', lowRating: 'Due to unsatisfactory ratings, people can no longer Ryde you.', dutyOff: 'Go online', dutyOn: 'Online · tap to stop', accept: 'Accept ride' };
 
   // lb-phone renders custom apps in an iframe and posts 'componentsLoaded' when

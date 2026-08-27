@@ -35,7 +35,7 @@ added to bring the theme into each one are included here.
   plugs into. Has its own `README.md` and `docs/INTERNALS.md` inside —
   start there for anything HUD-specific. Depends on `ox_lib`.
 
-- **`um_gigs`** — "Snarf" and "Ryde Me" (internal name `goober`): two
+- **`um_gigs`** — "Snarf" and "Ryde Me": two
   parody gig-economy phone apps served through `lb-phone`, styled with the
   same Art Deco / Vice aesthetic as the rest of this set. Depends on
   `ox_lib`, `ox_target`, `qbx_core`, `lb-phone`.

@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 name 'um_gigs'
-description 'Snarf and Goober: two parody gig-economy phone apps. Work that finds you, instead of a board you drive to.'
+description 'Snarf and Ryde Me: two parody gig-economy phone apps. Work that finds you, instead of a board you drive to.'
 author 'Geckomacabre'
 version '1.0.0'
 
@@ -22,11 +22,11 @@ server_scripts {
 -- runtime, so every file the phone loads has to be declared here.
 files {
     'ui/snarf.html',
-    'ui/goober.html',
+    'ui/rydeme.html',
     'ui/app.js',
     'ui/app.css',
     'ui/snarf.svg',
-    'ui/goober.svg',
+    'ui/rydeme.svg',
     'ui/Optien.ttf',
     'ui/fonts/GTAArtDecoRegular.ttf',
     'ui/fonts/GTAArtDecoMedium.ttf',

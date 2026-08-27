@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   Shared front end for Snarf and Ryde Me (internal identifier: goober).
+   Shared front end for Snarf and Ryde Me.
    -----------------------------------------------------------------------------
    Two apps, one script. They are different companies in fiction and different
    icons on the phone, but the plumbing is the same either way, and duplicating
@@ -155,7 +155,7 @@
        second by pollLive() (see below), same cadence a real nav app redraws
        its own speedometer at. */
     function tickDrive(liveData) {
-        if (APP !== 'goober' || !liveData || !el('drive-hud')) return;
+        if (APP !== 'rydeme' || !liveData || !el('drive-hud')) return;
 
         if (liveData.target && el('drive-map')) {
             if (!driveMap) {
@@ -220,7 +220,7 @@
         }
     }
 
-    /* The "phone mounted on the dash" HUD -- Goober only, since Snarf has no
+    /* The "phone mounted on the dash" HUD -- Ryde Me only, since Snarf has no
        speed mechanic and nobody is watching how you drive to a restaurant.
        This is the STATIC shell: it is rendered once per job (see the
        shownJobKey guard in renderBoard) and tickDrive() patches the live
@@ -229,7 +229,7 @@
        poll would tear down the Leaflet instance inside #drive-map. */
     function jobHtml(j) {
         var driveHud = '';
-        if (APP === 'goober') {
+        if (APP === 'rydeme') {
             driveHud = '<div id="drive-hud">'
                 + '<div id="drive-map"></div>'
                 + '<div id="drive-meter">'
@@ -907,7 +907,7 @@
     }
 
     /* ---- Driver Profile ---------------------------------------------------
-       Ryde Me only: goober.html is the one page with a #profile screen. */
+       Ryde Me only: rydeme.html is the one page with a #profile screen. */
 
     function timeAgo(ts) {
         var diff = Math.floor(Date.now() / 1000) - ts;

@@ -15,9 +15,6 @@ Config = {}
 --              there waiting; a request arrives, a clock starts, you take it or
 --              it goes to somebody else. Plus a rider side, so a fare can be
 --              another player rather than a spawned ped.
---              (internal identifier stays 'goober' throughout the code --
---              renaming that would mean touching every job.app check and the
---              player metadata key for no player-visible benefit.)
 --
 -- Both are parodies, and the satire is GTA's own target: not the logos, the
 -- BUSINESS. Snarf calls you a Partner, rates you out of five, and keeps most
@@ -44,16 +41,13 @@ Config.Apps = {
         ui = 'um_gigs/ui/snarf.html',
         size = 48,
     },
-    -- Internal identifier stays 'goober' -- it is wired through every job.app
-    -- check in client.lua/server.lua and the metadata key on the player. Only
-    -- what the player actually sees (name/description/developer/art) changes.
-    goober = {
-        identifier = 'goober',
+    rydeme = {
+        identifier = 'rydeme',
         name = 'rydeme',
         description = 'Rides from strangers, priced dynamically.',
         developer = 'rydeme',
-        icon = 'nui://um_gigs/ui/goober.svg',
-        ui = 'um_gigs/ui/goober.html',
+        icon = 'nui://um_gigs/ui/rydeme.svg',
+        ui = 'um_gigs/ui/rydeme.html',
         size = 52,
     },
 }
@@ -70,7 +64,7 @@ Config.Apps = {
 -- what that job actually looks like.
 Config.DispatchOnly = {
     snarf = false,
-    goober = true,
+    rydeme = true,
 }
 
 -- How many offers sit in a BOARD app at once, and how often the list refreshes.
@@ -665,7 +659,7 @@ Config.RiderMode.npc = {
 -- -----------------------------------------------------------------------------
 -- Marking the spot, and drawing the route.
 -- -----------------------------------------------------------------------------
-Config.Goober = {
+Config.RydeMe = {
     dropoffRadius = 9.0,
     markerScale = vec3(3.0, 3.0, 0.8),
     parkedSpeed = 0.5,
@@ -708,7 +702,7 @@ Config.Marker = {
     -- see the marker itself.
     radius = 22.0,
     snarf  = { r = 229, g = 57,  b = 127 },   -- matches --accent in snarf.html
-    goober = { r = 255, g = 45,  b = 149 },   -- matches --accent-text in goober.html (Ryde Me neon pink)
+    rydeme = { r = 255, g = 45,  b = 149 },   -- matches --accent-text in rydeme.html (Ryde Me neon pink)
 }
 
 -- -----------------------------------------------------------------------------

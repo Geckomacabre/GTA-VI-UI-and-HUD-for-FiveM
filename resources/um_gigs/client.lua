@@ -74,8 +74,7 @@ local function registerApps()
     end
 end
 
---- The player-facing name of an app. The identifier stayed 'goober' when the
---- rideshare was rebranded, so the two are never the same string.
+--- The player-facing name of an app.
 ---@param app string
 ---@return string
 local function appLabel(app)
@@ -447,7 +446,7 @@ end
 --- is still sitting in `passenger` on the spot. That blunt path stays as-is
 --- for a cancelled ride, where there is no dignified way out anyway.
 local function releasePassenger()
-    if job.app ~= 'goober' or not passenger then return end
+    if job.app ~= 'rydeme' or not passenger then return end
 
     local p = passenger
     passenger = nil
@@ -518,7 +517,7 @@ CreateThread(function()
             local pos = GetEntityCoords(cache.ped)
             local target = stage == 'pickup' and job.pickup or job.dropoff
             local dist = #(pos - target)
-            local dropoffZone = stage == 'dropoff' and job.app == 'goober'
+            local dropoffZone = stage == 'dropoff' and job.app == 'rydeme'
 
             local prompt, action, key, released
 
@@ -553,7 +552,7 @@ CreateThread(function()
                 -- drop-off gets a bigger circle: it is a park-and-wait, not a
                 -- walk-up, and needs room to actually stop a car in it.
                 local col = markerColour()
-                local scale = dropoffZone and Config.Goober.markerScale or Config.Marker.scale
+                local scale = dropoffZone and Config.RydeMe.markerScale or Config.Marker.scale
                 DrawMarker(
                     Config.Marker.type,
                     target.x, target.y, target.z - 0.95,
@@ -567,7 +566,7 @@ CreateThread(function()
                 -- Ryde Me, NPC work: the passenger appears when you pull up and
                 -- waits by the road. You pull alongside and honk to wave them
                 -- into the car, like a real rideshare.
-                if stage == 'pickup' and job.app == 'goober' and not job.playerRide then
+                if stage == 'pickup' and job.app == 'rydeme' and not job.playerRide then
                     if not passenger then spawnPassenger() end
 
                     if dist < 6.0 and GetVehiclePedIsIn(cache.ped, false) ~= 0 then
@@ -580,14 +579,14 @@ CreateThread(function()
                 -- Ryde Me drop-off: nobody to press E for, so this is park and
                 -- wait -- roll to a stop inside the (bigger) circle and they
                 -- let themselves out after a beat.
-                if dropoffZone and dist < Config.Goober.dropoffRadius then
+                if dropoffZone and dist < Config.RydeMe.dropoffRadius then
                     local veh = GetVehiclePedIsIn(cache.ped, false)
                     local speed = veh ~= 0 and GetEntitySpeed(veh) or 0.0
 
-                    if veh ~= 0 and speed <= Config.Goober.parkedSpeed then
+                    if veh ~= 0 and speed <= Config.RydeMe.parkedSpeed then
                         parkedSince = parkedSince or GetGameTimer()
 
-                        if GetGameTimer() - parkedSince >= Config.Goober.parkedHold then
+                        if GetGameTimer() - parkedSince >= Config.RydeMe.parkedHold then
                             if showing then lib.hideTextUI(); showing = false end
                             parkedSince = nil
                             finish()
@@ -704,7 +703,7 @@ CreateThread(function()
     local lastPing = 0
 
     while true do
-        local watching = job ~= nil and job.app == 'goober' and stage == 'dropoff'
+        local watching = job ~= nil and job.app == 'rydeme' and stage == 'dropoff'
 
         if watching then
             local veh = GetVehiclePedIsIn(cache.ped, false)
@@ -854,7 +853,7 @@ CreateThread(function()
         local showing = Config.SpeedLimit.enabled
             and Config.SpeedLimit.showMeter
             and not speedFreed
-            and job ~= nil and job.app == 'goober' and stage == 'dropoff'
+            and job ~= nil and job.app == 'rydeme' and stage == 'dropoff'
             and GetVehiclePedIsIn(cache.ped, false) ~= 0
 
         if showing then
@@ -1044,7 +1043,7 @@ RegisterNetEvent('um_gigs:client:rideUpdate', function(state, reason)
     if text then
         local ok = pcall(function()
             exports['lb-phone']:SendNotification({
-                app = 'goober',
+                app = 'rydeme',
                 title = 'rydeme',
                 content = text,
             })
@@ -1326,7 +1325,7 @@ end)
 
 RegisterNUICallback('um_gigs:getState', function(data, cb)
     local app = data and data.app
-    if app ~= 'snarf' and app ~= 'goober' then return cb({ offers = {}, rating = 0 }) end
+    if app ~= 'snarf' and app ~= 'rydeme' then return cb({ offers = {}, rating = 0 }) end
 
     local res = lib.callback.await('um_gigs:server:getState', false, app)
 
@@ -1365,10 +1364,10 @@ RegisterNUICallback('um_gigs:getLive', function(_, cb)
 
         -- The "phone mounted on the dash" HUD: a live map, current speed, and
         -- the posted limit, the same information a real nav app puts on
-        -- screen while driving. Goober only -- Snarf has no speed mechanic
+        -- screen while driving. Ryde Me only -- Snarf has no speed mechanic
         -- and nobody is watching how you drive to a restaurant.
         local target = stage == 'pickup' and job.pickup or job.dropoff
-        if job.app == 'goober' and target then
+        if job.app == 'rydeme' and target then
             out.target = { x = target.x, y = target.y }
 
             local pos = GetEntityCoords(cache.ped)
@@ -1420,7 +1419,7 @@ end)
 
 RegisterNUICallback('um_gigs:getProfile', function(data, cb)
     local app = data and data.app
-    if app ~= 'goober' then return cb({ rating = 0, history = {} }) end
+    if app ~= 'rydeme' then return cb({ rating = 0, history = {} }) end
 
     local res = lib.callback.await('um_gigs:server:getProfile', false, app)
     cb(res or { rating = 0, history = {} })
@@ -1428,7 +1427,7 @@ end)
 
 RegisterNUICallback('um_gigs:setAvatar', function(data, cb)
     local app = data and data.app
-    if app ~= 'goober' then return cb({ ok = false }) end
+    if app ~= 'rydeme' then return cb({ ok = false }) end
 
     local ok = lib.callback.await('um_gigs:server:setAvatar', false, data.avatar)
     cb({ ok = ok == true })
@@ -1458,7 +1457,7 @@ end)
 
 RegisterNUICallback('um_gigs:setDuty', function(data, cb)
     local app = data and data.app
-    if app ~= 'snarf' and app ~= 'goober' then return cb({ ok = false }) end
+    if app ~= 'snarf' and app ~= 'rydeme' then return cb({ ok = false }) end
 
     TriggerServerEvent('um_gigs:server:setDuty', app, data.on and true or false)
     cb({ ok = true })
@@ -1622,7 +1621,7 @@ RegisterNetEvent('um_gigs:client:startJob', function(assigned)
     -- now rather than trusting the pin. Snarf is a walk-up-to-the-ped delivery
     -- and is meant to put you at the actual door, not the nearest drivable
     -- point, so it stays exempt.
-    if job.app == 'goober' then
+    if job.app == 'rydeme' then
         job.pickup = snapToRoad(job.pickup)
         job.dropoff = snapToRoad(job.dropoff)
     end

@@ -19,7 +19,7 @@
 -- app's requests are built on demand and never pooled.
 local boards = { snarf = {} }
 local active = {}    -- src -> the gig they took
-local duty = {}      -- src -> { snarf = bool, goober = bool }
+local duty = {}      -- src -> { snarf = bool, rydeme = bool }
 local lastPing = {}  -- src .. app -> os.time() of the last "jobs available" ping
 local nextId = 0
 
@@ -151,7 +151,7 @@ local function loadHistory(src)
     local player = exports.qbx_core:GetPlayer(src)
     if not player then return {} end
 
-    local raw = player.PlayerData.metadata.gig_goober_history
+    local raw = player.PlayerData.metadata.gig_rydeme_history
     if not raw or raw == '' then return {} end
 
     local ok, decoded = pcall(json.decode, raw)
@@ -172,12 +172,12 @@ local function pushHistory(src, entry)
         table.remove(history)
     end
 
-    exports.qbx_core:SetMetadata(src, 'gig_goober_history', json.encode(history))
+    exports.qbx_core:SetMetadata(src, 'gig_rydeme_history', json.encode(history))
 end
 
 --- The Driver Profile avatar: a URL (lb-phone's own components.uploadMedia
 --- result, or a gallery item's .src), stored on player metadata the same way
---- as gig_goober_history. This is a link into lb-phone's own media storage,
+--- as gig_rydeme_history. This is a link into lb-phone's own media storage,
 --- not image data itself, so the length cap here is just to stop a tampered
 --- NUI call from writing something absurd rather than sizing for a photo.
 ---@param src number
@@ -186,7 +186,7 @@ local function loadAvatar(src)
     local player = exports.qbx_core:GetPlayer(src)
     if not player then return nil end
 
-    local raw = player.PlayerData.metadata.gig_goober_avatar
+    local raw = player.PlayerData.metadata.gig_rydeme_avatar
     return (raw and raw ~= '') and raw or nil
 end
 
@@ -199,7 +199,7 @@ local function saveAvatar(src, dataUrl)
     if not exports.qbx_core:GetPlayer(src) then return false end
 
     if dataUrl == nil or dataUrl == false then
-        exports.qbx_core:SetMetadata(src, 'gig_goober_avatar', nil)
+        exports.qbx_core:SetMetadata(src, 'gig_rydeme_avatar', nil)
         return true
     end
 
@@ -208,7 +208,7 @@ local function saveAvatar(src, dataUrl)
         return false
     end
 
-    exports.qbx_core:SetMetadata(src, 'gig_goober_avatar', dataUrl)
+    exports.qbx_core:SetMetadata(src, 'gig_rydeme_avatar', dataUrl)
     return true
 end
 
@@ -384,7 +384,7 @@ local function makeFare(src)
 
     return {
         id = nextId,
-        app = 'goober',
+        app = 'rydeme',
         kind = band.id,
         kindLabel = band.label,
         pickup = { x = pickup.coords.x, y = pickup.coords.y, z = pickup.coords.z },
@@ -513,7 +513,7 @@ local function dispatchFares(app)
             local due = nextDispatch[src .. app]
 
             if due and now >= due then
-                local offer = (app == 'goober') and makeFare(src) or nil
+                local offer = (app == 'rydeme') and makeFare(src) or nil
 
                 if not offer then
                     -- Board apps push whatever is already on the board.
@@ -575,7 +575,7 @@ end
 local function onlineDrivers()
     local n = 0
     for src, apps in pairs(duty) do
-        if apps.goober and not riderRide[src] then n = n + 1 end
+        if apps.rydeme and not riderRide[src] then n = n + 1 end
     end
     return n
 end
@@ -591,7 +591,7 @@ local function riderOffer(req)
 
     return {
         id = req.id,
-        app = 'goober',
+        app = 'rydeme',
         playerRide = true,
         riderSrc = req.rider,
         kind = req.kind,
@@ -647,16 +647,16 @@ local function broadcastRide(req)
     if not offer then return end
 
     for src, apps in pairs(duty) do
-        if apps.goober and src ~= req.rider and not (req.declined and req.declined[src])
-            and dispatchable(src, 'goober')
+        if apps.rydeme and src ~= req.rider and not (req.declined and req.declined[src])
+            and dispatchable(src, 'rydeme')
         then
             -- A real person waiting at the kerb jumps the pacing queue: the gap
             -- exists to stop the NPC drip feeling like a conveyor belt, and
             -- that reasoning does not apply here.
             if Config.Dispatch.playerRideIgnoresGap
-                or (nextDispatch[src .. 'goober'] or 0) <= os.time()
+                or (nextDispatch[src .. 'rydeme'] or 0) <= os.time()
             then
-                pushFare(src, 'goober', offer)
+                pushFare(src, 'rydeme', offer)
             end
         end
     end
@@ -668,7 +668,7 @@ end
 
 RegisterNetEvent('um_gigs:server:setDuty', function(app, on)
     local src = source
-    if app ~= 'snarf' and app ~= 'goober' then return end
+    if app ~= 'snarf' and app ~= 'rydeme' then return end
 
     duty[src] = duty[src] or {}
     duty[src][app] = on and true or nil
@@ -690,7 +690,7 @@ end)
 --- else. For a player ride it stays alive for whoever else is out there.
 RegisterNetEvent('um_gigs:server:declineFare', function(app, id)
     local src = source
-    if app ~= 'snarf' and app ~= 'goober' then return end
+    if app ~= 'snarf' and app ~= 'rydeme' then return end
 
     local key = src .. app
     local offer = pendingFare[key]
@@ -720,7 +720,7 @@ end)
 --- be able to show the request that is currently in front of you, whether you
 --- are looking at the screen or at the road.
 lib.callback.register('um_gigs:server:getState', function(src, app)
-    if app ~= 'snarf' and app ~= 'goober' then
+    if app ~= 'snarf' and app ~= 'rydeme' then
         return { offers = {}, rating = 0 }
     end
 
@@ -784,7 +784,7 @@ lib.callback.register('um_gigs:server:getState', function(src, app)
     end
 
     -- ---- rider side -------------------------------------------------------
-    if app == 'goober' and Config.RiderMode.enabled then
+    if app == 'rydeme' and Config.RiderMode.enabled then
         state.riderMode = true
         state.driversOnline = onlineDrivers()
 
@@ -846,7 +846,7 @@ end)
 -- -----------------------------------------------------------------------------
 
 lib.callback.register('um_gigs:server:accept', function(src, app, id)
-    if app ~= 'snarf' and app ~= 'goober' then
+    if app ~= 'snarf' and app ~= 'rydeme' then
         return { ok = false, message = 'Unknown app.' }
     end
 
@@ -937,7 +937,7 @@ RegisterNetEvent('um_gigs:server:abort', function(data)
     local gig = active[src]
 
     if not gig or type(data) ~= 'table' or data.offerId ~= gig.id then return end
-    if gig.app ~= 'goober' then return end
+    if gig.app ~= 'rydeme' then return end
 
     takeActive(src)
 
@@ -986,7 +986,7 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
     -- Applied to the FARE, not to Snarf: a delivery does not care what the bag
     -- arrived in. The class comes off the car the passenger actually got into.
     local info = Config.VehicleClassDefault
-    if gig.app == 'goober' then
+    if gig.app == 'rydeme' then
         info = classInfo(data.vehicleClass)
         pay = math.floor(pay * info.mult)
         if info.mult ~= 1.0 then
@@ -1002,7 +1002,7 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
         reasons[#reasons + 1] = 'late'
     end
 
-    if gig.app == 'goober' then
+    if gig.app == 'rydeme' then
         -- ---- police --------------------------------------------------------
         -- Not a matter of degree. From the back seat there is no difference
         -- between one star and five, so neither is there here.
@@ -1114,7 +1114,7 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
     -- Ryde Me only -- Snarf customers do not leave the equivalent of a star
     -- review in this resource today. A player ride is rated by the player, so
     -- nothing is written here; it lands when they submit.
-    if gig.app == 'goober' and not gig.playerRide then
+    if gig.app == 'rydeme' and not gig.playerRide then
         local stars, comment
 
         if wanted then
@@ -1131,7 +1131,7 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
             pay = pay,
             tip = tip,
             ts = os.time(),
-            tier = (gig.app == 'goober') and tierFor(info.mult) or nil,
+            tier = (gig.app == 'rydeme') and tierFor(info.mult) or nil,
         })
     end
 
@@ -1168,7 +1168,7 @@ RegisterNetEvent('um_gigs:server:cancel', function()
 end)
 
 lib.callback.register('um_gigs:server:getProfile', function(src, app)
-    if app ~= 'goober' then return { rating = 0, history = {} } end
+    if app ~= 'rydeme' then return { rating = 0, history = {} } end
 
     return {
         rating = getRating(src),
@@ -1504,7 +1504,7 @@ AddEventHandler('playerDropped', function()
     riderRide[src] = nil
     awaitingRating[src] = nil
 
-    for _, app in ipairs({ 'snarf', 'goober' }) do
+    for _, app in ipairs({ 'snarf', 'rydeme' }) do
         lastPing[src .. app] = nil
         pendingFare[src .. app] = nil
         pendingUntil[src .. app] = nil
@@ -1538,7 +1538,7 @@ CreateThread(function()
 
         expirePending()
 
-        for _, app in ipairs({ 'snarf', 'goober' }) do
+        for _, app in ipairs({ 'snarf', 'rydeme' }) do
             local ok, err = pcall(dispatchFares, app)
             if not ok then
                 print(('^1[um_gigs]^7 dispatchFares(%s) failed: %s'):format(app, err))

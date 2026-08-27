@@ -1,9 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
   <!--
     Snarf. Food delivery, parody.
-    Named away from "Gobblr" because that sat too close to "Goober"; two apps on
-    one home screen have to be tellable apart at a glance, which is as true of
-    the mark as of the name. Hot pink, and a bite taken out of a circle.
+    Named away from "Gobblr" because that sat too close to "Goober" (Ryde Me's
+    old internal name); two apps on one home screen have to be tellable apart
+    at a glance, which is as true of the mark as of the name. Hot pink, and a
+    bite taken out of a circle.
     Our own geometry: evocative of every delivery app, a copy of none.
     NOTE: no double hyphens anywhere in this file. XML forbids them inside a
     comment, and an invalid SVG renders as nothing at all.
