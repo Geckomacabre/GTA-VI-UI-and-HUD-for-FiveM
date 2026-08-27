@@ -129,6 +129,16 @@ Ryde Me still uses GTAArtDeco, Snarf still uses the system font stack — the
 font is just present and ready to use if you want to switch either app's
 `--font-body` to `'Arista Pro'`.
 
+## License
+
+This repository is licensed under the [GNU General Public License v3.0](LICENSE),
+matching `vice_hud`, its core resource.
+
+Individual folders under `resources/` and `patches/` may carry their own
+license from their original author (Overextended's `ox_*` projects are
+LGPL-3.0/GPL-3.0, for example) — where a folder has its own `LICENSE` file,
+that governs that folder specifically.
+
 ## Notes
 
 - Version numbers noted in `docs/PATCHES.md` are what each patch was built
