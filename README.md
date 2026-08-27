@@ -1,14 +1,9 @@
 # GTA VI Resources
 
-A bundle of every FiveM/Qbox resource on this server that's built around a
-GTA VI (Vice City / Leonida) visual identity — a shared HUD, a matching
-popup/menu theme spread across a few community resources, a gig-economy
-phone app pair, and a reskinned inventory screen. Pulled out of the main
-server tree and organized here as a standalone, installable package.
-
-This isn't a public repository — it's laid out like one (clear structure,
-README, drag-and-drop instructions) so it's easy to hand off, back up, or
-eventually publish, but it currently only exists locally.
+A bundle of FiveM/Qbox resources built around a GTA VI (Vice City / Leonida)
+visual identity — a shared HUD, a matching popup/menu theme spread across a
+few community resources, a gig-economy phone app pair, and a reskinned
+inventory screen — organized as a standalone, installable package.
 
 ## What's in here
 
@@ -25,12 +20,12 @@ GTA VI Resources/
 └── docs/          Extra documentation, including the patch install guide.
 ```
 
-Everything under `resources/` is a full copy of that resource as it runs on
-this server. Everything under `patches/` is deliberately **not** a full copy
-of the resource it touches — those are large, actively-updated community
-resources (ox_lib, ox_target, ox_inventory, qb-menu, qb-input) that aren't
-"GTA VI resources" in themselves. Only the handful of files this server
-changed or added to bring the theme into each one are included here.
+Everything under `resources/` is a complete, ready-to-run resource on its
+own. Everything under `patches/` is deliberately **not** a full copy of the
+resource it touches — those are large, actively-updated community resources
+(ox_lib, ox_target, ox_inventory, qb-menu, qb-input) that aren't "GTA VI
+resources" in themselves. Only the handful of files that were changed or
+added to bring the theme into each one are included here.
 
 ### `resources/`
 
@@ -103,10 +98,9 @@ font is just present and ready to use if you want to switch either app's
 
 ## Notes
 
-- This bundle was assembled from a live server tree; nothing here has its
-  own separate issue tracker or release process. Version numbers noted in
-  `docs/PATCHES.md` are what each patch was built and tested against.
+- Version numbers noted in `docs/PATCHES.md` are what each patch was built
+  and tested against.
 - `resources/vice_hud` carries its own `.gitignore` (excludes
   `node_modules/`, its Python asset-prep tooling's `__pycache__/`, and raw
-  pre-conversion texture originals) — respect it if you re-copy from the
-  live server later rather than flattening everything in.
+  pre-conversion texture originals) — respect it if you resync it from your
+  own server later rather than flattening everything in.

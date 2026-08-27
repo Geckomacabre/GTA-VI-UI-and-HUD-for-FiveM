@@ -51,10 +51,10 @@ Then add two lines to `web/build/index.html`, right before `</head>`:
 <!-- vice_hud glass -- END -->
 ```
 
-If a `web/build/index.html` is included in this patch folder, it's the
-already-edited version from this server — diff it against yours before
-overwriting, since ox_lib's own build hashes its bundle filenames per
-version and yours will differ.
+If a `web/build/index.html` is included in this patch folder, it's an
+already-edited reference copy — diff it against yours before overwriting,
+since ox_lib's own build hashes its bundle filenames per version and yours
+will differ.
 
 ## ox_target
 
