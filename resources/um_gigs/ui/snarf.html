@@ -11,21 +11,327 @@
     --on-accent: #ffffff;
     --accent-text: #ff7ab0;
   }
+  /* lb-phone draws its own status bar and dynamic island over the top of the
+     app iframe. Anything inside this band is invisible, so the header and
+     every full-screen sheet start below it rather than guessing a smaller
+     number and clipping again -- same constants rydeme.html uses. */
+  :root { --notch: 78px; --navbar: 26px; }
+
+  /* app.css never had to size a tabbed layout: this was a single flat
+     screen. Same fix rydeme.html applies -- body becomes the flex column
+     that gives #board/#profile real height instead of each one floating
+     mid-screen over a large dead black area. */
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  #tabbar { flex: 0 0 auto; }
+
+  .confetti { position: relative; overflow: hidden; }
+  .confetti .dot {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--accent);
+    pointer-events: none;
+    animation-name: confetti-float;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .confetti .d1 { left: 11%; top: 20%; width: 6px; height: 6px; opacity: 0.85; animation-duration: 3.8s; animation-delay: 0s; }
+  .confetti .d2 { left: 17%; top: 58%; width: 4px; height: 4px; opacity: 0.6;  animation-duration: 4.6s; animation-delay: 0.9s; }
+  .confetti .d3 { left: 7%;  top: 82%; width: 8px; height: 8px; opacity: 0.5;  animation-duration: 5.2s; animation-delay: 1.7s; }
+  .confetti .d4 { right: 13%; top: 16%; width: 5px; height: 5px; opacity: 0.7; animation-duration: 4.1s; animation-delay: 0.4s; }
+  .confetti .d5 { right: 8%;  top: 52%; width: 7px; height: 7px; opacity: 0.55; animation-duration: 4.9s; animation-delay: 1.3s; }
+  .confetti .d6 { right: 17%; top: 80%; width: 4px; height: 4px; opacity: 0.8; animation-duration: 4.3s; animation-delay: 2.1s; }
+  @keyframes confetti-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); opacity: 0.35; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .confetti .dot { animation: none; }
+  }
+
+  /* app.css's own <header> is a flat solid-pink block with no notch
+     clearance -- fine for a single flat screen, but it put the brand text
+     partly behind the phone's own status bar the moment this app grew a
+     tabbar. Same dark-header-with-notch treatment rydeme.html uses. */
+  header {
+    background: var(--bg);
+    color: var(--ink);
+    text-align: center;
+    padding: var(--notch) 16px 16px;
+    border-bottom: 2px solid var(--accent);
+  }
+  #tagline { opacity: 0.6; margin-top: 6px; }
+  #rating { justify-content: center; }
+  #warn { text-align: left; }
+
+  /* ---- Delivery Profile --------------------------------------------------
+     Same shell as Ryde Me's Driver Profile: avatar, standing, and a history
+     list -- just of deliveries rather than fares, and under its own
+     gig_snarf_history/gig_snarf_avatar metadata keys (server.lua). */
+  #profile { display: none; }
+  .profile-label {
+    background: var(--accent); color: var(--on-accent);
+    padding: var(--notch) 16px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .profile-label .avatar-btn {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    flex-shrink: 0; position: relative;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(0,0,0,0.25);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .profile-label .avatar-btn img {
+    display: none;
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .profile-label .avatar-btn.has-photo img { display: block; }
+  .profile-label .avatar-btn.has-photo .avatar-placeholder { display: none; }
+  .profile-label .avatar-cam {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: var(--on-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; line-height: 1;
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+  .profile-label .title {
+    flex: 1; text-align: center;
+    font-size: 17px; font-weight: 700;
+    margin-right: 44px;
+  }
+  .hero-brand { padding: 34px 16px 26px; text-align: center; }
+  .hero-brand .word { font-size: 44px; font-weight: 900; letter-spacing: -0.5px; }
+
+  #avatar-sheet {
+    display: none;
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 60;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  #avatar-sheet.on { display: flex; }
+  #avatar-sheet .sheet {
+    width: 100%;
+    background: var(--bg);
+    border-top: 2px solid var(--accent);
+    border-radius: 18px 18px 0 0;
+    padding: 18px 16px calc(16px + var(--navbar));
+  }
+  #avatar-sheet .sheet-title {
+    text-align: center; font-size: 13px; font-weight: 600;
+    opacity: 0.7; margin-bottom: 14px;
+  }
+  #avatar-sheet button.opt {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: block; width: 100%; text-align: center;
+    padding: 13px 0; margin-top: 8px;
+    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    color: var(--ink);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+  }
+  #avatar-sheet button.opt.cancel {
+    color: rgba(244,233,242,0.6);
+    background: transparent; border-color: transparent;
+    margin-top: 14px;
+  }
+
+  .map-topbar {
+    background: var(--accent); color: var(--on-accent);
+    padding: var(--notch) 16px 14px;
+    display: flex; align-items: center; gap: 10px;
+    flex: 0 0 auto;
+  }
+  .map-topbar button { all: unset; cursor: pointer; font-size: 20px; line-height: 1; padding: 2px 8px; }
+  .map-topbar .title { flex: 1; text-align: center; font-size: 13px; font-weight: 500; margin-right: 28px; }
+
+  #avatar-camera-overlay {
+    display: none;
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+    background: var(--bg);
+    flex-direction: column;
+    z-index: 61;
+  }
+  #avatar-camera-overlay.on { display: flex; }
+  #avatar-camera-canvas {
+    flex: 1 1 auto; min-height: 0;
+    width: 100%; height: 100%;
+    display: block;
+    background: #10151c;
+    object-fit: cover;
+  }
+  #avatar-camera-confirm {
+    flex: 0 0 auto;
+    padding: 14px 16px calc(14px + var(--navbar));
+  }
+
+  .suspend-alert {
+    margin: 0 16px 20px;
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+  }
+  .suspend-alert .icon { font-size: 22px; color: var(--accent); line-height: 1; }
+  .suspend-alert .title {
+    margin-top: 6px;
+    font-size: 14px; font-weight: 500; letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .suspend-alert .msg-pill {
+    margin-top: 14px;
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    opacity: 0.9;
+  }
+  #profile-stats { text-align: center; padding: 0 16px 22px; }
+  #profile-stats .num-big { font-size: 28px; font-weight: 500; }
+  #profile-stats .stars { font-size: 15px; display: block; margin-top: 2px; }
+  #profile-stats .sub { font-size: 11.5px; opacity: 0.65; margin-top: 6px; }
+  #profile-history { padding: 0 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  #profile-history .card .row { align-items: center; }
+  #profile-history .stars { font-size: 12px; }
+
+  .chips { margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px;
+    padding: 2px 7px; border-radius: 20px;
+    background: rgba(255,255,255,0.09); color: var(--ink);
+  }
+  .chip.bad { background: rgba(255,77,77,0.18); color: #ff9a9a; }
+
+  /* The one button in this app that is a joke -- see showReportToast() in
+     app.js. Static markup on the Profile screen rather than something a
+     render function has to keep rewiring. */
+  .report-link {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: block; width: 100%; text-align: center;
+    padding: 9px 0; margin: 4px 0 18px;
+    font-family: var(--font-body); font-size: 11px; font-weight: 500;
+    color: rgba(244,233,242,0.4);
+  }
+  .report-link:active { color: rgba(244,233,242,0.75); }
+  #toast {
+    position: fixed; left: 50%; bottom: calc(84px + var(--navbar));
+    transform: translate(-50%, 10px);
+    max-width: 82%;
+    background: rgba(18,10,16,0.95);
+    border: 1px solid rgba(255,45,149,0.35);
+    color: var(--ink);
+    font-family: var(--font-body); font-size: 12px; font-weight: 500; line-height: 1.4;
+    padding: 11px 16px; border-radius: 13px;
+    text-align: center;
+    z-index: 80;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---- Bottom tab bar: Board / Profile. No third "Ride" tab -- Snarf has
+     no rider mode, it is the job board and nothing else. */
+  #board, #profile { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  #tabbar {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.10);
+    background: var(--bg);
+    padding-bottom: var(--navbar);
+  }
+  #tabbar button {
+    all: unset; box-sizing: border-box;
+    flex: 1; text-align: center;
+    padding: 16px 0 16px;
+    font-family: var(--font-body);
+    font-size: 12px; font-weight: 500;
+    color: rgba(244,233,242,0.5);
+    cursor: pointer;
+    border-top: 2px solid transparent;
+  }
+  #tabbar button.on {
+    color: var(--accent);
+    border-top: 2px solid var(--accent);
+  }
 </style>
 </head>
 <body>
-  <header>
-    <div id="brand">Snarf</div>
-    <div id="tagline">Be your own boss. Hours not guaranteed.</div>
-    <div id="rating"></div>
-  </header>
+  <div id="board">
+    <header class="confetti">
+      <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
+      <span class="dot d4"></span><span class="dot d5"></span><span class="dot d6"></span>
+      <div id="brand">Snarf</div>
+      <div id="tagline">Be your own boss. Hours not guaranteed.</div>
+      <div id="rating"></div>
+    </header>
 
-  <div id="warn"></div>
-  <div id="list"></div>
-  <div id="actions">
-    <button id="duty">Go on duty</button>
-    <button id="refresh">Refresh</button>
+    <div id="warn"></div>
+    <div id="list"></div>
+    <div id="actions">
+      <button id="duty">Go on duty</button>
+      <button id="refresh">Refresh</button>
+    </div>
   </div>
+
+  <div id="profile">
+    <div class="profile-label">
+      <button id="avatar-btn" class="avatar-btn" type="button" aria-label="Change profile photo">
+        <img id="avatar-img" alt="" />
+        <span class="avatar-placeholder">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        </span>
+        <span class="avatar-cam">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/><circle cx="12" cy="13" r="3.5" fill="var(--bg)"/></svg>
+        </span>
+      </button>
+      <span class="title">Delivery Profile</span>
+    </div>
+    <div class="hero-brand confetti">
+      <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
+      <span class="dot d4"></span><span class="dot d5"></span><span class="dot d6"></span>
+      <div class="word">Snarf</div>
+    </div>
+    <div id="profile-alert"></div>
+    <div id="profile-stats"></div>
+    <div id="profile-history"></div>
+    <button class="report-link" id="contact-support">Contact support</button>
+  </div>
+
+  <!-- Sits outside #board/#profile for the same reason it does in
+       rydeme.html: app.js rewrites those on every poll, which would cut a
+       fade-out short mid-animation. See showReportToast() in app.js. -->
+  <div id="toast"></div>
+
+  <div id="avatar-sheet">
+    <div class="sheet">
+      <div class="sheet-title">Profile photo</div>
+      <button type="button" class="opt" id="avatar-take">Take photo</button>
+      <button type="button" class="opt" id="avatar-roll">Choose from camera roll</button>
+      <button type="button" class="opt cancel" id="avatar-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="avatar-camera-overlay">
+    <div class="map-topbar">
+      <button id="avatar-camera-back" aria-label="Back">‹</button>
+      <span class="title">Take photo</span>
+    </div>
+    <canvas id="avatar-camera-canvas"></canvas>
+    <div id="avatar-camera-confirm">
+      <button type="button" class="opt" id="avatar-camera-shoot">Capture</button>
+    </div>
+  </div>
+
+  <nav id="tabbar">
+    <button class="tab on" data-tab="board">Deliveries</button>
+    <button class="tab" data-tab="profile">Profile</button>
+  </nav>
 
 <script>
   window.GIG_APP  = 'snarf';

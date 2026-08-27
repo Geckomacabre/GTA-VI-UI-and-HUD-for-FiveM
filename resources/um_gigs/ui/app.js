@@ -629,14 +629,15 @@
     }
 
     /* The one button in this app that does nothing on purpose. #toast lives
-       outside #board/#profile/#ride (see the note on it in goober.html) so a
-       poll rewriting whichever tab is open can never cut its fade short. */
+       outside #board/#profile/#ride (see the note on it in rydeme.html and
+       snarf.html) so a poll rewriting whichever tab is open can never cut
+       its fade short. */
     var REPORT_LINES = [
         'Report filed. A team of exactly nobody is reviewing it.',
         'Thanks for your feedback. It will change nothing.',
-        'Report submitted. The driver will never know, and neither will we.',
+        'Message sent. No one will read it, and nothing will happen.',
         'Complaint logged in a system that does not exist.',
-        'Noted. rydeme cares deeply, in theory.'
+        'Noted. Someone cares deeply, in theory.'
     ];
     var toastTimer = null;
     function showReportToast() {
@@ -1093,6 +1094,12 @@
 
     var refreshEl = el('refresh');
     if (refreshEl) refreshEl.onclick = function () { setBusy(true); load(); };
+
+    /* Snarf's own joke button, static markup on its Profile screen rather
+       than rebuilt per render -- see showReportToast(). Absent on
+       rydeme.html so this is a no-op there. */
+    var supportEl = el('contact-support');
+    if (supportEl) supportEl.onclick = showReportToast;
 
     /* ---- Avatar picker -----------------------------------------------------
        #avatar-sheet is, like #ride-map-overlay, a permanent sibling wired once

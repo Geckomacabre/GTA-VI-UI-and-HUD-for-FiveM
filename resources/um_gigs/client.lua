@@ -1490,7 +1490,7 @@ end)
 
 RegisterNUICallback('um_gigs:getProfile', function(data, cb)
     local app = data and data.app
-    if app ~= 'rydeme' then return cb({ rating = 0, history = {} }) end
+    if app ~= 'rydeme' and app ~= 'snarf' then return cb({ rating = 0, history = {} }) end
 
     local res = lib.callback.await('um_gigs:server:getProfile', false, app)
     cb(res or { rating = 0, history = {} })
@@ -1498,9 +1498,9 @@ end)
 
 RegisterNUICallback('um_gigs:setAvatar', function(data, cb)
     local app = data and data.app
-    if app ~= 'rydeme' then return cb({ ok = false }) end
+    if app ~= 'rydeme' and app ~= 'snarf' then return cb({ ok = false }) end
 
-    local ok = lib.callback.await('um_gigs:server:setAvatar', false, data.avatar)
+    local ok = lib.callback.await('um_gigs:server:setAvatar', false, app, data.avatar)
     cb({ ok = ok == true })
 end)
 

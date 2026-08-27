@@ -570,6 +570,22 @@ Config.Feedback = {
         'Hit something. Twice.', 'I am still shaking.',
         'Genuinely dangerous.', 'Please do not let this person drive.',
     },
+
+    -- Snarf's much smaller version: no named customer to roll a temperament
+    -- for, just a note tied straight to whether the order was on time.
+    snarf = {
+        silence = 0.55,
+        good = {
+            'Still hot, thanks!', 'Fast delivery.', 'Left it right at the door.',
+            'No notes.', 'Exactly what I ordered.', 'Solid.',
+            'Didn\'t even have to come downstairs.',
+        },
+        late = {
+            'Took forever.', 'Fries were cold.', 'Finally.',
+            'Thought it got lost.', 'A bit late but whatever.',
+            'Cold and slightly crushed.',
+        },
+    },
 }
 
 -- -----------------------------------------------------------------------------

@@ -145,13 +145,20 @@ end
 --- The rider-facing history behind the Driver Profile screen. Stored as JSON
 --- on player metadata, same trick as gig_rating -- it needs to survive a
 --- reconnect, and this is not enough data to want its own table.
+---
+--- Keyed per app (gig_rydeme_history, gig_snarf_history, ...) rather than one
+--- shared list: a rydeme passenger review and a Snarf delivery note are not
+--- the same kind of thing, and the two apps' Profile tabs should each show
+--- their own. 'rydeme' keeps its original key exactly, so existing data reads
+--- back unchanged.
 ---@param src number
+---@param app string
 ---@return table
-local function loadHistory(src)
+local function loadHistory(src, app)
     local player = exports.qbx_core:GetPlayer(src)
     if not player then return {} end
 
-    local raw = player.PlayerData.metadata.gig_rydeme_history
+    local raw = player.PlayerData.metadata['gig_' .. app .. '_history']
     if not raw or raw == '' then return {} end
 
     local ok, decoded = pcall(json.decode, raw)
@@ -161,45 +168,50 @@ local function loadHistory(src)
 end
 
 ---@param src number
+---@param app string
 ---@param entry table
-local function pushHistory(src, entry)
+local function pushHistory(src, app, entry)
     if not exports.qbx_core:GetPlayer(src) then return end
 
-    local history = loadHistory(src)
+    local history = loadHistory(src, app)
     table.insert(history, 1, entry)
 
     while #history > Config.History.limit do
         table.remove(history)
     end
 
-    exports.qbx_core:SetMetadata(src, 'gig_rydeme_history', json.encode(history))
+    exports.qbx_core:SetMetadata(src, 'gig_' .. app .. '_history', json.encode(history))
 end
 
 --- The Driver Profile avatar: a URL (lb-phone's own components.uploadMedia
 --- result, or a gallery item's .src), stored on player metadata the same way
---- as gig_rydeme_history. This is a link into lb-phone's own media storage,
---- not image data itself, so the length cap here is just to stop a tampered
---- NUI call from writing something absurd rather than sizing for a photo.
+--- as the history, and per app for the same reason -- rydeme and Snarf are
+--- different companies in fiction and get different profile photos.
+--- This is a link into lb-phone's own media storage, not image data itself,
+--- so the length cap here is just to stop a tampered NUI call from writing
+--- something absurd rather than sizing for a photo.
 ---@param src number
+---@param app string
 ---@return string?
-local function loadAvatar(src)
+local function loadAvatar(src, app)
     local player = exports.qbx_core:GetPlayer(src)
     if not player then return nil end
 
-    local raw = player.PlayerData.metadata.gig_rydeme_avatar
+    local raw = player.PlayerData.metadata['gig_' .. app .. '_avatar']
     return (raw and raw ~= '') and raw or nil
 end
 
 local MAX_AVATAR_LEN = 2048
 
 ---@param src number
+---@param app string
 ---@param dataUrl unknown
 ---@return boolean
-local function saveAvatar(src, dataUrl)
+local function saveAvatar(src, app, dataUrl)
     if not exports.qbx_core:GetPlayer(src) then return false end
 
     if dataUrl == nil or dataUrl == false then
-        exports.qbx_core:SetMetadata(src, 'gig_rydeme_avatar', nil)
+        exports.qbx_core:SetMetadata(src, 'gig_' .. app .. '_avatar', nil)
         return true
     end
 
@@ -208,12 +220,13 @@ local function saveAvatar(src, dataUrl)
         return false
     end
 
-    exports.qbx_core:SetMetadata(src, 'gig_rydeme_avatar', dataUrl)
+    exports.qbx_core:SetMetadata(src, 'gig_' .. app .. '_avatar', dataUrl)
     return true
 end
 
-lib.callback.register('um_gigs:server:setAvatar', function(src, dataUrl)
-    return saveAvatar(src, dataUrl)
+lib.callback.register('um_gigs:server:setAvatar', function(src, app, dataUrl)
+    if app ~= 'rydeme' and app ~= 'snarf' then return false end
+    return saveAvatar(src, app, dataUrl)
 end)
 
 -- -----------------------------------------------------------------------------
@@ -254,6 +267,20 @@ local function reviewFor(clean)
     else pool = Config.Feedback.bad end
 
     return stars, pool and pick(pool) or nil
+end
+
+--- Snarf's much smaller equivalent of reviewFor(): there is no named customer
+--- to roll a temperament for, so the note is just a coin flip on whether the
+--- order actually showed up on time.
+---@param late boolean
+---@return number stars, string? comment
+local function snarfReviewFor(late)
+    local pool = Config.Feedback.snarf
+    local stars = late and 3 or 5
+
+    if math.random() < pool.silence then return stars, nil end
+
+    return stars, pick(late and pool.late or pool.good)
 end
 
 -- -----------------------------------------------------------------------------
@@ -944,7 +971,7 @@ RegisterNetEvent('um_gigs:server:abort', function(data)
     local reason = data.reason == 'fuel' and 'ran out of fuel' or 'the car died'
     local newRating = moveRating(src, -Config.Abort.ratingPenalty)
 
-    pushHistory(src, {
+    pushHistory(src, 'rydeme', {
         name = gig.passengerName or 'Rider',
         stars = Config.Abort.stars,
         comment = pick(Config.Abort.comments),
@@ -1111,9 +1138,10 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
     player.Functions.AddMoney(Config.Account, pay + tip, 'gig-' .. gig.app)
 
     -- ---- the review --------------------------------------------------------
-    -- Ryde Me only -- Snarf customers do not leave the equivalent of a star
-    -- review in this resource today. A player ride is rated by the player, so
-    -- nothing is written here; it lands when they submit.
+    -- A player ride is rated by the player, so nothing is written here for
+    -- one; it lands when they submit. Snarf has no named customer to roll a
+    -- temperament for, so its note is a much smaller coin flip on whether the
+    -- order was actually on time -- see snarfReviewFor().
     if gig.app == 'rydeme' and not gig.playerRide then
         local stars, comment
 
@@ -1124,14 +1152,25 @@ RegisterNetEvent('um_gigs:server:complete', function(data)
             stars, comment = reviewFor(clean)
         end
 
-        pushHistory(src, {
+        pushHistory(src, 'rydeme', {
             name = gig.passengerName or 'Rider',
             stars = stars,
             comment = comment,
             pay = pay,
             tip = tip,
             ts = os.time(),
-            tier = (gig.app == 'rydeme') and tierFor(info.mult) or nil,
+            tier = tierFor(info.mult),
+        })
+    elseif gig.app == 'snarf' then
+        local stars, comment = snarfReviewFor(data.late == true)
+
+        pushHistory(src, 'snarf', {
+            name = gig.pickupLabel or gig.kindLabel or 'Delivery',
+            stars = stars,
+            comment = comment,
+            pay = pay,
+            tip = tip,
+            ts = os.time(),
         })
     end
 
@@ -1168,13 +1207,13 @@ RegisterNetEvent('um_gigs:server:cancel', function()
 end)
 
 lib.callback.register('um_gigs:server:getProfile', function(src, app)
-    if app ~= 'rydeme' then return { rating = 0, history = {} } end
+    if app ~= 'rydeme' and app ~= 'snarf' then return { rating = 0, history = {} } end
 
     return {
         rating = getRating(src),
-        history = loadHistory(src),
+        history = loadHistory(src, app),
         warnThreshold = Config.Rating.warnThreshold,
-        avatar = loadAvatar(src),
+        avatar = loadAvatar(src, app),
     }
 end)
 
@@ -1405,7 +1444,7 @@ lib.callback.register('um_gigs:server:rateDriver', function(src, stars, comment)
     if exports.qbx_core:GetPlayer(driver) then
         local newRating = moveRating(driver, delta)
 
-        pushHistory(driver, {
+        pushHistory(driver, 'rydeme', {
             name = playerName(src),
             stars = s,
             comment = text,
