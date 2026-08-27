@@ -19,6 +19,8 @@ CyberLeek's videos.
 | Vehicle panel, minimap, speed limit sign (day) | Vehicle panel + turn-by-turn (night) |
 | ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
 | `um_gigs` — Ryde Me driver profile | Driver profile, close up |
+| ![ox_inventory weapon wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | |
+| `ox_inventory` — GTA6 weapon wheel hotbar | |
 
 ## What's in here
 
@@ -72,7 +74,8 @@ Overlays for resources you install separately:
   `ui_page`, so each needed its own small copy of the same theme hook.
 - **`ox_inventory`** — a separate, unrelated GTA6-inspired reskin of the F2
   inventory screen and the in-world hotbar (a curved five-slot weapon wheel,
-  not part of the vice_hud glass system above).
+  [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png), not part of
+  the vice_hud glass system above).
 - **`speedlimits`**, **`zseatbelt`** — positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
