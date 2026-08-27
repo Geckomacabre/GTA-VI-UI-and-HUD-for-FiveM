@@ -137,6 +137,11 @@ license from their original author (Overextended's `ox_*` projects are
 LGPL-3.0/GPL-3.0, for example) — where a folder has its own `LICENSE` file,
 that governs that folder specifically.
 
+## Contributing
+
+If you edit any part of this source, please make your fork available on
+GitHub so we can all work together on it.
+
 ## Notes
 
 - Version numbers noted in `docs/PATCHES.md` are what each patch was built
