@@ -799,8 +799,23 @@
                 host.innerHTML = npcRideHtml(n);
 
                 if (n.phase === 'done') {
-                    Array.prototype.forEach.call(host.querySelectorAll('.star'), function (b) {
-                        b.onclick = function () { rating.stars = parseInt(b.dataset.n, 10); renderRide(); };
+                    /* Patches the .on classes directly rather than calling
+                       renderRide() again: this whole block only runs on a
+                       phase CHANGE (see the shownNpcPhase guard above), so a
+                       star click -- which does not change the phase -- would
+                       call renderRide() and have it no-op, leaving every star
+                       looking exactly as it did before the click. */
+                    var starEls = host.querySelectorAll('.star');
+                    var paintStars = function () {
+                        Array.prototype.forEach.call(starEls, function (s) {
+                            s.classList.toggle('on', parseInt(s.dataset.n, 10) <= rating.stars);
+                        });
+                    };
+                    Array.prototype.forEach.call(starEls, function (b) {
+                        b.onclick = function () {
+                            rating.stars = parseInt(b.dataset.n, 10);
+                            paintStars();
+                        };
                     });
                     el('npc-rate-send').onclick = function () {
                         fetchNui('um_gigs:npcRateDriver', { stars: rating.stars }).then(function () {
