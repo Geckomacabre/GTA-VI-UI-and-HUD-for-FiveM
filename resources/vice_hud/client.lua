@@ -1861,7 +1861,14 @@ local function getWaypointCoords()
         local wc = Config.Nav.waypointColour
         if wc and blip ~= colouredWaypointBlip then
             SetBlipColour(blip, 84) -- required so SetBlipSecondaryColour's RGB actually takes
-            SetBlipSecondaryColour(blip, wc.r, wc.g, wc.b) -- recolours the cross AND the route line
+            SetBlipSecondaryColour(blip, wc.r, wc.g, wc.b) -- recolours the cross
+            -- The route line does NOT follow the blip's own colour/secondary
+            -- colour at all -- confirmed wrong in-game (cross went pink, line
+            -- stayed the default purple). SET_BLIP_ROUTE_COLOUR is the actual
+            -- native for the line, and colour index 84 is what makes IT pick
+            -- up the same custom RGB just set above via SetBlipSecondaryColour,
+            -- same as SetBlipColour(blip, 84) does for the cross.
+            SetBlipRouteColour(blip, 84)
             colouredWaypointBlip = blip
         end
         return GetBlipInfoIdCoord(blip)

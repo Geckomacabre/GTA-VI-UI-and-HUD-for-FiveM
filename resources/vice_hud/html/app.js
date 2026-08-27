@@ -1056,15 +1056,28 @@
     var honorPopTimer = null;
     var honorHideTimer = null;
 
-    function onHonorPop(delta, emoji) {
+    function onHonorPop(delta, emoji, broken) {
         var el = $('honor-pop');
         if (!el || !delta) return;
-        var up = delta > 0;
-        el.className = up ? 'up' : 'down';
         var sign = $('honor-pop-sign');
-        if (sign) sign.textContent = up ? '+' : '−';
         var face = $('honor-pop-face');
-        if (face) face.textContent = emoji || (up ? '😇' : '😈');
+        var crack = $('honor-pop-crack');
+
+        if (broken) {
+            // Broken isn't a direction -- no sign, and the face reads the
+            // same grey/cracked way the corner badge does.
+            el.className = 'broken';
+            if (sign) sign.textContent = '';
+            if (face) { face.textContent = emoji || '😈'; face.classList.add('broken'); }
+            show(crack, true);
+        } else {
+            var up = delta > 0;
+            el.className = up ? 'up' : 'down';
+            if (sign) sign.textContent = up ? '+' : '−';
+            if (face) { face.textContent = emoji || (up ? '😇' : '😈'); face.classList.remove('broken'); }
+            show(crack, false);
+        }
+
         show(el, true);
         if (honorPopTimer) clearTimeout(honorPopTimer);
         honorPopTimer = setTimeout(function () { show(el, false); }, 2200);
@@ -1072,9 +1085,12 @@
 
     function onHonor(d) {
         // A change fires the centre indicator; the corner panel then just
-        // reflects the current standing and stays put.
+        // reflects the current standing and stays put. Same trigger as
+        // always (a real delta) -- broken only changes HOW it renders once
+        // it fires (see onHonorPop): no sign, cracked face instead of a
+        // coloured direction arrow.
         if (d.delta) {
-            onHonorPop(d.delta, d.delta > 0 ? d.angelEmoji : d.devilEmoji);
+            onHonorPop(d.delta, d.delta > 0 ? d.angelEmoji : d.devilEmoji, d.broken);
         }
 
         var el = $('honor');

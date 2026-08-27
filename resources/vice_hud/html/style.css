@@ -2472,6 +2472,23 @@ html, body {
 #honor-pop.up   #honor-pop-sign { color: #bfe3c8; }
 #honor-pop.down #honor-pop-sign { color: #e3a9bf; }
 
+/* Unrepairable floor: no sign (see index.html's comment), face desaturated
+   with a crack overlaid, same treatment as the corner badge's #honor-badge/
+   #honor-crack. em-sized so it tracks #honor-pop's own font-size without
+   repeating that calc(). */
+#honor-pop-face-wrap { position: relative; display: inline-flex; }
+#honor-pop-face.broken { filter: grayscale(1) brightness(0.72); }
+#honor-pop-crack {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.72em;
+    height: 0.72em;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
 /* Reputation change popup ----------------------------------------------------
    Same "+N icon" shape as honor-pop, minus the up/down split — reputation
    only ever goes up, so there is exactly one colour, not a pair keyed off a
