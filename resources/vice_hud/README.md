@@ -93,7 +93,7 @@ on entering                          for the rest of the drive
 | **Optional** | `qbx_core` — the money readout and skill XP persistence |
 | **Optional** | `qbx_honor` — the honor system |
 | **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
-| **Optional** | `fenix-police` — feeds the wanted-search overlay and the real outfit/voice/vehicle tells; without it the HUD falls back to the plain wanted-star row with all three tells always shown. Not a public resource — a private server-specific fork, so it isn't linked or bundled here |
+| **Optional** | [`fenix-police`](https://github.com/Geckomacabre/fenix-police) — feeds the wanted-search overlay and the real outfit/voice/vehicle tells; without it the HUD falls back to the plain wanted-star row with all three tells always shown |
 | **Optional** | [`wasabi_backpack`](https://github.com/wasabirobby/wasabi_backpack) — feeds the Duffle Bag Value row. Not bundled (no upstream license covering redistribution, same reasoning as LS Map Lite below); install it separately and rename its item `dufflebag` to match `Config.Duffle.item` |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and

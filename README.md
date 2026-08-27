@@ -135,17 +135,24 @@ updating.
 
 ## Recommended pairings
 
-Not bundled here — separate projects you install yourself, credited rather
-than embedded because neither publishes a license covering redistribution:
+Not bundled here — separate projects you install yourself:
 
+- **[fenix-police](https://github.com/Geckomacabre/fenix-police)** (GPL-3.0)
+  — an AI police dispatch/pursuit resource. Not bundled because it's a
+  standalone gameplay system, not part of this repo's UI/HUD scope, but
+  `vice_hud` integrates with it directly when both are running: it feeds the
+  wanted-search minimap overlay and the real outfit/voice/vehicle tells (see
+  `resources/vice_hud/README.md`'s Requirements table). Without it vice_hud
+  falls back to a plain wanted-star row.
 - **[FlyBanditMods-iOS_LS_Map-Lite](https://github.com/TheFlyBandit/FlyBanditMods-iOS_LS_Map-Lite)**
-  by TheFlyBandit — an iOS/Google-Maps-styled minimap texture replacement.
-  Drag-and-drop per its own README; `vice_hud`'s rounded minimap mask and
-  wanted-search overlay sit on top of whatever map style is loaded, so the
-  two work together with no extra configuration. Grab it from the link
-  above rather than from a copy in this repo.
+  by TheFlyBandit — an iOS/Google-Maps-styled minimap texture replacement. No
+  license published upstream covering redistribution, so it's linked rather
+  than copied in here. Drag-and-drop per its own README; `vice_hud`'s rounded
+  minimap mask and wanted-search overlay sit on top of whatever map style is
+  loaded, so the two work together with no extra configuration.
 - **[wasabi_backpack](https://github.com/wasabirobby/wasabi_backpack)** by
-  wasabirobby — an ox_inventory bag item with its own per-bag stash.
+  wasabirobby — an ox_inventory bag item with its own per-bag stash. Same
+  licensing reasoning as LS Map Lite above — linked, not embedded.
   `vice_hud`'s Duffle Bag Value row (`Config.Duffle`) reads whatever's inside
   it, priced against what a fence/pawn shop would actually pay. Rename its
   item to `dufflebag` (or change `Config.Duffle.item` to match whatever you
