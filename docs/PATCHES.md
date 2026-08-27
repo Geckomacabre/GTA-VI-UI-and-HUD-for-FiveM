@@ -5,17 +5,24 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
-(ox_lib, ox_target, ox_inventory, qb-menu, qb-input) to bring vice_hud's
-theme into that resource's own UI. Copy the files into place, then make the
-one- or two-line edit shown below for that resource. None of these change
-functionality — every patch is presentational only (a stylesheet + a script
-that listens for a theme broadcast from vice_hud).
+(ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
+um_smallresources) to connect it to vice_hud. Copy the files into place, then
+make the one- or two-line edit shown below for that resource.
+
+Most of these are presentational only — a stylesheet plus a script that
+listens for a theme broadcast from vice_hud. Two are not: `speedlimits` and
+`zseatbelt` are **positioning hooks** (they let vice_hud's `/movehud` editor
+move that resource's own on-screen icon, which vice_hud otherwise has no way
+to reach since each one draws through its own NUI page rather than
+vice_hud's), and `um_smallresources` is a **functional conflict fix** (a
+competing script that resets player stamina every 500ms, which pins vice_hud's
+stamina bar at full and makes it look broken).
 
 **Version pinned against:** ox_lib 3.32.3, ox_target 1.18.0, ox_inventory
-2.45.0, qb-menu 1.2.0, qb-input 1.2.0. If your copy of any of these is on a
-different version, check the target file still looks like the snippet below
-before you paste the patch in — a big upstream version jump can move things
-around.
+2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um.
+If your copy of any of these is on a different version, check the target
+file still looks like the snippet below before you paste the patch in — a
+big upstream version jump can move things around.
 
 **An update to any of these resources will silently wipe its patch.** That's
 expected — these are hand-edits sitting on top of someone else's resource,
@@ -210,3 +217,70 @@ rather than dropping the build output in blind.
 
 Colors are exposed as CSS custom properties in `gta6-theme.scss`, so you can
 retheme without touching component code.
+
+## speedlimits
+
+Positioning hook, so the posted-speed-limit sign can be moved with everything
+else in vice_hud's `/movehud` editor (**Other resources** row). Both files
+were edited directly, not just appended to — the CSS in particular was
+rewritten to anchor against vice_hud's own viewport stage (`.stage`, full
+viewport, not a centred 16:9 box) instead of floating at a raw screen edge,
+so it stays lined up with the minimap on ultrawide.
+
+Copy over your `speedlimits/` install:
+
+```
+patches/speedlimits/client/main.lua
+patches/speedlimits/html/index.html
+patches/speedlimits/html/index.html.pre-vice_hud   (restore point — the un-patched original)
+```
+
+No `fxmanifest.lua` edit needed — both files already exist in stock
+`speedlimits` and are already declared there; only their contents changed.
+
+If your `speedlimits` version differs from 1.2.0, diff `index.html.pre-vice_hud`
+against your own `html/index.html` first — if the stock file has changed
+shape, hand-merge the vice_hud hook (the `.stage` wrapper, the `--off-*`
+transform, and the `case "offset":` branch in the message listener) instead
+of overwriting.
+
+## zseatbelt
+
+Same kind of positioning hook as `speedlimits`, for the seatbelt icon.
+
+Copy over your `zseatbelt/` install:
+
+```
+patches/zseatbelt/client/main.lua
+patches/zseatbelt/client/html/index.html
+patches/zseatbelt/config.lua
+```
+
+`config.lua` is included because `Config.showUnbuckledIndicator` was flipped
+back to `true` here — it had been turned off because an older HUD (`um_hud`)
+drew its own belt icon, and vice_hud's vehicle panel does not. If you've
+already set that config value deliberately for your own reasons, don't
+overwrite it — only the `client/` and `html/` changes are the actual
+vice_hud hook.
+
+No `fxmanifest.lua` edit needed.
+
+## um_smallresources (Stamina)
+
+Not a theme patch — a **functional conflict fix**. `um_smallresources`
+bundles a `Stamina` script that calls `ResetPlayerStamina()` every 500ms to
+give infinite stamina. That pins `GetPlayerSprintStaminaRemaining()` at full
+faster than it can ever drain, so vice_hud's stamina bar reads "full"
+forever and looks broken — it isn't; there's just nothing for it to read.
+
+If you run `um_smallresources` alongside vice_hud, replace:
+
+```
+patches/um_smallresources/Stamina/client.lua
+```
+
+The original — the infinite-stamina version — sits beside it as
+`client.lua.pre-vice_hud` if you'd rather keep infinite stamina and just
+remove vice_hud's stamina bar instead (`Config.Stamina` in `vice_hud`).
+
+No `fxmanifest.lua` edit needed — same filename, same file list.
