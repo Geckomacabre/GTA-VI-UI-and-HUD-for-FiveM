@@ -133,10 +133,23 @@ font is just present and ready to use if you want to switch either app's
 This repository is licensed under the [GNU General Public License v3.0](LICENSE),
 matching `vice_hud`, its core resource.
 
-Individual folders under `resources/` and `patches/` may carry their own
-license from their original author (Overextended's `ox_*` projects are
-LGPL-3.0/GPL-3.0, for example) — where a folder has its own `LICENSE` file,
-that governs that folder specifically.
+`resources/vice_hud` carries its own `LICENSE` file (also GPL-3.0) — that
+governs that folder specifically. Nothing else under `resources/` or
+`patches/` ships its own `LICENSE` here, since `patches/` is only a handful
+of individual files extracted from each project, not a full copy — but the
+original projects remain under their own upstream license:
+
+| Project | License |
+| --- | --- |
+| `ox_lib` | LGPL-3.0 |
+| `ox_target` | MIT |
+| `ox_inventory` | GPL-3.0 |
+| `qb-menu`, `qb-input` | GPL-3.0 |
+| `speedlimits`, `zseatbelt` | MIT |
+| `um_smallresources` | GPL-3.0 |
+
+Check each project's own repository for its full license text before
+redistributing patched files from this bundle outside your own server.
 
 ## Contributing
 
