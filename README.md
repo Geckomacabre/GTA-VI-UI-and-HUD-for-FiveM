@@ -71,7 +71,8 @@ Overlays for resources you install separately:
 - **`ox_target`**, **`qb-menu`**, **`qb-input`** — each has its own
   `ui_page`, so each needed its own small copy of the same theme hook.
 - **`ox_inventory`** — a separate, unrelated GTA6-inspired reskin of the F2
-  inventory screen (not part of the vice_hud glass system above).
+  inventory screen and the in-world hotbar (a curved five-slot weapon wheel,
+  not part of the vice_hud glass system above).
 - **`speedlimits`**, **`zseatbelt`** — positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.

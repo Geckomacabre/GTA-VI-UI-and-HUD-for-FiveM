@@ -181,11 +181,16 @@ runtime, always after this one):
 <!-- vice_hud theme -- END -->
 ```
 
-## ox_inventory (GTA6 F2 screen reskin)
+## ox_inventory (GTA6 reskin)
 
-This one is a separate, unrelated visual — a GTA VI-inspired reskin of the
-F2 inventory screen, not part of the vice_hud glass/theme system above. It's
-presentation-only: no drag/drop, slot, or networking logic is touched.
+This one is a separate, unrelated visual — a GTA VI-inspired reskin of both
+the F2 inventory screen and the in-world hotbar, not part of the vice_hud
+glass/theme system above. The hotbar becomes a curved five-slot weapon wheel
+(`WeaponWheel.tsx`) pinned to inventory slots 1-5, positioned and sized off
+measured reference art rather than an evenly-spaced circle. It's
+presentation-only: no drag/drop, slot, or networking logic is touched —
+`WeaponWheel.tsx` wraps the same `InventorySlot` components, so dnd,
+right-click, ctrl+click drop, and alt+click use all keep working.
 
 Source files (for reference / future edits — editing these does nothing on
 their own, ox_inventory's web UI is a Vite/React build):
