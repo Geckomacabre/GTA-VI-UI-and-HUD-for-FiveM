@@ -1866,9 +1866,18 @@ local function getWaypointCoords()
             -- in-game with the colour-84 + SetBlipSecondaryColour trick: the
             -- cross went pink (that part happens to also respond to it) but
             -- the route line ignored it completely and stayed the default
-            -- purple. Both natives now take the SAME verified index so they
-            -- can never visually disagree again.
+            -- purple.
+            --
+            -- SetBlipRouteColour alone ALSO wasn't enough (confirmed wrong
+            -- in-game a second time). Rockstar's own decompiled scripts
+            -- (towing.c, the tow-destination blip) always pair it with an
+            -- explicit SetBlipRoute(blip, true) right before it -- even
+            -- though this blip's route already exists via the vanilla
+            -- waypoint system, that call is apparently what makes the
+            -- ALREADY-DRAWN route actually pick up a new colour rather than
+            -- just being what turns a route on in the first place.
             SetBlipColour(blip, idx)
+            SetBlipRoute(blip, true)
             SetBlipRouteColour(blip, idx)
             colouredWaypointBlip = blip
         end
