@@ -160,7 +160,7 @@
         if (liveData.target && el('drive-map')) {
             if (!driveMap) {
                 driveMap = makeBaseMap('drive-map');
-                driveDestMarker = L.marker(gToL(liveData.target.x, liveData.target.y)).addTo(driveMap);
+                driveDestMarker = L.marker(gToL(liveData.target.x, liveData.target.y), { icon: pinIcon() }).addTo(driveMap);
 
                 if (liveData.pos) {
                     driveMeMarker = L.circleMarker(gToL(liveData.pos.x, liveData.pos.y), {
@@ -403,7 +403,6 @@
        lookup here comes back null and the whole block is a no-op there. */
 
     function riderIdleHtml(s) {
-        var dests = s.destinations || [];
         var drivers = s.driversOnline || 0;
 
         var head = '<div class="ride-head confetti">'
@@ -413,44 +412,30 @@
             + '<div class="ride-sub">' + drivers + (drivers === 1 ? ' driver' : ' drivers')
             + ' online right now</div></div>';
 
-        /* A segmented tier choice, not two buttons per row: pick real-driver
-           or NPC once, then every destination below books at that tier -- the
-           same shape as choosing "Comfort" vs "X" before the list appears. */
-        var mode = '<div class="ride-mode">'
-            + '<button class="' + (rideMode === 'real' ? 'on' : '') + '" data-mode="real">Real driver'
-            + '<span class="sub">a person · costs more</span></button>'
-            + '<button class="' + (rideMode === 'npc' ? 'on' : '') + '" data-mode="npc">NPC driver'
-            + '<span class="sub">instant · costs less</span></button>'
+        /* One tap picks the tier AND takes you straight into naming a
+           destination -- see chooseRideMode(). No curated stop list and no
+           separate "pick on map" row: the map picker (seeded from an
+           existing waypoint if there is one) IS how every ride starts now. */
+        var picks = '<div class="ride-picks">'
+            + '<button class="ride-pick" data-mode="real">'
+            + '<span class="ride-pick-icon">🚖</span>'
+            + '<span class="ride-pick-body">'
+            + '<span class="ride-pick-title">Player pickup</span>'
+            + '<span class="ride-pick-sub">a real driver comes to you</span>'
+            + '</span>'
+            + '<span class="ride-pick-tag">COSTS MORE</span>'
+            + '</button>'
+            + '<button class="ride-pick npc" data-mode="npc">'
+            + '<span class="ride-pick-icon">🤖</span>'
+            + '<span class="ride-pick-body">'
+            + '<span class="ride-pick-title">AI pickup</span>'
+            + '<span class="ride-pick-sub">a car shows up right now</span>'
+            + '</span>'
+            + '<span class="ride-pick-tag">INSTANT</span>'
+            + '</button>'
             + '</div>';
 
-        /* Two ways into the same map preview: tap around in the app itself,
-           or shortcut straight to wherever the player already dropped a pin
-           on their own map. Both sit in the destination list, styled as the
-           same kind of row -- they are other ways to pick a destination, not
-           a separate feature bolted on top. */
-        var rows = '<div class="dests">'
-            + '<button class="dest map-pick" data-map="1">'
-            + '<span class="dest-label">🗺️ Pick on map</span>'
-            + '<span class="dest-meta">tap to drop a pin</span>'
-            + '</button>'
-            + '<button class="dest use-waypoint" data-map="1">'
-            + '<span class="dest-label">📍 Use my waypoint</span>'
-            + '<span class="dest-meta">already set one</span>'
-            + '</button>';
-
-        if (dests.length) {
-            rows += dests.map(function (d) {
-                return '<button class="dest" data-index="' + d.index + '">'
-                    + '<span class="dest-label">' + esc(d.label) + '</span>'
-                    + '<span class="dest-meta">' + km(d.distance) + '</span>'
-                    + '<span class="dest-fare">$' + d.fare + '</span>'
-                    + '</button>';
-            }).join('');
-        }
-
-        rows += '</div>';
-
-        return head + mode + rows
+        return head + picks
             + '<div class="ride-foot">Fares are estimates. rydeme keeps a service fee.</div>';
     }
 
@@ -481,6 +466,28 @@
 
     function gToL(x, y) { return [2.566 * y - 5585.98, 2.566 * x - 1325.11]; }
     function lToG(lat, lng) { return { x: (lng + 1325.11) / 2.566, y: (lat + 5585.98) / 2.566 }; }
+
+    /* A pin drawn as inline SVG, not L.marker()'s own default icon: that
+       default points at image files (marker-icon.png etc.) served relative
+       to wherever Leaflet's CSS loaded from, and this app never bundled
+       them -- every plain L.marker() call was rendering as a broken-image
+       icon on the map. One shared divIcon means there is nothing to fetch
+       and nothing that can 404. */
+    var PIN_ICON = null;
+    function pinIcon() {
+        if (!PIN_ICON) {
+            PIN_ICON = L.divIcon({
+                className: 'ride-pin',
+                html: '<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">'
+                    + '<path d="M13 0C5.8 0 0 5.8 0 13c0 9.5 13 21 13 21s13-11.5 13-21C26 5.8 20.2 0 13 0z" fill="#ff2d95"/>'
+                    + '<circle cx="13" cy="13" r="5" fill="#0c0710"/>'
+                    + '</svg>',
+                iconSize: [26, 34],
+                iconAnchor: [13, 34],
+            });
+        }
+        return PIN_ICON;
+    }
 
     var SAT_URL = 'nui://night_shifts_mdt/NUI/img/map/satellite.png';
     var MAP_BOUNDS = [[-16000, -16000], [16000, 16000]];
@@ -550,7 +557,7 @@
         var ll = gToL(point.x, point.y);
 
         if (rideMarker) rideMarker.setLatLng(ll);
-        else rideMarker = L.marker(ll).addTo(rideMap);
+        else rideMarker = L.marker(ll, { icon: pinIcon() }).addTo(rideMap);
         rideMap.setView(ll, 4);
 
         el('ride-map-confirm').innerHTML = '<p class="sub">Getting a price…</p>';
@@ -602,30 +609,43 @@
         });
     }
 
-    /* The waypoint shortcut: reads the player's own waypoint (client.lua, not
-       the server -- blips are client-only state) and opens the same picker
-       already dropped on it. If none is set this drops the same inline error
-       the destination-list request failures use, since #ride has nowhere
-       else to put one while this tab is open. */
-    function openMapPickerFromWaypoint() {
+    /* What tapping "Player pickup" or "AI pickup" actually does: pick the
+       tier, then go straight into the map picker -- seeded with wherever the
+       player already dropped a waypoint on their own map if they have one
+       (client.lua, not the server -- blips are client-only state), or blank
+       and ready for a tap if they do not. Either way the picker is the very
+       next thing on screen; there is no destination list to choose from
+       first any more. */
+    function chooseRideMode(mode) {
+        rideMode = mode;
         fetchNui('um_gigs:getMyWaypoint').then(function (wp) {
-            if (!wp || wp.ok === false) {
-                var host = el('ride');
-                if (host) {
-                    var old = host.querySelector('.ride-err');
-                    if (old) old.remove();
-                    host.insertAdjacentHTML('afterbegin', '<div class="ride-err">'
-                        + esc((wp && wp.message) || 'Set a waypoint on your map first.') + '</div>');
-                }
-                return;
-            }
-            openMapPicker(wp);
+            openMapPicker(wp && wp.ok !== false ? wp : null);
         });
     }
 
     function closeMapPicker() {
         var overlay = el('ride-map-overlay');
         if (overlay) overlay.classList.remove('on');
+    }
+
+    /* The one button in this app that does nothing on purpose. #toast lives
+       outside #board/#profile/#ride (see the note on it in goober.html) so a
+       poll rewriting whichever tab is open can never cut its fade short. */
+    var REPORT_LINES = [
+        'Report filed. A team of exactly nobody is reviewing it.',
+        'Thanks for your feedback. It will change nothing.',
+        'Report submitted. The driver will never know, and neither will we.',
+        'Complaint logged in a system that does not exist.',
+        'Noted. rydeme cares deeply, in theory.'
+    ];
+    var toastTimer = null;
+    function showReportToast() {
+        var t = el('toast');
+        if (!t) return;
+        t.textContent = REPORT_LINES[Math.floor(Math.random() * REPORT_LINES.length)];
+        t.classList.add('on');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
     }
 
     function riderActiveHtml(r) {
@@ -657,7 +677,8 @@
         var cancellable = (r.state === 'searching' || r.state === 'assigned' || r.state === 'onboard');
 
         return body + (cancellable
-            ? '<div class="ride-foot"><button class="danger" id="ride-cancel">Cancel ride</button></div>'
+            ? '<div class="ride-foot"><button class="danger" id="ride-cancel">Cancel ride</button>'
+              + '<button class="report-link" id="ride-report">Report driver</button></div>'
             : '');
     }
 
@@ -701,10 +722,16 @@
 
         var boarded = n.phase === 'boarded';
 
-        return '<div class="empty">'
-            + '<p><b>' + (boarded ? 'On the way to ' + esc(n.destLabel) + '.' : 'Your driver is on the way.') + '</b></p>'
-            + '</div>'
+        /* .ride-live fills the whole tab -- see the CSS note on it -- with
+           #npc-map going edge to edge underneath and the status line/buttons
+           floating on top of it as translucent cards, instead of the map
+           being a 200px strip above a lot of empty space. */
+        return '<div class="ride-live">'
+            + '<div class="ride-live-status"><p><b>'
+            + (boarded ? 'On the way to ' + esc(n.destLabel) + '.' : 'Your driver is on the way.')
+            + '</b></p></div>'
             + '<div id="npc-map"></div>'
+            + '<div class="ride-live-actions">'
             + (boarded
                 ? '<div class="npc-actions">'
                   + '<button id="npc-speedup"' + (n.speedBoost ? ' disabled' : '') + '>'
@@ -712,7 +739,10 @@
                   + '</button>'
                   + '<button class="danger" id="npc-end">End fare here</button>'
                   + '</div>'
-                : '');
+                : '')
+            + '<button class="report-link" id="npc-report">Report driver</button>'
+            + '</div>'
+            + '</div>';
     }
 
     /* Patches the live bits into whichever phase npcRideHtml() built: the car
@@ -767,7 +797,7 @@
             }
 
             if (n.destPos && !npcDestMarker) {
-                npcDestMarker = L.marker(gToL(n.destPos.x, n.destPos.y)).addTo(npcMap);
+                npcDestMarker = L.marker(gToL(n.destPos.x, n.destPos.y), { icon: pinIcon() }).addTo(npcMap);
             }
 
             if (!npcMapCentred) {
@@ -835,6 +865,9 @@
                             fetchNui('um_gigs:npcEndRide');
                         };
                     }
+
+                    var reportBtn = el('npc-report');
+                    if (reportBtn) reportBtn.onclick = showReportToast;
                 }
             }
 
@@ -875,6 +908,8 @@
                     fetchNui('um_gigs:cancelRide').then(load);
                 };
             }
+            var rb = el('ride-report');
+            if (rb) rb.onclick = showReportToast;
             return;
         }
 
@@ -886,38 +921,8 @@
 
         host.innerHTML = riderIdleHtml(state);
 
-        Array.prototype.forEach.call(host.querySelectorAll('.ride-mode button'), function (b) {
-            b.onclick = function () {
-                rideMode = b.dataset.mode;
-                renderRide();
-            };
-        });
-
-        var mapBtn = host.querySelector('.map-pick');
-        if (mapBtn) mapBtn.onclick = function () { openMapPicker(); };
-
-        var waypointBtn = host.querySelector('.use-waypoint');
-        if (waypointBtn) waypointBtn.onclick = openMapPickerFromWaypoint;
-
-        /* [data-index] excludes the map-pick and use-waypoint buttons -- both
-           are styled as a .dest but carry no index, and parseInt(undefined)
-           is NaN, which used to wire them to a broken request. */
-        Array.prototype.forEach.call(host.querySelectorAll('.dest[data-index]'), function (b) {
-            b.onclick = function () {
-                b.disabled = true;
-                fetchNui('um_gigs:requestRide', {
-                    index: parseInt(b.dataset.index, 10),
-                    npc: rideMode === 'npc'
-                }).then(function (r) {
-                    if (r && r.ok === false) {
-                        host.insertAdjacentHTML('afterbegin',
-                            '<div class="ride-err">' + esc(r.message) + '</div>');
-                        b.disabled = false;
-                        return;
-                    }
-                    load();
-                });
-            };
+        Array.prototype.forEach.call(host.querySelectorAll('.ride-pick'), function (b) {
+            b.onclick = function () { chooseRideMode(b.dataset.mode); };
         });
     }
 
