@@ -1,0 +1,3051 @@
+/* Helvetica Neue, the reference face. One @font-face per REAL cut, so the
+   browser never has to synthesise a weight — a synthetic bold smears badly next
+   to a genuine one, and a synthetic light is worse, because the rasteriser
+   thins strokes it was never given outlines for and the result is the ragged,
+   pixelated look that makes people blame the screen.
+     Thin   100/200 - the lightest installed cut
+     Roman  400     - zone bar, body copy
+     Medium 500     - labels wanting a touch more presence
+     Bold   700     - vehicle make/model, money, honor
+   Italics are still deliberately absent: nothing asks for them, and every file
+   in the manifest's files{} is downloaded by each player who connects.
+   Add a cut here AND to html/fonts/ AND to fxmanifest's files{} if another
+   weight is ever needed — miss any of the three and it silently synthesises. */
+/* NOT BUNDLED -- resolved from the player's own machine.
+   Helvetica Neue is a commercial Monotype/Linotype face and redistributing the
+   .otf files in a public repository is not ours to do, so the four cuts are
+   looked up with local() instead of shipped. The family name is unchanged, so
+   every font stack further down this file still reads 'HelveticaNeueHUD' and
+   nothing else had to move.
+
+   The chain degrades on purpose: the real face on machines that have it
+   (macOS ships it; many Windows installs do too), then Helvetica, then Arial
+   -- which is metrically compatible with Helvetica, so line lengths and the
+   shrink-to-fit measurements hold -- then Liberation Sans, its metric clone on
+   Linux. One of those exists everywhere, so the family always resolves.
+
+   The one real loss is the Thin cut: Arial has no 100/200, so a thin weight
+   falls back to regular on machines without Helvetica Neue. That affects the
+   nav bar and wanted box, both of which are tuned to thin in the shipped
+   layout. Bundle the .otf files again locally if you own a licence for them
+   and want the exact cut back -- drop them in html/fonts/ and restore the
+   url() sources; fxmanifest already globs html/fonts/*.otf. */
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue Thin'), local('HelveticaNeue-Thin'),
+         local('Helvetica Neue Light'), local('HelveticaNeue-Light'),
+         local('Arial'), local('Liberation Sans');
+    /* Claimed for both 100 and 200 so "Thin" is a real cut at either, rather
+       than 100 being real and 200 being a synthesised in-between. */
+    font-weight: 100 200;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue'), local('HelveticaNeue'), local('Helvetica'),
+         local('Arial'), local('Liberation Sans');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue Medium'), local('HelveticaNeue-Medium'),
+         local('Helvetica'), local('Arial'), local('Liberation Sans');
+    font-weight: 500;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue Bold'), local('HelveticaNeue-Bold'),
+         local('Helvetica Bold'), local('Arial Bold'), local('Arial'),
+         local('Liberation Sans Bold');
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* =============================================================================
+   vice_hud — GTA6-style HUD
+   -----------------------------------------------------------------------------
+   Everything lives inside .stage, which spans the FULL viewport — the reference
+   anchors its HUD to the physical screen edges, and so does GTA's own minimap,
+   so a centred 16:9 stage would displace every panel on an ultrawide.
+
+   All sizes use cqw/cqh (container query units) against .stage. The composition
+   is authored against 1920x1080, so at 16:9 every value below is a direct
+   percentage of the reference frame. Type is sized in --w (see below) rather
+   than raw cqw so it tracks viewport HEIGHT and stays proportionate on wider
+   monitors.
+   ========================================================================== */
+
+@font-face {
+    font-family: 'Pricedown';
+    src: url('fonts/pricedown.otf') format('opentype');
+    font-display: block;
+}
+
+/* GTA Art Deco. Two real cuts, so Regular and Medium are separate faces rather
+   than one face the browser thickens by hand. TrueType, not OpenType — the
+   format() hint has to match or the browser rejects the file and falls back
+   without telling anyone. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+/* Design tokens. The reference footage is low-bitrate, so exact radii and
+   shadow values cannot be read off it — these are chosen to be consistent and
+   clean rather than to replicate compression artefacts. Proportions and colour
+   still come from measurement. */
+:root {
+    --r-sm: 0.18cqw;   /* pills, small plates */
+    --r-md: 0.30cqw;   /* zone bar, wanted box */
+    --r-lg: 0.62cqw;   /* minimap frame, vehicle panel */
+
+    /* Plate sampled across 113 frames: median #3c393d over typical scenery,
+       #6e6b6f over bright. Slightly purple-grey — my old value was too blue.
+       These composite to the measured median at normal backdrop brightness. */
+    --plate:      rgba(57, 53, 59, 0.88);
+    --plate-soft: rgba(50, 47, 53, 0.76);
+
+    /* The MAP PANEL surface -- zone bar, vehicle panel, nav bar.
+       Deliberately NOT --plate. Those three sit together in one stack and read
+       as one object, so they share a surface; --plate is the warm, slightly
+       purple, semi-transparent material the rest of the HUD (wanted box,
+       prompts) is made of, and against the reference the three map panels are
+       a cooler, flatter, more opaque charcoal with no lit edge. Having them on
+       --plate is what made them "not match" the nav bar once that was rebuilt
+       to the reference. Keep these three on --panel and everything else on
+       --plate; do not merge the two. */
+    --panel:      rgba(35, 37, 46, 0.95);
+    --r-panel:    calc(0.55 * var(--w));
+
+    --shadow-sm: 0 0.12cqh 0.34cqh rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 0.25cqh 0.70cqh rgba(0, 0, 0, 0.46);
+
+    --text:      #f4f4f2;
+    --text-dim:  #c2c2c6;
+    --ink-shadow: 0 0.10cqh 0.22cqh rgba(0, 0, 0, 0.88);
+
+    /* ---- glass -------------------------------------------------------------
+       Every panel this HUD puts ON TOP of itself — the editor, the skills
+       screen, the level-up card — is the same material, and it is defined once
+       here so it stays that way.
+
+       There is no backdrop-filter anywhere in it, and that is not an oversight:
+       on a transparent NUI page CEF has no backdrop to sample and rasterises
+       the region as opaque black. The whole look is therefore carried by things
+       that do not need one — a translucent tint, a bright rim, a specular cap
+       and a top-lit sheen. Use .glass rather than reaching for these directly;
+       the recipe matters as much as the colours.
+
+       These are deliberately NOT the HUD's own palette. That one is measured
+       off the reference footage and describes the game; this describes the
+       chrome sitting over it, and the two should not drift into each other. */
+    --g-tint:    rgba(20, 20, 26, 0.82);
+    --g-rim:     rgba(255, 255, 255, 0.20);
+    --g-spec:    rgba(255, 255, 255, 0.42);
+    --g-fill:    rgba(255, 255, 255, 0.07);
+    --g-fill-hi: rgba(255, 255, 255, 0.13);
+    --g-line:    rgba(255, 255, 255, 0.10);
+    --g-accent:  #5fd8c8;
+    /* The one warm note in the set, for the moment something is EARNED. Kept
+       here so it cannot be reinvented slightly differently next time. */
+    --g-gold:    #e8c56a;
+}
+
+/* -----------------------------------------------------------------------------
+   .glass — SUPERSEDED, and nothing uses it
+   -----------------------------------------------------------------------------
+   Kept as a working recipe rather than deleted, because it is the thing .plate
+   below is defined against and the contrast is most of what explains .plate.
+   Every surface moved to .plate; if you are restyling, that is the one that
+   renders. Do not add a .glass to new markup expecting it to match anything.
+   -----------------------------------------------------------------------------
+   Two fills (a top-lit sheen over the tint), a 1px rim, and a wide low shadow
+   with an inset specular highlight along the top edge. The ::before is a
+   specular CAP: a real edge catches light unevenly along its top curve, and a
+   uniform border cannot say that on its own. That cap is most of the difference
+   between "a pane of glass" and "a grey box with rounded corners".
+
+   Do not flatten the layered fills to one colour to simplify. The flat version
+   IS the grey box.
+   -------------------------------------------------------------------------- */
+.glass {
+    position: relative;
+    background:
+        linear-gradient(176deg,
+            rgba(255, 255, 255, 0.13) 0%,
+            rgba(255, 255, 255, 0.03) 34%,
+            rgba(255, 255, 255, 0.015) 66%,
+            rgba(255, 255, 255, 0.06) 100%),
+        var(--g-tint);
+    border: 1px solid var(--g-rim);
+    box-shadow:
+        0 2.6cqh 7cqh rgba(0, 0, 0, 0.55),
+        0 0.5cqh 1.6cqh rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 var(--g-spec),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.07);
+}
+.glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(125% 62% at 50% -12%,
+        rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0) 62%);
+}
+/* Anything the cap must not sit on top of has to be raised above it. */
+.glass > * { position: relative; z-index: 1; }
+
+/* -----------------------------------------------------------------------------
+   .plate — the MAP PANEL surface, as a shared class
+   -----------------------------------------------------------------------------
+   The second of this HUD's two materials, and the counterpart to .glass above.
+   Same relationship as the two variable blocks in :root: .glass is the chrome
+   the HUD lays over itself, .plate is what the HUD's own panels are made of.
+
+   Lifted out of .slot unchanged so the two cannot drift. The differences from
+   .glass are all deliberate and all load-bearing:
+
+     · the measured plate colour, not the near-black tint
+     · a hairline INSET ring rather than a 1px border, so it costs no layout
+       width — which is what lets a panel keep an exact width while gaining an
+       edge
+     · #vehicle::after's two-gradient sheen (a top-down wash plus a wide
+       diagonal highlight) baked in as background layers
+     · NO specular cap. .glass has a radial ::before and this deliberately does
+       not; adding one here is the single change that would stop a .plate
+       surface reading as the same thing as the zone bar.
+
+   The shadow is --shadow-md rather than .slot's --shadow-sm: a panel floating
+   over the whole screen has to sit further off it than one lying on the map.
+
+   Used by the /movehud editor, and matched byte for byte in the three
+   own-ui_page resources (ox_target, qb-menu, qb-input) that draw their menus
+   next to the map. Change the recipe here and those four have to move together.
+   -------------------------------------------------------------------------- */
+.plate {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--plate);
+    box-shadow:
+        var(--shadow-md),
+        inset 0 0 0 0.055cqw rgba(255, 255, 255, 0.10),
+        inset 0 0.09cqh 0 rgba(255, 255, 255, 0.055);
+}
+/* Same reason as .glass's: the sheen is a background layer here rather than a
+   pseudo-element, but children still need their own stacking to sit cleanly
+   over an inset ring that is drawn on top of the background. */
+.plate > * { position: relative; z-index: 1; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    /* Humanist grotesque, closest widely-available match to the reference UI. */
+    font-family: 'HelveticaNeueHUD', 'Helvetica Neue',
+                 'Segoe UI Variable Display', 'Segoe UI', Inter, system-ui,
+                 Roboto, Arial, sans-serif;
+    /* The source is blurry; ours should not be. */
+    -webkit-font-smoothing: antialiased;
+    /* geometricPrecision, not optimizeLegibility: every movable element carries
+       a scale transform from the editor, and this asks the rasteriser to keep
+       glyph outlines exact under it rather than snapping them to a hinted grid
+       sized for the untransformed text. optimizeLegibility is a kerning and
+       ligature hint that brings its own rasterisation quirks and buys this HUD
+       nothing — there is no ligature anywhere in it. */
+    text-rendering: geometricPrecision;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+}
+
+/* --w: one "reference cqw".
+   The reference footage is 16:9, where 1cqw == 1.7778cqh. Sizing type in cqw
+   means it tracks viewport WIDTH, so on a 21:9 or 32:9 monitor every label grows
+   ~35% relative to the 16:9 layout it was measured against — which is why the
+   zone bar and vehicle panel read as "way too big" on an ultrawide while looking
+   correct in the reference.
+   Expressing type in this unit instead makes it track viewport HEIGHT: identical
+   to the old values at 16:9, correctly proportioned everywhere else.
+   Set --w to 1cqw on .stage to go back to width-relative sizing. */
+:root { --w: 1.7778cqh; }
+
+.stage {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    /* The reference anchors HUD elements to the physical screen edges. Keeping
+       this at a centred 16:9 width displaced every NUI element on ultrawide
+       displays while GTA's native minimap remained left-anchored. */
+    transform: translateX(var(--hud-offset-x, 0px));
+    container-type: size;
+    pointer-events: none;
+}
+
+.hidden { display: none !important; }
+
+/* Shared fade. Elements animate opacity only — never display — so layout
+   never jumps as things come and go. */
+.fade { transition: opacity 200ms ease; opacity: 1; }
+.fade.out { opacity: 0; }
+
+/* -----------------------------------------------------------------------------
+   Status bars (top-left)
+   Reference: left 1.75%, top 2.05%. Health track is visibly longer than the
+   others in the source frames, so the widths differ on purpose.
+   -------------------------------------------------------------------------- */
+/* Measured off native 1920x1080 video frames:
+     icon circle  centre x 2.34%, y 4.12%, diameter 1.17% of width
+     bar          left 3.26%, top 3.52%, height 1.30% of height
+   The bars are RECTANGLES with a thin darker border and only a hair of corner
+   rounding — not pills — and the fills are desaturated and translucent rather
+   than saturated. Rows are spaced ~2.9% of height apart. */
+#status {
+    position: absolute;
+    left: 1.755cqw;   /* icon centre 2.34% minus half the icon */
+    top: 3.08cqh;     /* icon centre 4.12% minus half the icon (1.17cqw ~= 2.08cqh) */
+    display: flex;
+    flex-direction: column;
+    gap: 1.6cqh;
+}
+
+.srow { display: flex; align-items: center; gap: 0.57cqw; }
+
+/* Icon: a dark disc with a glyph TINTED to match its bar (pink / teal /
+   purple), per the reference stills. */
+.sic {
+    width: calc((calc(1.17 * var(--w))) * var(--ic-status, 1));
+    height: calc((calc(1.17 * var(--w))) * var(--ic-status, 1));
+    border-radius: 50%;
+    background: rgba(28, 26, 32, 0.72);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc((calc(0.62 * var(--w))) * var(--fs-status, 1));
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* Colours sampled across 166 reference frames, taking the BRIGHTEST readings
+   per element so a dark backdrop doesn't drag them down (these bars are
+   translucent, so every sample is a composite):
+     health   #fdccd2   pale pink, NOT a saturated rose
+     stamina  #95b8b7   muted teal-grey, NOT a vivid cyan
+   Pulled a little back toward saturation from the raw brightest values, which
+   sit over bright scenery and read slightly washed. The track IS the "empty"
+   colour — no dark trough, no outline. */
+/* 68 samples across the reference set: bar height median 16.5px = 1.53% of
+   height, left edge 3.50% of width. Both were slightly under. */
+/* The reference bar has a clear light OUTLINE around the whole rectangle —
+   that is what keeps it readable over bright ground. Without it these pale
+   fills wash out completely against grass or concrete, which is why they read
+   as "not working". */
+.strack {
+    height: 1.53cqh;
+    /* Pill by default; .bars-square on .stage switches to the squared-off
+       corners. Length and height are identical either way. */
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    border: 0.055cqw solid rgba(226, 232, 231, 0.62);
+    box-shadow: 0 0.08cqh 0.20cqh rgba(0, 0, 0, 0.45);
+}
+
+/* NO width transition. Animating width here left the fill stuck at whichever
+   value it first received — the inline style kept updating but the rendered
+   box never moved. Transform is cheap and reliable, so the bar scales from its
+   left edge instead. */
+.stage.bars-square .strack { border-radius: calc((0.06cqw) * var(--rad-status, 1)); }
+
+.sfill {
+    height: 100%;
+    width: 100%;
+    /* Deliberately square: .strack has overflow:hidden, so the pill shape clips
+       this already. A radius here would be stretched into an ellipse by the
+       scaleX that drives the bar, giving a warped cap at low percentages. */
+    transform-origin: left center;
+    transform: scaleX(1);
+    transition: transform 200ms ease;
+}
+
+/* NOT repeating ticks — the reference shows a single divider where the fill
+   meets the empty portion, so it rides the fill's right edge instead. */
+.sfill { position: relative; }
+.sfill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 0.09cqw;
+    background: rgba(28, 30, 32, 0.70);
+}
+
+#s-health  .strack { width: 9.6cqw; background: rgba(122, 86, 96, 0.62); }
+#s-stamina .strack { width: 5.6cqw; background: rgba(62, 92, 94, 0.62); }
+#s-focus   .strack { width: 5.8cqw; background: rgba(78, 70, 116, 0.62); }
+
+#s-health  .sic { color: #f6bcc6; }
+#s-stamina .sic { color: #a3c6c4; }
+#s-focus   .sic { color: #bdaae6; }
+
+/* Engaged focus: the eye glows rather than sitting flat, so the one moment
+   the world visibly slows down is also the one moment this row visibly says
+   why. Pulses instead of holding steady so it reads as "active", not just
+   "a different colour". */
+#s-focus.active .sic {
+    color: #d6c8ff;
+    text-shadow: 0 0 0.5cqw rgba(189, 170, 230, 0.85);
+    animation: focus-pulse 1.1s ease-in-out infinite;
+}
+@keyframes focus-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+/* The hunger/thirst cap: health that cannot be healed back into, darkened in
+   from the right end of the track. Translucent rather than opaque, so it DIMS
+   whatever is under it instead of replacing it -- a player at full health with a
+   cap must still read as a full bar with a spent end, not as a short bar. The
+   left border is the cap line itself, and is what makes the boundary legible
+   when the tail sits over the fill. */
+.scap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    transform-origin: right center;
+    transform: scaleX(0);
+    transition: transform 200ms ease;
+    background: rgba(16, 14, 20, 0.62);
+    border-left: 0.09cqw solid rgba(236, 240, 240, 0.55);
+    pointer-events: none;
+}
+
+/* Which one to fix. Warm for food, cool for water -- and mild, because this is
+   a tint over a darkened area, not a bar of its own competing with the fill. */
+.scap.hunger { background: rgba(56, 30, 10, 0.62); border-left-color: rgba(240, 178, 92, 0.72); }
+.scap.thirst { background: rgba(12, 30, 52, 0.62); border-left-color: rgba(140, 196, 240, 0.72); }
+
+#s-health  .sfill { background: #f6bcc6; }
+#s-stamina .sfill { background: #a3c6c4; }
+#s-focus   .sfill { background: #bdaae6; }
+
+/* Underwater the stamina row becomes the OXYGEN row -- same track, same length,
+   same place. Only the colour and the glyph change, and they change together:
+   a cooler, bluer cast than the stamina teal so the swap is unmistakable at a
+   glance without the eye having to find a new bar first. */
+#s-stamina.oxygen .strack { background: rgba(52, 78, 108, 0.62); }
+#s-stamina.oxygen .sic    { color: #9ec4e8; }
+#s-stamina.oxygen .sfill  { background: #9ec4e8; }
+
+/* -----------------------------------------------------------------------------
+   Top-right: wanted stars, the three "tells", money
+   -------------------------------------------------------------------------- */
+/* Measured: star centres at y 3.98%, 1.9% apart; rightmost star's right edge
+   1.87% from the screen edge; each star ~1.1% of width. The equipped-weapon
+   icon sits below them at top 6.5%, right 1.77%, ~4.7% wide. */
+/* Medians across 124 reference frames (every video, one frame per 4s), not a
+   single hand-picked frame — an outlier frame had the tells reading 1.09%
+   right, where the median is 1.82%.
+     stars  w 1.15%  spacing 1.88%  right 1.93%  top 2.96%
+     tells  w 1.11%  spacing 1.76%  right 1.82%  top 5.14%
+   Star bottom lands at ~5.0%, so the rows sit almost flush — the old 1.55cqh
+   gap pushed the tell row far below where it belongs. */
+#topright {
+    position: absolute;
+    right: 1.93cqw;
+    top: 2.96cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.14cqh;
+}
+
+/* Measured off the reference by pixel analysis, not by eye:
+     star     24.5px wide  = 1.28% of width
+     spacing  35.5px       = 1.85% centre-to-centre  => gap 0.57%
+     right    36px         = 1.88%
+     top      32px         = 2.96% */
+#stars { display: flex; gap: 0.73cqw; }
+
+.star {
+    width: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
+    height: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
+    display: block;
+    overflow: visible;
+}
+/* Unearned stars are hollow outlines; earned ones fill red. */
+/* stroke-width 9 with paint-order:stroke painted the outline OUTSIDE the
+   viewBox, so a 1.1cqw star rendered nearer 1.6%. A thinner, inside-painted
+   stroke matches the reference's fine hollow outline. */
+.star path {
+    fill: none;
+    stroke: #e8e8e6;
+    stroke-width: 6;
+    stroke-linejoin: round;
+}
+.star.on path { fill: #d4565c; stroke: #f2f2f0; }
+
+/* Measured: plate 18.5px = 0.98% wide, ~24px = 2.2% tall, 31.5px = 1.64%
+   centre-to-centre => gap 0.66%. Right margin is 1.09%, NOT the 1.87% the
+   stars use — the tell row sits further right, so it pulls itself out of the
+   shared column. */
+#tells {
+    display: flex;
+    gap: 0.65cqw;
+    /* The stars and the tell row are separate groups in the reference, with a
+       clear break between them — measured at ~0.45x a star's height across two
+       reference frames. #topright's shared 0.14cqh row gap alone left them
+       almost touching. */
+    margin-top: 0.78cqh;
+    /* Tell row sits a hair further right than the stars (1.82% vs 1.93%). */
+    margin-right: -0.11cqw;
+}
+
+/* Measured off the reference: ~0.88% of width by ~1.94% of height, so a
+   PORTRAIT rounded square, not a circle. Red plate, white line-art. */
+.tell {
+    /* Circles, per the GTA6 footage. Both axes use the same unit — the previous
+       1.11cqw x 2.31cqh could only be round at one specific aspect ratio. */
+    width: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
+    height: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
+    border-radius: 50%;
+    background: #c0393f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.tell svg {
+    width: 74%;
+    height: 74%;
+    display: block;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+/* The microphone capsule and the wheels read better filled than outlined. */
+.tell svg rect,
+.tell svg circle { fill: #fff; stroke: none; }
+
+/* Money. Cash and bank on their own rows, amounts right-aligned against the
+   icon so the digits line up as the value changes. */
+#money {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.45cqh;
+    margin-top: 1.15cqh;
+}
+.money-row { display: flex; align-items: center; gap: 0.6cqw; }
+
+.money-amt {
+    /* Pinned, not tunable. Money is Pricedown — GTA's own display face — and
+       the editor deliberately offers no Font row for this element, so reading a
+       variable here would be a hook nothing can ever set. */
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    /* 1.62cqw rendered noticeably larger than the reference, which measures
+       ~1.2% of screen width for the amount text. */
+    font-size: calc((calc(1.2 * var(--w))) * var(--fs-money, 1));
+    color: var(--text);
+    text-shadow: 0 0.12cqh 0.26cqh rgba(0, 0, 0, 0.92);
+    letter-spacing: var(--ls-money, 0.025em);
+    line-height: 1;
+    /* Digits are tabular so the string doesn't jitter as the amount changes. */
+    font-variant-numeric: tabular-nums;
+}
+
+.money-ic {
+    width: calc((1.15cqw) * var(--ic-money, 1));
+    height: calc((1.15cqw) * var(--ic-money, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+.money-ic svg { width: 100%; height: 100%; display: block; }
+.money-ic rect, .money-ic circle { fill: currentColor; }
+.money-ic .hole { fill: rgba(0, 0, 0, 0.38); }
+.money-ic .stripe { fill: rgba(0, 0, 0, 0.42); }
+
+.money-ic-cash { color: #4fc27b; }   /* green banknote */
+.money-ic-bank { color: #4f8fd6; }   /* blue card      */
+
+/* Ammo readout. Measured: text spans 4.3% of width, cap height ~1.76% of
+   height, clip and reserve separated by ~0.78%. Pricedown is GTA's own display
+   face and matches the blocky condensed numerals in the frames. */
+#ammo {
+    display: flex;
+    align-items: baseline;
+    gap: 0.78cqw;
+    font-family: var(--ff-topright, 'Pricedown', 'Segoe UI', Arial, sans-serif);
+    line-height: 1;
+    color: #d8d8d4;
+    text-shadow: 0 0.15cqh 0.2cqh rgba(0, 0, 0, 0.9), 0 0 0.15cqh rgba(0, 0, 0, 0.8);
+}
+#ammo-clip { font-size: calc((2.9cqh) * var(--fs-topright, 1)); color: #f0f0ec; }
+#ammo-reserve { font-size: calc((2.9cqh) * var(--fs-topright, 1)); color: #cfcfca; }
+
+/* Measured 63x43px at 1920x1080 => 3.28% wide, 3.98% tall. */
+#weapon-icon {
+    width: calc((3.28cqw) * var(--ic-topright, 1));
+    height: auto;
+    max-height: calc((3.98cqh) * var(--ic-topright, 1));
+    object-fit: contain;
+    filter: drop-shadow(0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.85));
+}
+
+/* -----------------------------------------------------------------------------
+   Minimap slot — the strip directly above the native minimap.
+   Occupants stack UPWARD from the minimap's top edge.
+   -----------------------------------------------------------------------------
+   THE PANEL STACK NO LONGER TRACKS THE MAP.
+
+   It used to read --map-left / --map-width / --map-bottom directly, so the two
+   panels were the minimap's left edge and width by construction. That is a fine
+   DEFAULT and a bad rule: scaling the map in /movehud dragged the panels along
+   with it and resized them, and there was no way to hold them still short of
+   overriding the whole published map rect (which also moves the frame).
+
+   So the stack now reads its OWN three variables, and falls back to the map's
+   only when they are unset. app.js writes them once, from the first map rect of
+   the session — a SNAPSHOT, not a subscription — so an untouched layout still
+   lands exactly on the map's edge and then stays there while you resize.
+   Setting any Panel row in the editor, or turning Follow map on, replaces the
+   snapshot; see PANEL_PROPS in app.js.
+
+   The frame (#map-frame) and the centre cross deliberately still track the map
+   live. They are drawn ON the map and are wrong the instant they do not. */
+#slots {
+    position: absolute;
+    left: var(--panel-left, var(--map-left, 1.75cqw));
+    width: var(--panel-width, var(--map-width, 15.8cqw));
+    bottom: var(--panel-bottom, var(--map-bottom, 17.9cqh));
+    display: flex;
+    flex-direction: column-reverse; /* first child sits closest to the map */
+    gap: 0.45cqh;
+}
+
+.slot {
+    width: 100%;
+    background: var(--panel);
+    border-radius: calc((var(--r-panel)) * var(--rad-slots, 1));
+    overflow: hidden;
+    /* A plain drop shadow and NO inset ring. There used to be a fine lit edge
+       here, read off compressed reference frames as a highlight; against the
+       cleaner reference shots it is not there, and it was the second thing
+       (after the warm --plate fill) making these panels look like a different
+       component from the nav bar they stack with. */
+    box-shadow: var(--shadow-md);
+}
+/* BOTH nav elements are .slot ONLY so they inherit the fade behaviour. Neither
+   is a panel: #nav-popup is a transparent flex wrapper whose child #nav-turn
+   carries the surface, and #nav-compass is a bare text label sitting on the
+   map. Without this reset .slot's `width: 100%` + panel fill turn #nav-compass
+   into a dark band spanning the whole screen across the minimap, and give
+   #nav-popup a second plate one radius step larger than the bar in front of
+   it. If any other non-panel element is ever given .slot for the fade, it
+   needs to be added here too. */
+#nav-popup, #nav-compass {
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+}
+#nav-compass { width: auto; }
+
+/* -----------------------------------------------------------------------------
+   Map panel arrival
+   -----------------------------------------------------------------------------
+   The two map panels arrive the way a phone announces a message: a springy rise
+   into place rather than a hard cut. Only the ARRIVAL is animated — going away
+   stays the instant hide it always was, which is what the panels' own timers
+   already do.
+
+   The overshoot is in the easing, not in the keyframes. A cubic-bezier whose
+   second control point sits above 1 carries the value past its target and lets
+   it settle back, which is the whole character of the motion; expressing the
+   same thing as extra keyframe stops would double-count it the moment anyone
+   adjusted the curve.
+
+   transform-origin is the BOTTOM edge, because the panels stack upward off the
+   minimap — growing from the bottom reads as rising out of it, growing from the
+   centre reads as a box inflating in mid-air.
+   -------------------------------------------------------------------------- */
+@keyframes slotIn {
+    from { opacity: 0; transform: translateY(115%) scale(0.94); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+/* Leaving is a plain fade — no travel, deliberately. The panel has said what it
+   had to say and should stop competing for attention; sliding it away is a
+   second piece of motion for an event that no longer matters. Slower than the
+   arrival and eased so most of the opacity goes late, which is what reads as
+   graceful rather than as a light being switched off.
+
+   Keep the duration in step with SLOT_OUT_MS in app.js: that timer is what
+   swaps in `display: none` afterwards, and if it fires early it cuts the fade
+   off part-way. */
+@keyframes slotOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+.slot { transform-origin: 50% 100%; }
+.slot.slot-in {
+    animation: slotIn 520ms cubic-bezier(0.16, 1.28, 0.38, 1) both;
+}
+.slot.slot-out {
+    animation: slotOut 420ms cubic-bezier(0.4, 0.0, 0.7, 0.2) both;
+    /* Nothing should be clickable while it is on its way out. The stage is
+       already pointer-events:none, so this is only insurance against a future
+       panel that is not. */
+    pointer-events: none;
+}
+/* Motion is the entire point of these, so there is nothing to soften — the
+   reduced-motion answer is to arrive and leave with no travel and no fade. */
+@media (prefers-reduced-motion: reduce) {
+    .slot.slot-in, .slot.slot-out { animation: none; }
+}
+
+/* Zone bar */
+#zone {
+    height: 3.11cqh;
+    display: flex;
+    align-items: center;
+    padding: 0 0.85cqw;
+}
+#zone.water { background: rgba(46, 116, 178, 0.88); }
+#zone-text {
+    /* Every one of these falls back to the PANEL PAIR's value, so a layout
+       saved while these were one element still renders identically. Set the
+       Zone bar row and it takes over for this panel alone. */
+    font-family: var(--ff-zone, var(--ff-slots, inherit));
+    /* Kept in step with .vname's 0.75. These two panels sit one on top of the
+       other and are read as one object, so a zone name set half again as
+       large as the vehicle name above it reads as a mistake even when each
+       is defensible on its own. At 1.15 the label also filled two thirds of
+       the bar's own height, which is what made the bar look stuffed. */
+    font-size: calc((calc(0.80 * var(--w))) * var(--fs-zone, var(--fs-slots, 1)) * var(--fit, 1));
+    font-weight: var(--fw-zone, var(--fw-slots, 500));
+    letter-spacing: var(--ls-zone, var(--ls-slots, 0.004em));
+    color: var(--text);
+    text-shadow: var(--ink-shadow);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Vehicle make/model panel */
+#vehicle {
+    /* Same radius as the zone bar and the nav bar -- one stack, one corner. */
+    border-radius: calc((var(--r-panel)) * var(--rad-slots, 1));
+    /* The plate's texture and its manufacturer tint are both drawn as
+       pseudo-elements rather than as this element's background-image, so they
+       can be stacked in a fixed order — see the manufacturer tint block below
+       for why that order is the whole point. `position` is what the two of them
+       are positioned against. */
+    position: relative;
+    /* min-height, not height.
+       The panel's height is in cqh (viewport height) while .vname's font-size is
+       in cqw (viewport WIDTH), so the wider the monitor the larger the text gets
+       relative to this box. At 2.4:1 the make/model plus the pip row no longer
+       fit, and the top of the make was being clipped. A minimum lets the panel
+       grow with its content; at 16:9 it is unchanged. */
+    min-height: 9.34cqh;
+    display: flex;
+    flex-direction: column;
+    /* No padding and no gap here any more: the plate is now two BANDS that meet
+       at the barrier, and either of those would put a strip of plate between
+       them that the barrier could not span. The head carries the padding
+       instead. */
+    padding: 0;
+}
+.vname {
+    font-family: var(--ff-vehicle, var(--ff-slots, inherit));
+    /* --fit is the shrink-to-fit factor, written by app.js when the text is
+       wider than the panel. It multiplies rather than replaces, so it composes
+       with whatever font size was tuned here. */
+    /* 0.75, down from 1.18. Measured against the reference rather than
+       chosen: there the make spans about 37% of the panel's width, and at
+       1.18 it spans 59% -- which is why the panel was also coming out too
+       TALL, the name block simply not fitting inside its min-height and
+       pushing the plate open. Smaller type fixes the proportion and the
+       height together, and gives --fit more room before a long name has to
+       be shrunk at all. */
+    font-size: calc((calc(0.75 * var(--w))) * var(--fs-vehicle, var(--fs-slots, 1)) * var(--fit, 1));
+    font-weight: var(--fw-vehicle, var(--fw-slots, 700));
+    color: var(--text);
+    /* Tracked out — the reference sets the make/model in wide caps. */
+    letter-spacing: var(--ls-vehicle, var(--ls-slots, 0.075em));
+    text-shadow: var(--ink-shadow);
+    text-transform: uppercase;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+/* The lock / engine / fuel pips are their own editor element ("Vehicle icons"),
+   because scaling them from the panel alone looked wrong: the discs grew and
+   the GAP between them did not, so three round icons turned into three round
+   icons crowded against each other. Their own spacing, position and scale fix
+   that; --sp- is the gap multiplier. */
+#veh-pips {
+    display: flex;
+    gap: calc(0.7cqw * var(--sp-vehpips, 1));
+    /* No margin: the foot band's own padding is the separation now, and a
+       margin here would push the discs off centre inside it. */
+    margin-top: 0;
+}
+.pip {
+    /* Falls back to the PANEL's icon size, so a layout saved before these had
+       their own row keeps rendering exactly as it did. Once the Vehicle icons
+       row is touched it takes over, rather than multiplying with the panel and
+       giving one visual size two places to come from. */
+    width: calc((1.5cqw) * var(--ic-vehpips, var(--ic-slots, 1)));
+    height: calc((1.5cqw) * var(--ic-vehpips, var(--ic-slots, 1)));
+    border-radius: calc(50% * var(--rad-vehpips, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    /* Still a font-size even though the glyphs are SVG, because the SVG is
+       sized in `em` below. That keeps the editor's Font size row meaning "how
+       big is the glyph" and its Icon size row meaning "how big is the disc",
+       which is the split those two rows had when these were emoji. */
+    font-size: calc((calc(0.68 * var(--w))) * var(--fs-vehpips, var(--fs-slots, 1)));
+    line-height: 1;
+    /* DARK disc, coloured ink. The state used to be the disc's fill with a dark
+       glyph on top, which cannot carry a gauge ring: a coloured ring on a
+       coloured disc has nothing to read against. Moving the colour into the ink
+       and the ring leaves the disc as a constant dark backing for both. */
+    background: rgba(16, 15, 18, 0.62);
+    color: var(--tone);
+    --tone: rgba(206, 206, 212, 0.82);
+}
+.pip.good    { --tone: #4fc27b; }
+.pip.warn    { --tone: #e0a63a; }
+.pip.bad     { --tone: #d9534f; }
+.pip.unknown { --tone: rgba(206, 206, 212, 0.82); }
+
+/* Stroked, not filled. A filled glyph needs its counters -- the padlock's
+   keyhole, the pump's window -- knocked out in the DISC's colour, which means
+   the icon would have to know what state it is in. Strokes get the same reading
+   from one colour, so `currentColor` alone is the whole of it.
+
+   They are also SVG rather than the emoji they started as: an emoji is drawn by
+   the platform's own font, and Windows renders the padlock orange and the pump
+   red whatever `color` says, so two of the three came out in colours the design
+   never picked. */
+.pip-glyph {
+    /* About 57% of the disc, which is where the reference sits. An emoji came
+       with its own internal margin and a bare glyph does not, so matching the
+       old font-size 1:1 filled the disc edge to edge. */
+    width: 1em;
+    height: 1em;
+    display: block;
+    position: relative;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* -----------------------------------------------------------------------------
+   The gauge rings
+   -----------------------------------------------------------------------------
+   Engine and fuel fill a ring around the disc to their real reading, so the
+   panel answers "how much" rather than only "is it bad yet". The lock has no
+   quantity and deliberately has no ring.
+
+   --pct is written by app.js, 0..100. pathLength="100" on the circle relabels
+   its own length as 100 units, so the dash offset IS the percentage and nothing
+   here has to know the radius.
+   -------------------------------------------------------------------------- */
+.pip-ring {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    /* From twelve o'clock, clockwise, like every gauge anyone has ever read.
+       An SVG circle starts at three o'clock. */
+    transform: rotate(-90deg);
+}
+.pip-track {
+    stroke: rgba(255, 255, 255, 0.16);
+    stroke-width: 3.1;
+}
+.pip-fill {
+    stroke: var(--tone);
+    stroke-width: 3.1;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: calc(100 - var(--pct, 0));
+    /* Fuel drains and damage accumulates over seconds, not frames, and the poll
+       that feeds this runs four times a second -- without the transition the
+       ring visibly steps. */
+    transition: stroke-dashoffset 260ms linear, stroke 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    .pip-fill { transition: none; }
+}
+/* At zero, `round` linecaps still paint a dot at twelve o'clock -- an empty
+   tank would show a pip of fuel. */
+.pip-fill[data-empty="1"] { stroke-linecap: butt; }
+
+/* -----------------------------------------------------------------------------
+   Collapsed: just the icons
+   -----------------------------------------------------------------------------
+   The full panel is an ANNOUNCEMENT -- you got into a car, here is what it is.
+   Once it has said that, the make, the model and the badge have no more news in
+   them, but the fuel and the engine do. So the plate goes and the three icons
+   stay, floating over the map with nothing behind them, for as long as you are
+   in the vehicle.
+
+   The panel is not rebuilt for this: it keeps its place in the slot stack and
+   simply sheds everything that was the announcement. That is what lets it
+   collapse in place rather than vanishing and something else appearing.
+
+   Shedding it is animated, unlike slotVanish's hard cut. Cutting instantly
+   here was worse than the vanish case: it left the plate as one flat colour
+   right up to the frame it disappeared, AND dropped the icons straight down
+   by the head's whole height in that same frame -- the map showing through
+   and the icons relocating happened simultaneously with nothing easing
+   either one, which read as the panel breaking rather than tidying itself
+   up. Transitioning #veh-head's own box down to nothing lets the layout
+   reflow ride along with the fade instead of snapping to it, so the icons
+   drift down into their resting spot rather than jumping there. */
+#vehicle {
+    transition: background 320ms ease, box-shadow 320ms ease, min-height 320ms ease;
+}
+#vehicle.collapsed {
+    background: none;
+    box-shadow: none;
+    min-height: 0;
+    /* .slot sets overflow: hidden so a child's square corners cannot poke out
+       past the plate's rounded ones. Collapsed there IS no plate -- background
+       and shadow are both off above, and #veh-foot's band is off too -- so the
+       clip has nothing left to protect and only does harm: #veh-pips is scaled
+       with a TRANSFORM (see the --sc-vehpips rule), and a transform does not
+       change the layout box, so the parent never grows to fit the bigger discs
+       and the clip cuts their tops and bottoms off.
+       That is the "icons get cut off when I scale them" report.
+       #veh-head keeps its OWN overflow:hidden below, so switching this to
+       visible up front does not let the head's shrinking content spill out
+       mid-transition. */
+    overflow: visible;
+}
+#vehicle::after {
+    transition: opacity 260ms ease;
+}
+#vehicle.collapsed::after { opacity: 0; }   /* the plate's sheen */
+/* max-height, not height: the head's real height is content-driven (the
+   make/model text and --fit), and max-height is the one property that can
+   transition FROM "however tall that turns out to be" TO zero without a
+   fixed number baked in. Set comfortably above anything two lines of vname
+   plus its padding can reach, so the expanded state is never the one that
+   gets clipped. overflow:hidden is what makes the shrink read as the plate
+   folding away rather than as text sliding out from under a lid. */
+#veh-head {
+    max-height: 10cqh;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 320ms ease, opacity 220ms ease, padding 320ms ease;
+}
+#vehicle.collapsed #veh-head {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+#veh-foot {
+    transition: background 320ms ease, border-color 320ms ease;
+}
+/* Padding is deliberately NOT part of the collapsed state below. The icons
+   are centred inside #veh-foot's padding box, so shrinking that padding to 0
+   pulls their centre down toward the band's new, tighter bottom edge -- a
+   second source of vertical drift on top of the head folding away, and the
+   one still visible after the head's own motion was fixed. #veh-foot's
+   height, and therefore the icons' position, has to stay IDENTICAL between
+   the two states for them to look like they never moved at all. */
+#vehicle.collapsed #veh-foot {
+    background: none;
+    /* border-color, not border-top:none -- removing the border outright is
+       another instant cut, and a border-STYLE cannot transition. Fading its
+       colour to transparent while keeping the same width gets the barrier
+       to dissolve instead of vanishing, and costs no layout shift since the
+       width never changes. */
+    border-top-color: transparent;
+}
+/* The discs are the only thing left, so they have to carry their own separation
+   from the map. On the plate they had one; here there is nothing behind them. */
+#vehicle.collapsed .pip {
+    box-shadow: 0 0.12cqh 0.34cqh rgba(0, 0, 0, 0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+    #vehicle, #vehicle::after, #veh-head, #veh-foot { transition: none; }
+}
+
+/* -----------------------------------------------------------------------------
+   Manufacturer mark
+   -----------------------------------------------------------------------------
+   The vehicle panel carries the badge of whatever you are sitting in, stamped
+   into the plate behind the make and model. app.js points --veh-logo at a file
+   in html/logos/ and adds .badged; html/makes.js decides which file.
+
+   THREE LAYERS, IN THIS ORDER, AND THE ORDER IS THE POINT
+     .slot's own background   the grey plate, unchanged
+     #veh-logo                the mark
+     ::after                  the panel's sheen and diagonal highlight
+     the two names, the pips  on top of all of it
+
+   The sheen used to be this element's background-image, which would have put
+   it UNDER the mark. A badge sitting on top of the highlight reads as a sticker
+   stuck to the panel; a badge underneath it reads as part of the panel, because
+   the highlight then lies across the badge the way it lies across the plate.
+   Same two gradients as before, moved a layer up.
+
+   The mark is an <img>, not a background-image, because the roster runs from
+   Ocelot's near-square roundel to Western Company's 5:1 wordmark and CSS has no
+   background-size that means "contain, but bigger". max-width and max-height on
+   a real element are exactly that, and they cost nothing.
+   -------------------------------------------------------------------------- */
+#vehicle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    /* Textured, not a flat fill: a soft top-down sheen plus a wide diagonal
+       highlight sweeping across the panel, which is what reads as "material" in
+       the reference stills rather than a solid swatch. Pure CSS gradients, so
+       there is no image to stream and it scales with the panel. */
+    background-image:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%);
+}
+
+/* The upper band: the names, and the badge behind them. */
+#veh-head {
+    flex: 1 1 auto;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: var(--ai-slots, center);
+    justify-content: center;
+    gap: 0.35cqh;
+    padding: 0.55cqh 0.5cqw;
+    /* Deliberately NOT a stacking context -- position without a z-index. The
+       badge inside it has to stay UNDER #vehicle::after, and a stacking context
+       here would trap it above the sheen along with everything else in the
+       band. */
+    position: relative;
+}
+
+/* The lower band: a full-width strip in a slightly lighter grey, so the status
+   icons read as their own section rather than as a third line of the name.
+   The barrier is this element's border-top -- edge to edge by construction,
+   which is the thing a centred rule of its own could never quite promise. */
+#veh-foot {
+    flex: none;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45cqh 0;
+    /* Both of these are deliberately faint. The band and its barrier used to
+       be strong enough to read as a second panel welded under the first; in
+       the reference the pips sit in a barely-there compartment on the same
+       surface, and the separation is a hint rather than a rule. */
+    background: rgba(255, 255, 255, 0.028);
+    border-top: 0.09cqh solid rgba(255, 255, 255, 0.07);
+    position: relative;
+    z-index: 2;
+}
+
+/* The badge's window. The mark is oversized on purpose and runs off the top and
+   bottom of the plate, but it must stop at the barrier: a mark bleeding through
+   into the status strip is what stops the strip looking like a separate band.
+   Clipping it here rather than on the image means the image can still be moved
+   and scaled by the editor without the clip following it around. */
+#veh-logo-clip {
+    position: absolute;
+    /* Long-hand AND the shorthand. `inset` is Chromium 87+, and a client on an
+       older CEF would resolve it to nothing, collapse the window to zero and
+       show no badge at all -- indistinguishable from the file being missing.
+       Four extra declarations is a cheap way to never have to tell those two
+       apart again. */
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+}
+
+#veh-logo {
+    position: absolute;
+    /* Centred by the offsets block further down, which pairs these with a
+       translate(-50%, -50%). Splitting it that way is what lets the editor's
+       Position rows move the mark off centre without this rule and that one
+       having to agree about where "centre" was. */
+    left: 50%;
+    top: 50%;
+    /* EVERY mark is the same square canvas (tools/normalize_logos.py), with the
+       ink scaled to a constant area and centred in it. That is what makes one
+       rule here correct for all fifty-one: before it, each file was cropped
+       hard to its own ink, so a wide slab like Truffade was bounded by width
+       and a narrow upright like Albany by height, and the two landed on the
+       panel at completely different sizes -- Truffade about three times the
+       visual mass of its neighbours.
+
+       Because the canvas is SQUARE and uniform, height is the only binding
+       constraint in practice and max-width is just a backstop. The ink is a
+       known fraction of the canvas (INK in that script, ~0.47), so the figure
+       below is roughly twice the ink height you actually want: 220% of the
+       name band puts the ink itself at just over 100% of it, which keeps the
+       mark running a little past the band and cropping to it -- the "stamped
+       into the panel" look this always had -- rather than sitting inside it
+       like a picture.
+
+       Retune the SIZE here; retune the evenness in normalize_logos.py. Making
+       one mark bigger on its own is not a thing this rule can do, and that is
+       deliberate. */
+    max-width: 96%;
+    max-height: 220%;
+    width: auto;
+    height: auto;
+    /* The marks are greyscale by the time they ship (tools/fetch_logos.py), so
+       there is no colour here to fight the white type in front of it. */
+    pointer-events: none;
+    /* Hidden until app.js has a mark to show. Nothing else sets display on it,
+       so this doubles as the empty state. */
+    display: none;
+}
+/* .badged is app.js saying "the make resolved AND that manufacturer has a
+   mark". Two of the sixty-six have none, and neither does an addon vehicle with
+   no resolvable make; all of those keep the plain plate. */
+#vehicle.badged #veh-logo { display: block; }
+
+/* Above both layers. Without this the names and the pips are painted into the
+   same stacking context as the sheen and land under it. */
+#veh-head > .vname { position: relative; z-index: 2; }
+
+/* -----------------------------------------------------------------------------
+   Wanted notification (middle-left)
+   -------------------------------------------------------------------------- */
+#wanted {
+    position: absolute;
+    left: 1.5cqw;
+    top: 26.7cqh;
+    width: 23cqw;
+    background: var(--plate-soft);
+    border-radius: calc((var(--r-md)) * var(--rad-wanted, 1));
+    box-shadow: var(--shadow-sm);
+    padding: 1.5cqh 1.1cqw 1.35cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1cqh;
+}
+#wanted-line { display: flex; align-items: flex-start; gap: 0.7cqw; }
+#wanted-copy {
+    flex: 1;
+    font-size: calc((calc(1.05 * var(--w))) * var(--fs-wanted, 1));
+    font-weight: var(--fw-wanted, 400);
+    color: var(--text);
+    line-height: 1.45;
+    letter-spacing: var(--ls-wanted, 0.004em);
+    text-shadow: var(--ink-shadow);
+}
+#wanted .star { width: calc((1.2cqw) * var(--ic-wanted, 1)); height: calc((1.2cqw) * var(--ic-wanted, 1)); flex-shrink: 0; }
+#wanted-tells { display: flex; gap: 0.55cqw; }
+
+/* -----------------------------------------------------------------------------
+   Honor toast — transient, fires only on an honor change
+   -------------------------------------------------------------------------- */
+/* Bottom-right, matching where the reference frames put the mugshot
+   (right ~0.75%, top ~86%). The copy sits to the LEFT of the portrait because
+   the portrait is hard against the right edge. Anchored above #prompts so the
+   two never collide when a prompt is also showing. */
+/* Anchored so the PORTRAIT lands exactly where the reference frames put it:
+   right 0.75%, top 86.12%, 4.25% wide x 7.74% tall. The container offsets
+   account for its own padding so the mugshot itself hits those numbers. */
+#honor {
+    position: absolute;
+    right: 0.25cqw;
+    bottom: 5.24cqh;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: 0.8cqw;
+    padding: 0.9cqh 0.5cqw 0.9cqh 1.3cqw;
+    background: rgba(18, 18, 22, 0.82);
+    border-radius: calc((0.4cqw) * var(--rad-honor, 1));
+}
+#honor-copy {
+    align-items: flex-end;
+    text-align: right;
+    padding-bottom: 0.6cqh;
+}
+/* The reference portrait is a PORTRAIT rectangle, not a square:
+   4.25% of width by 7.74% of height. */
+#honor-mug {
+    position: relative;
+    width: calc((4.25cqw) * var(--ic-honor, 1));
+    height: calc((7.74cqh) * var(--ic-honor, 1));
+    border-radius: calc((0.3cqw) * var(--rad-honor, 1));
+    background: linear-gradient(155deg, #8d7f74, #4a423c);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    overflow: visible;
+    flex-shrink: 0;
+}
+#honor-mug img { width: 100%; height: 100%; object-fit: cover; border-radius: calc((0.3cqw) * var(--rad-honor, 1)); display: block; }
+#honor-badge {
+    position: absolute;
+    left: 50%;
+    bottom: -1.1cqh;
+    transform: translateX(-50%);
+    font-size: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+#honor-copy { display: flex; flex-direction: column; gap: 0.15cqh; }
+#honor-title { font-size: calc((calc(1.08 * var(--w))) * var(--fs-honor, 1)); font-weight: var(--fw-honor, 700); color: var(--text); letter-spacing: var(--ls-honor, 0.01em); text-shadow: var(--ink-shadow); }
+#honor-sub { font-size: calc((calc(0.92 * var(--w))) * var(--fs-honor, 1)); color: var(--text-dim); text-shadow: var(--ink-shadow); }
+
+/* Reputation standing --------------------------------------------------------
+   Mirrors #honor's shape (icon/mug + two lines of copy) but on the LEFT edge,
+   bottom-anchored the same distance up as honor is on the right — the two
+   read as a matched pair without ever overlapping. No mugshot: the icon is a
+   plain glyph, so the row is `flex-direction: row` (icon first) rather than
+   honor's row-reverse. */
+#reputation {
+    position: absolute;
+    left: 0.25cqw;
+    bottom: 5.24cqh;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.8cqw;
+    padding: 0.9cqh 1.3cqw 0.9cqh 0.5cqw;
+    background: rgba(18, 18, 22, 0.82);
+    border-radius: calc((0.4cqw) * var(--rad-reputation, 1));
+}
+#reputation-icon {
+    flex-shrink: 0;
+    font-size: calc((calc(2.2 * var(--w))) * var(--fs-reputation, 1));
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+#reputation-copy { display: flex; flex-direction: column; gap: 0.15cqh; }
+#reputation-title { font-size: calc((calc(1.08 * var(--w))) * var(--fs-reputation, 1)); font-weight: var(--fw-reputation, 700); color: var(--text); letter-spacing: var(--ls-reputation, 0.01em); text-shadow: var(--ink-shadow); }
+#reputation-sub { font-size: calc((calc(0.92 * var(--w))) * var(--fs-reputation, 1)); color: var(--text-dim); text-shadow: var(--ink-shadow); }
+
+/* -----------------------------------------------------------------------------
+   Contextual action prompts (bottom-right)
+   -------------------------------------------------------------------------- */
+#prompts {
+    position: absolute;
+    right: 2cqw;
+    bottom: 7cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.8cqh;
+}
+.prompt {
+    display: flex;
+    align-items: center;
+    gap: 0.75cqw;
+    font-size: calc((calc(1.1 * var(--w))) * var(--fs-prompts, 1));
+    font-weight: var(--fw-prompts, 700);
+    letter-spacing: var(--ls-prompts, 0.08em);
+    color: #f0f0ee;
+    text-transform: uppercase;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.glyph {
+    min-width: calc((1.7cqw) * var(--ic-prompts, 1));
+    height: calc((1.7cqw) * var(--ic-prompts, 1));
+    border-radius: 50%;
+    background: rgba(240, 240, 238, 0.95);
+    box-shadow: var(--shadow-sm);
+    color: #17181b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc((calc(0.82 * var(--w))) * var(--fs-prompts, 1));
+    font-weight: var(--fw-prompts, 700);
+    line-height: 1;
+}
+/* A multi-character label needs a keycap, not a circle, or it overflows. */
+.glyph.wide {
+    width: auto;
+    border-radius: calc((0.28cqw) * var(--rad-prompts, 1));
+    padding: 0 0.45cqw;
+    font-size: calc((calc(0.72 * var(--w))) * var(--fs-prompts, 1));
+}
+.glyph.pad-a { background: #6ec06e; color: #10240f; }
+.glyph.pad-b { background: #d9585c; color: #2a0d0e; }
+.glyph.pad-x { background: #6fa8dc; color: #0b1a26; }
+.glyph.pad-y { background: #e8c95a; color: #2a2208; }
+
+/* -----------------------------------------------------------------------------
+   Directional police glow
+   -----------------------------------------------------------------------------
+   Every layer is FULL VIEWPORT. The previous version used sized boxes
+   (30vw wide, 70% tall) and any gradient that hadn't fully reached transparent
+   by the box edge left a visible rectangle on screen — that was the grey box.
+   Full-bleed layers with the falloff finishing well inside the viewport cannot
+   produce an edge at any resolution or aspect ratio.
+   -------------------------------------------------------------------------- */
+#police {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.pol {
+    position: fixed;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity;
+}
+.pol > span { position: absolute; inset: 0; display: block; }
+
+/* A real lightbar does not cross-fade. It fires short, hard bursts: a double
+   tap of red, a double tap of blue half a cycle later, with the white takedown
+   popping between them. Smooth easing is what made this read as "colours on the
+   screen" rather than light. The stops are paired a hair apart (6.9% -> 7%) so
+   each transition is a ~6ms ramp: visually instant, but no aliasing.
+
+   Red and blue also drift a little (polSweepX/Y below), running in opposite
+   phase, so they read as two independent rotating lamps rather than one blob
+   that changes colour in place. */
+.pol-left  .pol-r, .pol-right  .pol-r { animation: polRed  var(--pol-flash, 900ms) linear infinite, polSweepY var(--pol-sweep-ms, 2600ms) ease-in-out infinite; }
+.pol-left  .pol-b, .pol-right  .pol-b { animation: polBlue var(--pol-flash, 900ms) linear infinite, polSweepY var(--pol-sweep-ms, 2600ms) ease-in-out infinite reverse; }
+.pol-top   .pol-r, .pol-bottom .pol-r { animation: polRed  var(--pol-flash, 900ms) linear infinite, polSweepX var(--pol-sweep-ms, 2600ms) ease-in-out infinite; }
+.pol-top   .pol-b, .pol-bottom .pol-b { animation: polBlue var(--pol-flash, 900ms) linear infinite, polSweepX var(--pol-sweep-ms, 2600ms) ease-in-out infinite reverse; }
+.pol-w { animation: polWhite var(--pol-flash, 900ms) linear infinite; }
+
+/* Gentle drift around each lamp's anchor point (see the per-edge positions
+   below) — small enough to stay anchored to the edge, big enough to read as a
+   beacon sweeping rather than sitting still. --pol-sweep (vh/vw) and
+   --pol-sweep-ms are tunable from the /hudpolice edit panel. */
+@keyframes polSweepY {
+    0%, 100% { transform: translateY(calc(var(--pol-sweep, 1.6) * -1vh)); }
+    50%      { transform: translateY(calc(var(--pol-sweep, 1.6) * 1vh)); }
+}
+@keyframes polSweepX {
+    0%, 100% { transform: translateX(calc(var(--pol-sweep, 1.6) * -1vw)); }
+    50%      { transform: translateX(calc(var(--pol-sweep, 1.6) * 1vw)); }
+}
+
+@keyframes polRed {
+    0%,   6.9%  { opacity: 1; }
+    7%,   13.9% { opacity: 0; }
+    14%,  20.9% { opacity: 1; }
+    21%,  100%  { opacity: 0; }
+}
+@keyframes polBlue {
+    0%,   49.9% { opacity: 0; }
+    50%,  56.9% { opacity: 1; }
+    57%,  63.9% { opacity: 0; }
+    64%,  70.9% { opacity: 1; }
+    71%,  100%  { opacity: 0; }
+}
+/* Short, bright, and off-beat from both colours - that stagger is most of what
+   sells it as a rotating bar rather than two lamps taking turns. */
+@keyframes polWhite {
+    0%,   22.9% { opacity: 0; }
+    23%,  25.9% { opacity: 1; }
+    26%,  72.9% { opacity: 0; }
+    73%,  75.9% { opacity: 1; }
+    76%,  100%  { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pol-left .pol-r, .pol-right .pol-r, .pol-top .pol-r, .pol-bottom .pol-r,
+    .pol-left .pol-b, .pol-right .pol-b, .pol-top .pol-b, .pol-bottom .pol-b,
+    .pol-w { animation: none; }
+    .pol-r { opacity: 0.55; }
+    .pol-b { opacity: 0.55; }
+    .pol-w { opacity: 0; }
+}
+
+/* Two small lamps per edge, not one wash across half the screen — each stays
+   tucked into its corner of the edge and fades out well before reaching the
+   far side or the opposite lamp. --pol-lamp-a/b (ellipse radii, % of
+   viewport), --pol-spread (how far apart the two sit) and --pol-softness (the
+   falloff stop — lower is a harder edge) are tunable from /hudpolice edit.
+
+   The ellipse is ALWAYS "a wide, b tall" here, on every edge — it used to
+   swap to "b wide, a tall" on top/bottom so the long axis stayed parallel to
+   whichever edge it was on, which sounded right but actually meant the same
+   lamp looked like a different shape depending which edge it landed on
+   (tall on the sides, short and wide on top/bottom). Same numbers, same
+   shape, everywhere now; only the position swaps per edge. */
+.pol-left   .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% - var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-left   .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% + var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-right  .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% - var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-right  .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% + var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-top    .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * 1%) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-top    .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * 1%) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-bottom .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * 1%) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-bottom .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * 1%) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+
+/* Punchier than before: these are meant to feel like light spilling in from
+   off-camera, and at 0.62 they were closer to a tint. */
+.pol-r { --polc: rgba(255, 42, 58, 0.92); }
+.pol-b { --polc: rgba(64, 118, 255, 0.92); }
+/* White reaches less far by default (--pol-white-w/h default smaller than
+   --pol-lamp-a/b). A takedown is a tight hot spot, not a wash - letting it
+   cover the same area as the colours just greys the screen out.
+   --pol-white-a is the takedown's own intensity, tunable separately from the
+   red/blue brightness slider. Same "always a-wide-b-tall" rule as above. */
+.pol-w { --polc: rgba(255, 250, 240, var(--pol-white-a, 0.70)); }
+#police.no-white .pol-w { display: none; }
+.pol-left   .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 0% 50%,   var(--polc) 0%, transparent 58%); }
+.pol-right  .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 100% 50%, var(--polc) 0%, transparent 58%); }
+.pol-top    .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 50% 0%,   var(--polc) 0%, transparent 58%); }
+.pol-bottom .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 50% 100%, var(--polc) 0%, transparent 58%); }
+
+/* -----------------------------------------------------------------------------
+   Radius police glow
+   -----------------------------------------------------------------------------
+   The alternative to the four fixed edges above: one lamp pair positioned by
+   --pol-rx/ry (red) and --pol-bx/by (blue), set directly in percent by
+   client.lua from the actual bearing to the siren — so a car to the
+   south-west lands in the bottom-left corner instead of lighting the whole
+   left edge and the whole bottom edge as two separate glows. Shares the same
+   flash keyframes, --pol-lamp-a/b, and --pol-softness as edges mode so
+   switching modes doesn't require retuning the shape.
+   -------------------------------------------------------------------------- */
+#police-radius {
+    position: fixed;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+#police-radius > span { position: absolute; inset: 0; display: block; }
+
+.polr-r { animation: polRed  var(--pol-flash, 900ms) linear infinite; }
+.polr-b { animation: polBlue var(--pol-flash, 900ms) linear infinite; }
+.polr-w { animation: polWhite var(--pol-flash, 900ms) linear infinite; }
+
+.polr-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-rx, 50%) var(--pol-ry, 0%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.polr-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-bx, 100%) var(--pol-by, 50%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.polr-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at var(--pol-wx, 75%) var(--pol-wy, 25%), var(--polc) 0%, transparent 58%); }
+
+.polr-r { --polc: rgba(255, 42, 58, 0.92); }
+.polr-b { --polc: rgba(64, 118, 255, 0.92); }
+.polr-w { --polc: rgba(255, 250, 240, var(--pol-white-a, 0.70)); }
+#police-radius.no-white .polr-w { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .polr-r, .polr-b, .polr-w { animation: none; }
+    .polr-r { opacity: 0.55; }
+    .polr-b { opacity: 0.55; }
+    .polr-w { opacity: 0; }
+}
+
+/* -----------------------------------------------------------------------------
+   Minimap frame
+   -----------------------------------------------------------------------------
+   Sits exactly on the native minimap's rect (same vars the slot stack uses), so
+   the map reads as a framed panel rather than a soft-edged blob. The mask
+   texture handles clipping the map content; this handles the boundary.
+   -------------------------------------------------------------------------- */
+#map-frame {
+    position: absolute;
+    left: var(--map-left, 1.75cqw);
+    bottom: var(--map-bottom-edge, 2.6cqh);
+    /* Sized from the map's rect, then scaled per axis. Done on width/height
+       rather than with a transform so the border stays a hairline and the
+       left/bottom anchor stays exact -- the frame's whole job is to sit on the
+       map, and the map's rect is a different shape from the frame that has to
+       land on it, so the two axes have to move independently. */
+    width:  calc(var(--map-width, 15.8cqw) * var(--sc-mapframe-x, 1));
+    height: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1));
+    border: 0.085cqw solid rgba(236, 236, 240, 0.30);
+    border-radius: calc((0.62cqw) * var(--rad-mapframe, 1));
+    /* --shadow-md rather than the one-off 0 0.25cqh 0.6cqh rgba(0,0,0,0.42)
+       that used to be here. It was within a hair of the token and had no reason
+       to be its own value: the frame and the two panels stacked on top of it
+       are one object in the corner of the screen, and one object should not
+       cast three subtly different shadows. The inset stays — it is doing
+       something the token does not, darkening the map's own edge inward.
+
+       The top-lit inset is the same rule .slot carries, and is the other half
+       of making these read as one material: every plate in this corner is now
+       brightest along its top edge, as if lit from above. The frame was the
+       one piece drawing a flat outline instead. */
+    box-shadow:
+        var(--shadow-md),
+        inset 0 0 0.5cqh rgba(0, 0, 0, 0.22),
+        inset 0 0.09cqh 0 rgba(255, 255, 255, 0.055);
+    pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Nav popup
+   -----------------------------------------------------------------------------
+   ONE bar: instruction + distance on the left, a full-height turn tile flush
+   to the right edge. Built to match the reference overlay, which is why a few
+   things here deliberately break this file's usual habits:
+
+     - The surface is a FLAT dark fill, not `.plate`. The plate's gradient and
+       sheen are this HUD's own material; the reference bar is matte, and the
+       sheen on it was the most obvious "not the same thing" tell.
+     - The type is HelveticaNeueHUD, set EXPLICITLY rather than inherited.
+       #slots defaults to GTAArtDeco (see the note by the font rows further
+       down) and the nav bar is the one panel in that stack that must not take
+       it -- the reference sets this in a plain bold grotesque, and Art Deco's
+       flat terminals read as a different UI entirely at this size.
+     - The turn tile is FULL BLEED: it runs the whole height of the bar and
+       right up to its edge, clipped by the bar's own radius (which is what
+       the overflow:hidden is for). It is not an inset icon chip -- that was
+       the "green area is too small" this went through several rounds of.
+
+   NOT independently positioned: it is the last child of #slots (see
+   index.html), so the same column-reverse flow that stacks the vehicle panel
+   above the zone bar stacks this above both, growing and shrinking with
+   whatever else is showing. The editor's generic x/y/scale rows (navpopup)
+   still nudge it via the transform below, same as every other element. */
+#nav-popup {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+}
+#nav-popup { transform: translate(var(--off-navpopup-x,0cqw), var(--off-navpopup-y,0cqh)) scale(var(--sc-navpopup-x,1), var(--sc-navpopup-y,1)); transform-origin: bottom left; opacity: var(--op-navpopup, 1); }
+#nav-popup { -webkit-font-smoothing: var(--sm-navpopup, antialiased); }
+
+/* #nav-popup carries its own editor-tuned position/scale transform above, so
+   it CANNOT use the generic .slot-in entrance: that keyframe drives the
+   `transform` property directly and, with fill-mode `both`, pins the element
+   at identity transform for as long as slot-in stays applied -- i.e. the
+   whole time the popup is on screen, silently discarding the editor's offset
+   and scale, not just during the animation. Same story for #nav-compass,
+   which has its own absolute-position transform. Both get a plain opacity
+   fade instead -- higher specificity (id + class) than `.slot.slot-in`, so it
+   wins without touching the shared rule the other slot panels rely on. */
+@keyframes navFadeIn { from { opacity: 0; } to { opacity: 1; } }
+#nav-popup.slot-in, #nav-compass.slot-in {
+    animation: navFadeIn 280ms ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+    #nav-popup.slot-in, #nav-compass.slot-in { animation: none; }
+}
+
+#nav-turn {
+    /* One number drives the bar: its own height, the tile's size and the type
+       scale all come off this, so the bar resizes as a unit instead of three
+       values drifting apart.
+
+       cqh, and the type in this bar is in --w (never raw cqw) -- both track
+       viewport HEIGHT, so the bar's internal proportions hold at any aspect
+       ratio. Sizing the type in cqw instead is exactly the ultrawide bug --w
+       exists to prevent: it made this text 50% of the bar height at 21:9
+       against the 37% it is at 16:9. See --w's comment near the top. */
+    --nav-h: calc(5.6cqh * var(--sc-navbar, 1));
+    height: var(--nav-h);
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    background: var(--nav-bg, rgba(35, 37, 46, 0.95));
+    border-radius: calc(0.55 * var(--w) * var(--rad-navpopup, 1));
+    /* Clips the full-bleed tile to the bar's rounded corner. */
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+#nav-turn-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.12cqh;
+    min-width: 0;
+    padding: 0 calc(0.7 * var(--w)) 0 calc(0.95 * var(--w));
+}
+/* Explicit family, not `inherit` -- see the header note above. */
+#nav-turn-text {
+    font-family: var(--ff-navpopup, 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif);
+    font-weight: var(--fw-navpopup, 700);
+    font-size: calc(1.18 * var(--w) * var(--fs-navpopup, 1) * var(--fit, 1));
+    line-height: 1.12;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#nav-turn-dist {
+    font-family: var(--ff-navpopup, 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif);
+    font-weight: var(--fw-navpopup-dist, 500);
+    font-size: calc(0.95 * var(--w) * var(--fs-navpopup, 1) * var(--fit, 1));
+    line-height: 1.12;
+    color: rgba(255, 255, 255, 0.82);
+    white-space: nowrap;
+}
+
+/* The turn tile. Square, full height, flush right.
+   Two glyphs share the svg (see index.html): a plain up-arrow for "straight"
+   and a hooked turn glyph for everything else, swapped by [data-dir] rather
+   than one shape stretched to mean four different things. Left is the glyph's
+   own drawn direction; right is that path mirrored, u-turn is it rotated a
+   half turn -- one curve authored once, not three. Stroked, not filled: a
+   road bending is a LINE, and a filled chevron rotated 90 degrees reads as
+   "bigger arrow", not "turn". */
+#nav-turn-arrow {
+    width: calc(var(--nav-h) * var(--ic-navpopup, 1));
+    height: 100%;
+    flex-shrink: 0;
+    background: var(--nav-accent, #6fd5c3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#nav-turn-arrow svg {
+    width: 58%;
+    height: 58%;
+    fill: none;
+    stroke: var(--nav-accent-ink, #0c2320);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 180ms ease;
+}
+#nav-turn-arrow .arrow-turn { display: none; }
+#nav-turn-arrow[data-dir="left"]  .arrow-straight,
+#nav-turn-arrow[data-dir="right"] .arrow-straight,
+#nav-turn-arrow[data-dir="uturn"] .arrow-straight { display: none; }
+#nav-turn-arrow[data-dir="left"]  .arrow-turn,
+#nav-turn-arrow[data-dir="right"] .arrow-turn,
+#nav-turn-arrow[data-dir="uturn"] .arrow-turn { display: inline; }
+#nav-turn-arrow[data-dir="right"] svg { transform: scaleX(-1); }
+#nav-turn-arrow[data-dir="uturn"] svg { transform: rotate(180deg); }
+
+/* -----------------------------------------------------------------------------
+   Nav remaining-distance figure
+   -----------------------------------------------------------------------------
+   The whole-route distance, sitting in the map's own top-left corner the way
+   the reference puts it -- ON the map, not in the panel stack above it, so it
+   is anchored to the live --map-* vars #map-frame reads (see the note there:
+   --map-bottom is screen-bottom to the map's TOP edge).
+
+   The needle an earlier version drew here is gone: no bearing is sent from
+   client.lua so it was purely decorative, and the reference has no needle
+   either -- just the figure. */
+#nav-compass {
+    position: absolute;
+    left: calc(var(--map-left, 1.75cqw) + 0.5 * var(--w));
+    bottom: calc(var(--map-bottom, 17.9cqh) - 2.1cqh);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+#nav-compass {
+    transform: translate(var(--off-navcompass-x,0cqw), var(--off-navcompass-y,0cqh)) scale(var(--sc-navcompass-x,1), var(--sc-navcompass-y,1));
+    transform-origin: top left;
+    opacity: var(--op-navcompass, 1);
+}
+#nav-compass-dist {
+    font-family: var(--ff-navcompass, 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif);
+    font-weight: var(--fw-navcompass, 500);
+    font-size: calc(0.88 * var(--w) * var(--fs-navcompass, 1));
+    color: #fff;
+    text-shadow: 0 0.1cqh 0.3cqh rgba(0, 0, 0, 0.85);
+    white-space: nowrap;
+    -webkit-font-smoothing: var(--sm-navcompass, antialiased);
+}
+
+/* -----------------------------------------------------------------------------
+   Exhaustion vignette
+   -----------------------------------------------------------------------------
+   Darkens and closes in from the screen edges as stamina empties, with a slow
+   breathing pulse. Kept mild on purpose — it is a "you are winded" cue, not a
+   damage overlay, so it must never fight the HUD for attention.
+   -------------------------------------------------------------------------- */
+#exhaust {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 500ms ease;
+    /* --exhaust-tunnel closes the aperture as you tire: the clear centre
+       shrinks, so the edges creep inward rather than just darkening. */
+    background:
+        radial-gradient(ellipse var(--exhaust-w, 74%) var(--exhaust-h, 68%) at 50% 50%,
+            transparent 30%,
+            rgba(8, 4, 10, 0.42) 62%,
+            rgba(5, 2, 7, 0.88) 88%,
+            rgba(3, 1, 4, 0.97) 100%);
+}
+
+#exhaust.breathing {
+    animation: exhaustPulse var(--exhaust-pulse, 1100ms) ease-in-out infinite;
+}
+
+/* Multiplies the base opacity set from Lua, so the pulse rides on top of the
+   level rather than replacing it. */
+@keyframes exhaustPulse {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #exhaust.breathing { animation: none; }
+}
+
+/* Focus vignette -------------------------------------------------------
+   The NUI is composited OVER the 3D game as a transparent layer, not mixed
+   with it, so nothing in here can desaturate or blur the world itself --
+   only draw on top of it. This is that: a purple vignette that closes the
+   edges in and a pulsing inner glow, in the same colour as the focus bar,
+   so the bar and the screen read as one signal instead of two.
+
+   --fxstrength-focusfx / --fxpulse-focusfx / --fxspeed-focusfx are the
+   editor's three rows for this element (Vignette strength / Pulse size /
+   Pulse speed, /movehud > Focus screen effect) -- multipliers on the alpha,
+   reach and blur set here, and on the keyframes' own swing below, so 1.00
+   everywhere reproduces exactly this shipped look. */
+#focus-fx {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 450ms ease;
+    background:
+        radial-gradient(ellipse 150% 135% at 50% 50%,
+            transparent 38%,
+            rgba(58, 30, 92, calc(0.32 * var(--fxstrength-focusfx, 1))) 70%,
+            rgba(28, 10, 52, calc(0.68 * var(--fxstrength-focusfx, 1))) 100%);
+    box-shadow: inset 0 0 calc(7cqw * var(--fxstrength-focusfx, 1)) rgba(180, 140, 240, calc(0.55 * var(--fxstrength-focusfx, 1)));
+}
+#focus-fx.active {
+    opacity: 1;
+    animation: focusFxPulse var(--fxspeed-focusfx, 1100ms) ease-in-out infinite;
+}
+/* Base swing raised from the original brightness(1.3)/saturate(1.2) flicker
+   -- too small to notice mid-fight -- to a visible breathe: brighter,
+   more saturated, AND a touch of scale so the vignette itself grows and
+   shrinks each beat instead of just flickering in place. --fxpulse-focusfx
+   is a multiplier on top of this baseline, so 0 is dead flat and turning it
+   up keeps making the beat bigger past what's shipped here. */
+@keyframes focusFxPulse {
+    0%, 100% { filter: brightness(1) saturate(1); transform: scale(1); }
+    50%      {
+        filter: brightness(calc(1 + 0.45 * var(--fxpulse-focusfx, 1)))
+                saturate(calc(1 + 0.35 * var(--fxpulse-focusfx, 1)));
+        transform: scale(calc(1 + 0.05 * var(--fxpulse-focusfx, 1)));
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    #focus-fx.active { animation: none; }
+}
+
+/* -----------------------------------------------------------------------------
+   Per-element offsets (HUD editor)
+   -----------------------------------------------------------------------------
+   Every movable element carries its own translate, driven from Lua and saved
+   per player. Offsets are in stage units (cqw/cqh) so a position set on one
+   resolution holds on another.
+   -------------------------------------------------------------------------- */
+/* Each movable element carries its own translate AND scale, both driven from
+   the editor and saved per player. Scale uses its own origin per element so a
+   corner-anchored item grows toward the screen rather than off it. */
+#status   { transform: translate(var(--off-status-x,0cqw),   var(--off-status-y,0cqh))   scale(var(--sc-status-x,1), var(--sc-status-y,1));   transform-origin: top left; opacity: var(--op-status, 1); }
+#tells    { transform: translate(var(--off-tells-x,0cqw),    var(--off-tells-y,0cqh))    scale(var(--sc-tells-x,1), var(--sc-tells-y,1));    transform-origin: top right; opacity: var(--op-tells, 1); }
+#topright { transform: translate(var(--off-topright-x,0cqw), var(--off-topright-y,0cqh)) scale(var(--sc-topright-x,1), var(--sc-topright-y,1)); transform-origin: top right; opacity: var(--op-topright, 1); }
+#money    { transform: translate(var(--off-money-x,0cqw),    var(--off-money-y,0cqh))    scale(var(--sc-money-x,1), var(--sc-money-y,1));    transform-origin: top right; opacity: var(--op-money, 1); }
+#slots    { transform: translate(var(--off-slots-x,0cqw),    var(--off-slots-y,0cqh))    scale(var(--sc-slots-x,1), var(--sc-slots-y,1));    transform-origin: bottom left; opacity: var(--op-slots, 1); }
+#wanted   { transform: translate(var(--off-wanted-x,0cqw),   var(--off-wanted-y,0cqh))   scale(var(--sc-wanted-x,1), var(--sc-wanted-y,1));   transform-origin: top left; opacity: var(--op-wanted, 1); }
+#honor    { transform: translate(var(--off-honor-x,0cqw),    var(--off-honor-y,0cqh))    scale(var(--sc-honor-x,1), var(--sc-honor-y,1));    transform-origin: bottom right; opacity: var(--op-honor, 1); }
+#reputation { transform: translate(var(--off-reputation-x,0cqw), var(--off-reputation-y,0cqh)) scale(var(--sc-reputation-x,1), var(--sc-reputation-y,1)); transform-origin: bottom left; opacity: var(--op-reputation, 1); }
+#prompts  { transform: translate(var(--off-prompts-x,0cqw),  var(--off-prompts-y,0cqh))  scale(var(--sc-prompts-x,1), var(--sc-prompts-y,1));  transform-origin: bottom right; opacity: var(--op-prompts, 1); }
+#honor-pop{
+    transform: translate(-50%, -50%)
+               translate(var(--off-honorpop-x,0cqw), var(--off-honorpop-y,0cqh))
+               scale(var(--sc-honorpop-x,1), var(--sc-honorpop-y,1));
+    transform-origin: center;
+    opacity: var(--op-honorpop, 1);
+}
+#reputation-pop{
+    transform: translate(-50%, -50%)
+               translate(var(--off-reputationpop-x,0cqw), var(--off-reputationpop-y,0cqh))
+               scale(var(--sc-reputationpop-x,1), var(--sc-reputationpop-y,1));
+    transform-origin: center;
+    opacity: var(--op-reputationpop, 1);
+}
+#map-frame{ transform: translate(var(--off-mapframe-x,0cqw), var(--off-mapframe-y,0cqh)); transform-origin: bottom left; opacity: var(--op-mapframe, 1); }
+/* Centre origin, unlike the corner-anchored panels: the pip row sits in the
+   middle of the vehicle panel, so growing it from a corner would walk it out of
+   the plate rather than swelling it in place. */
+/* The mark carries the same centring translate as #honor-pop: the -50% pair
+   puts it in the middle of the panel, and the editor's offset is applied AFTER
+   so nudging it does not have to know what the centring was.
+   The 0.42 is the shipped strength, and it multiplies rather than being
+   replaced -- an untouched Opacity row of 1.00 renders the design, and turning
+   the row down fades the mark out from there. It is low on purpose: this sits
+   directly behind the make and model, and a watermark that competes with the
+   text it is behind has failed at the one thing it has to do. */
+#veh-logo {
+    transform: translate(-50%, -50%)
+               translate(var(--off-vehlogo-x,0cqw), var(--off-vehlogo-y,0cqh))
+               scale(var(--sc-vehlogo-x,1), var(--sc-vehlogo-y,1));
+    transform-origin: center;
+    /* 0.42 was tuned against the old warm --plate. On the flatter, darker
+       --panel the same value reads as hard grey BLOCKS with a visible straight
+       cut where the clip crops them -- particularly the wide, angular marks
+       (Truffade, Benefactor), which have no round silhouette to soften them.
+       This is a watermark: it should be felt, not read. Still multiplied by
+       the editor's Vehicle badge -> Opacity row, so 1.00 there is this. */
+    opacity: calc(0.22 * var(--op-vehlogo, 1));
+}
+#veh-pips { transform: translate(var(--off-vehpips-x,0cqw), var(--off-vehpips-y,0cqh)) scale(var(--sc-vehpips-x,1), var(--sc-vehpips-y,1)); transform-origin: center; opacity: var(--op-vehpips, 1); }
+
+/* -----------------------------------------------------------------------------
+   Per-element spacing (HUD editor)
+   -----------------------------------------------------------------------------
+   A multiplier on the gap between an element's own children. Without it,
+   scaling an element's icons or type left the spacing at its original value and
+   the result read as crowded or as adrift — the size control alone could never
+   produce a proportionate stack. Every fallback is the shipped gap, so an
+   untouched element is unchanged.
+   -------------------------------------------------------------------------- */
+#status    { gap: calc(1.6cqh  * var(--sp-status, 1)); }
+#topright  { gap: calc(0.14cqh * var(--sp-topright, 1)); }
+#tells     { gap: calc(0.65cqw * var(--sp-tells, 1)); }
+#money     { gap: calc(0.45cqh * var(--sp-money, 1)); }
+#slots     { gap: calc(0.45cqh * var(--sp-slots, 1)); }
+#wanted    { gap: calc(1.1cqh  * var(--sp-wanted, 1)); }
+#honor     { gap: calc(0.8cqw  * var(--sp-honor, 1)); }
+#honor-pop { gap: calc(0.35cqw * var(--sp-honorpop, 1)); }
+#reputation     { gap: calc(0.8cqw  * var(--sp-reputation, 1)); }
+#reputation-pop { gap: calc(0.35cqw * var(--sp-reputationpop, 1)); }
+#prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
+.srow      { gap: calc(0.57cqw * var(--sp-status, 1)); }
+
+/* -----------------------------------------------------------------------------
+   Per-element typeface and text rasterisation (HUD editor)
+   -----------------------------------------------------------------------------
+   --ff-* used to be written by the editor for EVERY element and read by only
+   two of them, so choosing a font on the zone bar, the wanted box, honor or the
+   prompts did nothing at all — the row moved, the screen did not. Both
+   properties inherit, so setting them on the container reaches the copy inside.
+
+   --sm-* is `-webkit-font-smoothing`, which decides how glyph edges are
+   rasterised and was previously hardcoded to `antialiased` for the whole page.
+   That is a real lever on how sharp or how soft text looks, and which setting
+   wins depends on the display, so it belongs to the player rather than to this
+   stylesheet:
+     auto         subpixel where the compositor allows it, otherwise grayscale
+     antialiased  grayscale — the shipped behaviour, slightly lighter stems
+     none         no antialiasing at all: hard edges, genuinely aliased
+   -------------------------------------------------------------------------- */
+#status    { font-family: var(--ff-status, inherit);    -webkit-font-smoothing: var(--sm-status, antialiased); }
+#topright  { -webkit-font-smoothing: var(--sm-topright, antialiased); }
+#tells     { font-family: var(--ff-tells, inherit);     -webkit-font-smoothing: var(--sm-tells, antialiased); }
+#money     { -webkit-font-smoothing: var(--sm-money, antialiased); }
+/* GTA Art Deco is the DEFAULT for the two map panels, not just an option in
+   the Font row. It is GTA's own display face and it is what the make, the
+   model and the zone name are set in; Helvetica stays the fallback for the
+   moment before the file loads and for any glyph Art Deco does not carry.
+   Both panels inherit from here, so this is the one place that decides it --
+   and the Font rows on Map panels / Vehicle panel / Zone bar still override,
+   because every one of them reads --ff-* first. */
+#slots     { font-family: var(--ff-slots, 'GTAArtDeco', 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif);     -webkit-font-smoothing: var(--sm-slots, antialiased); }
+#zone      { -webkit-font-smoothing: var(--sm-zone, inherit); }
+#vehicle   { -webkit-font-smoothing: var(--sm-vehicle, inherit); }
+#veh-pips  { font-family: var(--ff-vehpips, inherit);   -webkit-font-smoothing: var(--sm-vehpips, inherit); }
+#wanted    { font-family: var(--ff-wanted, inherit);    -webkit-font-smoothing: var(--sm-wanted, antialiased); }
+#honor     { font-family: var(--ff-honor, inherit);     -webkit-font-smoothing: var(--sm-honor, antialiased); }
+#honor-pop { font-family: var(--ff-honorpop, inherit);  -webkit-font-smoothing: var(--sm-honorpop, antialiased); }
+#reputation     { font-family: var(--ff-reputation, inherit);     -webkit-font-smoothing: var(--sm-reputation, antialiased); }
+#reputation-pop { font-family: var(--ff-reputationpop, inherit);  -webkit-font-smoothing: var(--sm-reputationpop, antialiased); }
+#prompts   { font-family: var(--ff-prompts, inherit);   -webkit-font-smoothing: var(--sm-prompts, antialiased); }
+#map-frame { -webkit-font-smoothing: var(--sm-mapframe, antialiased); }
+
+/* -----------------------------------------------------------------------------
+   Component outlines (/hudrects)
+   -----------------------------------------------------------------------------
+   A diagnostic, not decoration. Deliberately thin, unfilled and labelled: the
+   whole point is to see what is UNDER them, and an outline you cannot name is
+   no better than no outline.
+   -------------------------------------------------------------------------- */
+#map-rects .mrect {
+    position: absolute;
+    border: 1px solid currentColor;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+#map-rects .mrect span {
+    position: absolute;
+    left: 0;
+    bottom: 100%;
+    font-size: calc(0.72 * var(--w));
+    line-height: 1.2;
+    padding: 0 0.25cqw;
+    white-space: nowrap;
+    /* Black on the outline's own colour. NOT `background: currentColor` — the
+       span sets its own `color` for the text, so currentColor resolves to that
+       and every label came out a black bar on black. */
+    color: #000;
+    font-family: system-ui, sans-serif;
+}
+#map-rects .mrect span b { color: #000; font-weight: 700; }
+#map-rects .m-minimap           { color: #5ce07a; }
+#map-rects .m-minimap span      { background: #5ce07a; }
+#map-rects .m-minimap_mask      { color: #56d7f2; }
+#map-rects .m-minimap_mask span { background: #56d7f2; }
+#map-rects .m-minimap_blur      { color: #f2d24f; }
+#map-rects .m-minimap_blur span { background: #f2d24f; }
+/* Stagger the labels so three overlapping rects do not stack their captions on
+   one line and hide each other. */
+#map-rects .m-minimap_mask span { bottom: calc(100% + 1.4cqh); }
+#map-rects .m-minimap_blur span { bottom: calc(100% + 2.8cqh); }
+
+/* -----------------------------------------------------------------------------
+   Shrink-to-fit overflow (see fitBox in app.js)
+   -----------------------------------------------------------------------------
+   Long names are scaled down to fit their panel. `.fit-wrap` is the last stop
+   before that becomes unreadable: at the floor the words are allowed to wrap
+   instead of being cut, because "Western Motorcycle Company" does not fit this
+   panel at any size you could still read, and half a name is worth less than a
+   taller panel. Both panels size from their content, so they simply grow.
+   -------------------------------------------------------------------------- */
+#zone.fit-wrap #zone-text,
+#vehicle.fit-wrap .vname {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    /* Break inside a word only when the word alone is wider than the panel —
+       a single long model name should not silently vanish either. */
+    overflow-wrap: anywhere;
+    line-height: 1.05;
+}
+/* The zone bar has a FIXED height, which would clip a second line straight back
+   off. Wrapping turns it into a minimum. */
+#zone.fit-wrap {
+    height: auto;
+    min-height: 3.11cqh;
+    padding-top: 0.35cqh;
+    padding-bottom: 0.35cqh;
+}
+
+/* -----------------------------------------------------------------------------
+   Per-element text alignment (HUD editor)
+   -----------------------------------------------------------------------------
+   One control in /movehud writes TWO custom properties per element:
+     --al-<key>   a text-align value   (left | center | right)
+     --ai-<key>   the matching flex alignment (flex-start | center | flex-end)
+   Two are needed because these panels are flex containers: text-align alone
+   moves the glyphs inside a box that is still hard against one edge, and the
+   flex value alone does nothing to copy that wraps. Setting both is what makes
+   "pull it left / centre it / push it right" behave the way it reads.
+
+   Every fallback below is the value the element already shipped with, so
+   "Default" in the editor renders exactly as designed and an untouched layout
+   is byte-for-byte the old one.
+   -------------------------------------------------------------------------- */
+#status            { align-items: var(--ai-status, stretch); }
+#topright          { align-items: var(--ai-topright, flex-end); }
+#tells             { justify-content: var(--ai-tells, flex-start); }
+#money             { align-items: var(--ai-money, flex-end); }
+#slots             { align-items: var(--ai-slots, stretch); }
+/* CENTRED, not left, is the shipped default for the map panels: the reference
+   centres the zone name and the make/model over the panel, and with the nav
+   bar in the same stack a left-ragged zone bar above a centred one read as two
+   different components. The editor's Text align row still moves them. */
+#zone              { justify-content: var(--ai-slots, center); }
+#veh-head          { align-items: var(--ai-slots, center); }
+#zone-text, .vname { text-align: var(--al-slots, center); }
+#wanted            { align-items: var(--ai-wanted, stretch); }
+#wanted-copy       { text-align: var(--al-wanted, left); }
+#honor-copy        { align-items: var(--ai-honor, flex-end); text-align: var(--al-honor, right); }
+#honor-pop         { justify-content: var(--ai-honorpop, center); }
+#reputation-copy   { align-items: var(--ai-reputation, flex-start); text-align: var(--al-reputation, left); }
+#reputation-pop    { justify-content: var(--ai-reputationpop, center); }
+#prompts           { align-items: var(--ai-prompts, flex-end); }
+.prompt            { justify-content: var(--ai-prompts, flex-start); }
+
+/* -----------------------------------------------------------------------------
+   HUD editor  (/movehud)  —  "liquid glass"
+   -----------------------------------------------------------------------------
+   THERE IS NO backdrop-filter HERE, AND THERE CANNOT BE.
+
+   `backdrop-filter` samples the PAGE's own backdrop. This page is a transparent
+   overlay: the game is composited underneath by the ENGINE, not by Chromium, so
+   as far as the blur is concerned the backdrop is empty. CEF does not treat
+   "empty" as "leave it alone" — it rasterises the backdrop root and hands back
+   OPAQUE BLACK, in a rectangle that is larger than the element itself.
+
+   That never showed up while the editor drew a full-screen scrim: the scrim was
+   the backdrop, so the blur had something real to sample. Remove the scrim and
+   the panel sits in a black box with the HUD behind it gone. Both cannot exist
+   at once, and of the two, seeing the HUD you are editing is the point.
+
+   So the look has to be carried entirely by things that do NOT depend on a
+   backdrop, and that is what everything below is doing:
+     · a translucent tint, so the world genuinely shows through
+     · a bright specular rim plus an inset top highlight, which is what actually
+       reads as "a pane of glass" rather than "a grey box"
+     · a soft top-lit gradient and a wide, low shadow for thickness
+     · generous radii, so the rim curves the way real glass edges do
+   Do not swap the layered fills for one flat colour "to simplify" — the flat
+   version is the grey box.
+   -------------------------------------------------------------------------- */
+#editor {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+
+    /* NO SCRIM, and no backdrop-filter out here.
+       This used to be a full-screen graded wash with a 3px blur over it. The
+       game and the ENGINE-DRAWN minimap are composited underneath this page, so
+       that wash dimmed the very thing the editor exists to position — the map
+       went black, the HUD went murky, and you were tuning by memory. A layout
+       tool has to leave the layout visible. */
+    background: none;
+    pointer-events: none;
+
+    /* The glass tokens now live on :root — see the block near the top. They
+       were editor-local while the editor was the only glass surface; three
+       surfaces later, each hand-rolling its own near-miss of the same colours,
+       is how a design becomes an approximation of itself. */
+
+    /* System UI for the chrome. Helvetica Neue is the HUD's voice; the editor is
+       a tool sitting on top of the game, and the platform face is what makes it
+       read that way. */
+    font-family: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+                 'SF Pro Text', Inter, Roboto, sans-serif;
+}
+#editor.hidden { display: none !important; }
+
+#editor-panel {
+    /* Absolutely placed rather than flex-centred, because it is DRAGGABLE:
+       once you pick it up, JS writes left/top in pixels and clears the
+       centring transform. Until then it sits in the middle. */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+
+    /* Height-relative, so the panel is the same physical size on 16:9 and
+       on a 3440-wide ultrawide instead of growing to half the screen.
+       Deliberately narrower than it was: at 52 units it spanned roughly half a
+       1080p screen and there was no corner of the HUD it did not cover. */
+    /* A STARTING size, not a fixed one: #ed-resize writes width/height in px
+       from here on. The max-width used to be min(74vw, 920px), which is what
+       made the settings labels ellipsise with no way out — a ceiling on a panel
+       whose contents the player controls is a wall. It is now only wide enough
+       to stop the panel covering the entire screen. */
+    width: calc(46 * var(--w));
+    min-width: 560px;
+    max-width: 96vw;
+    display: flex;
+    flex-direction: column;
+    max-height: 92cqh;
+    overflow: hidden;
+
+    /* Surface comes from .plate — the MAP PANEL material.
+       Every surface this HUD draws is now the same plate: the zone bar and
+       vehicle panel, this editor, the skills screen, the level-up card, the
+       police-light editor, ox_lib's popup layer, and the ox_target / qb-menu /
+       qb-input menus. .glass is kept below as a recipe but nothing uses it.
+       No backdrop-filter in either recipe — see the note above. */
+    border-radius: calc(1.5 * var(--w));
+    font-size: calc(1.02 * var(--w));
+    color: var(--text);
+}
+/* Dragged: JS owns left/top from here on, so the centring offset has to go or
+   the panel would sit half a panel-width away from the cursor. */
+#editor-panel.dragged { transform: none; }
+
+/* Resized: JS owns width/height. max-height has to go with them, or a panel
+   dragged taller than 92cqh would be clipped back to it and the grip would
+   appear to stop responding partway down. */
+#editor-panel.resized { max-height: none; max-width: none; }
+#editor-panel.resizing { transition: none; user-select: none; }
+/* The body is the part that grows. Without this the two columns keep their
+   content height and a taller panel is just more empty plate underneath. */
+#editor-panel.resized #editor-body { flex: 1 1 auto; min-height: 0; }
+
+/* The grip itself: bottom-right corner, two hairline strokes. Deliberately not
+   an icon font or an SVG — it is two gradients and it scales with the panel.
+   Sits above the head's drag handler because it is a corner of the same panel;
+   z-index rather than DOM order so it stays last in the tab sequence. */
+#ed-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: calc(1.5 * var(--w));
+    height: calc(1.5 * var(--w));
+    cursor: nwse-resize;
+    z-index: 3;
+    pointer-events: auto;
+    background:
+        linear-gradient(135deg, transparent 0 45%,
+            rgba(255, 255, 255, 0.34) 45% 52%, transparent 52%),
+        linear-gradient(135deg, transparent 0 66%,
+            rgba(255, 255, 255, 0.22) 66% 73%, transparent 73%);
+    border-bottom-right-radius: calc(1.5 * var(--w));
+}
+#ed-resize:hover { background-color: rgba(255, 255, 255, 0.07); }
+/* Collapsed the panel is just its title bar, and there is nothing to resize. */
+#editor-panel.collapsed #ed-resize { display: none; }
+#editor-panel.dragging { transition: none; cursor: grabbing; }
+
+/* Collapsed (H). The body and the buttons fold away and only the title bar is
+   left — small enough to park anywhere, and still draggable, so nothing about
+   the editor is ever hidden behind an invisible state. */
+#editor-panel.collapsed #editor-body,
+#editor-panel.collapsed #editor-actions,
+#editor-panel.collapsed #editor-keys { display: none; }
+#editor-panel.collapsed #editor-head { border-bottom: none; }
+#editor-panel.collapsed { width: auto; min-width: 0; }
+
+/* The whole head is the drag handle. */
+#editor-head { cursor: grab; }
+#editor-panel.dragging #editor-head { cursor: grabbing; }
+
+/* Peek (hold Space). The panel all but disappears for as long as the key is
+   held, so you can check the piece you just nudged against the rest of the HUD
+   without moving, collapsing or closing anything. */
+#editor-panel { transition: opacity 120ms ease; }
+#editor-panel.peek { opacity: 0.07; }
+
+/* The specular cap and the stacking that goes with it now come from .glass. */
+
+#editor-head {
+    padding: 1.5cqh calc(1.5 * var(--w)) 1.1cqh;
+    border-bottom: 1px solid var(--g-line);
+}
+#editor-titlerow {
+    display: flex;
+    align-items: baseline;
+    gap: calc(0.7 * var(--w));
+    flex-wrap: wrap;
+}
+#editor-title {
+    font-size: calc(1.32 * var(--w));
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+#editor-sub {
+    font-size: calc(0.88 * var(--w));
+    color: rgba(244, 244, 242, 0.55);
+}
+
+/* Collapse toggle, pushed to the far end of the title row. */
+#ed-collapse {
+    margin-left: auto;
+    flex: 0 0 auto;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    font-size: calc(0.9 * var(--w));
+    padding: 0.4cqh calc(0.55 * var(--w));
+    border-radius: calc(0.4 * var(--w));
+    color: rgba(244, 244, 242, 0.7);
+    background: var(--g-fill);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+}
+#ed-collapse:hover { color: var(--text); background: var(--g-fill-hi); }
+#ed-collapse:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; }
+
+/* Shortcut chips. One long sentence of bindings is unreadable; grouped chips
+   let the eye land on the one it wants. */
+#editor-keys {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35cqh calc(0.85 * var(--w));
+    margin-top: 0.9cqh;
+}
+#editor-keys .kg {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(0.16 * var(--w));
+}
+#editor-keys .kg i {
+    font-style: normal;
+    margin-left: calc(0.28 * var(--w));
+    font-size: calc(0.8 * var(--w));
+    color: rgba(244, 244, 242, 0.5);
+}
+#editor-keys .kx { color: rgba(244, 244, 242, 0.35); font-size: calc(0.78 * var(--w)); }
+#editor-keys kbd {
+    font: inherit;
+    font-size: calc(0.76 * var(--w));
+    line-height: 1;
+    padding: 0.32cqh calc(0.34 * var(--w));
+    min-width: calc(1.35 * var(--w));
+    text-align: center;
+    border-radius: calc(0.28 * var(--w));
+    color: rgba(244, 244, 242, 0.86);
+    background: var(--g-fill);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Column captions, so each side of the body says what it is. */
+.ed-colhead {
+    font-size: calc(0.76 * var(--w));
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(244, 244, 242, 0.42);
+    padding: 0 calc(0.3 * var(--w)) 0.6cqh;
+}
+
+#editor-list { list-style: none; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+
+/* Group heading inside the list. The three kinds of element behave differently
+   — page CSS, engine-owned, another resource entirely — and interleaving them
+   with no separation was the main reason the list read as a wall. */
+#editor-list .ed-group {
+    padding: 1.0cqh calc(0.3 * var(--w)) 0.35cqh;
+    font-size: calc(0.74 * var(--w));
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(244, 244, 242, 0.34);
+    pointer-events: none;
+}
+#editor-list .ed-group:first-child { padding-top: 0.1cqh; }
+
+#editor-list .ed-item {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--w));
+    padding: 0.78cqh calc(0.75 * var(--w));
+    border-radius: calc(0.72 * var(--w));
+    cursor: pointer;
+    color: rgba(244, 244, 242, 0.72);
+    border: 1px solid transparent;
+    transition: background 120ms ease, color 120ms ease;
+}
+#editor-list .ed-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+}
+/* The selected row is its own small pane of glass, lifted off the panel. */
+#editor-list .ed-item.sel {
+    color: var(--text);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.06));
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        0 0.28cqh 0.8cqh rgba(0, 0, 0, 0.26);
+}
+
+/* "Changed from default" marker. Answers "what have I actually touched" without
+   reading fourteen rows of numbers. */
+.ed-dot {
+    flex: 0 0 auto;
+    width: calc(0.34 * var(--w));
+    height: calc(0.34 * var(--w));
+    min-width: 5px;
+    min-height: 5px;
+    border-radius: 50%;
+    background: transparent;
+}
+.ed-dot.on {
+    background: var(--g-accent);
+    box-shadow: 0 0 calc(0.5 * var(--w)) rgba(95, 216, 200, 0.55);
+}
+
+#editor-list .ed-name { font-weight: 500; min-width: 0; flex: 1 1 auto; }
+#editor-list .ed-desc {
+    font-size: calc(0.8 * var(--w));
+    color: rgba(244, 244, 242, 0.44);
+    display: block;
+    font-weight: 400;
+    margin-top: 0.1cqh;
+}
+#editor-list .ed-val {
+    font-variant-numeric: tabular-nums;
+    font-size: calc(0.82 * var(--w));
+    color: rgba(244, 244, 242, 0.6);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+#editor-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(0.6 * var(--w));
+    padding: 1.15cqh calc(1.5 * var(--w));
+    border-top: 1px solid var(--g-line);
+}
+.ed-actgroup { display: flex; gap: calc(0.5 * var(--w)); }
+.ed-actgroup-end { margin-left: auto; }
+
+#editor-actions button {
+    font: inherit;
+    font-size: calc(0.92 * var(--w));
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 0.82cqh calc(1.0 * var(--w));
+    border-radius: calc(0.62 * var(--w));
+    cursor: pointer;
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: linear-gradient(180deg, var(--g-fill-hi), var(--g-fill));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    transition: background 120ms ease, border-color 120ms ease;
+}
+#editor-actions button:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.10));
+    border-color: rgba(255, 255, 255, 0.24);
+}
+#editor-actions button:active { background: rgba(255, 255, 255, 0.07); }
+#editor-actions button.ghost {
+    color: rgba(244, 244, 242, 0.72);
+    background: rgba(255, 255, 255, 0.045);
+    box-shadow: none;
+}
+#editor-actions button.ghost:hover { color: var(--text); background: rgba(255, 255, 255, 0.10); }
+/* The one affirmative action, tinted with the HUD's accent so it is findable
+   without being loud. */
+#editor-actions button.primary {
+    background: linear-gradient(180deg, rgba(95, 216, 200, 0.34), rgba(95, 216, 200, 0.17));
+    border-color: rgba(95, 216, 200, 0.46);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
+                0 0.2cqh 0.7cqh rgba(95, 216, 200, 0.14);
+}
+#editor-actions button.primary:hover {
+    background: linear-gradient(180deg, rgba(95, 216, 200, 0.44), rgba(95, 216, 200, 0.24));
+}
+#editor-actions button:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 2px; }
+
+/* Thin, self-coloured scrollbars. The default chrome bar is opaque and lands on
+   a translucent panel like a strip of tape. */
+#editor-list::-webkit-scrollbar,
+#editor-props::-webkit-scrollbar { width: calc(0.34 * var(--w)); }
+#editor-list::-webkit-scrollbar-thumb,
+#editor-props::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: calc(1 * var(--w));
+}
+#editor-list::-webkit-scrollbar-track,
+#editor-props::-webkit-scrollbar-track { background: transparent; }
+
+/* The element currently being moved gets a marker so you can see what you're
+   dragging without having to guess from the list. */
+.ed-target {
+    outline: calc(0.14 * var(--w)) dashed var(--g-accent);
+    outline-offset: 0.3cqh;
+}
+
+/* At full exhaustion the pulse tightens and deepens — this is the state that
+   costs health, so it should feel different from merely being winded. */
+#exhaust.critical { animation-duration: 620ms !important; }
+#exhaust.critical.breathing { animation-name: exhaustPulseHard; }
+
+@keyframes exhaustPulseHard {
+    0%, 100% { filter: brightness(1) saturate(0.85); }
+    50%      { filter: brightness(1.85) saturate(0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #exhaust.critical.breathing { animation: none; }
+}
+
+/* Wanted stars — searching vs spotted.
+   Police know about you but cannot see you: the star pulses between a hollow
+   cut-out and a white fill. Once they actually have eyes on you it goes solid
+   red and stops moving, so the change of state is unmistakable. */
+.star.searching path {
+    animation: starHunt 900ms steps(1, end) infinite;
+}
+@keyframes starHunt {
+    0%, 49%   { fill: transparent; }
+    50%, 100% { fill: #f2f2f0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .star.searching path { animation: none; fill: rgba(242, 242, 240, 0.55); }
+}
+
+
+/* -----------------------------------------------------------------------------
+   Honor change indicator
+   -------------------------------------------------------------------------- */
+/* The reference shows an honor change as a sign and a face in the middle of the
+   screen — "-😈" or "+😇" — not as a titled panel. The corner mugshot is a
+   separate, PERSISTENT readout of where your honor currently stands. */
+#honor-pop {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* NO `transform` here. The centring translate(-50%, -50%) lives in the
+       layout block above, where it is composed with the editor's offset and
+       scale vars. Re-declaring transform in this later rule has the same
+       specificity and therefore WINS, which silently threw away
+       --off-honorpop-x/y and --sc-honorpop-x/y — that is why /movehud could
+       select "Honor +/- popup" but never actually move it. */
+    display: flex;
+    align-items: center;
+    gap: 0.35cqw;
+    font-size: calc((calc(3.1 * var(--w))) * var(--fs-honorpop, 1));
+    line-height: 1;
+    text-shadow: 0 0.25cqh 0.5cqh rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+}
+#honor-pop-sign {
+    font-weight: var(--fw-honorpop, 700);
+    color: #fff;
+}
+#honor-pop.up   #honor-pop-sign { color: #bfe3c8; }
+#honor-pop.down #honor-pop-sign { color: #e3a9bf; }
+
+/* Reputation change popup ----------------------------------------------------
+   Same "+N icon" shape as honor-pop, minus the up/down split — reputation
+   only ever goes up, so there is exactly one colour, not a pair keyed off a
+   class that would never be toggled. */
+#reputation-pop {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* Transform lives in the layout block above; see the note on #honor-pop. */
+    display: flex;
+    align-items: center;
+    gap: 0.35cqw;
+    font-size: calc((calc(3.1 * var(--w))) * var(--fs-reputationpop, 1));
+    line-height: 1;
+    text-shadow: 0 0.25cqh 0.5cqh rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+}
+#reputation-pop-sign {
+    font-weight: var(--fw-reputationpop, 700);
+    color: #bfe3c8;
+}
+
+/* -----------------------------------------------------------------------------
+   HUD editor — body: element list on the left, its settings on the right
+   -----------------------------------------------------------------------------
+   Buttons as well as keys, because NUI focus is held while the editor is open
+   and the mouse is the discoverable way in. See the glass note further up for
+   why the surfaces are layered the way they are.
+   -------------------------------------------------------------------------- */
+#editor-body {
+    display: flex;
+    align-items: stretch;
+    gap: calc(1.1 * var(--w));
+    min-height: 0;
+    padding: 1.1cqh calc(1.2 * var(--w)) 1.2cqh;
+}
+/* The settings column carries labels of a fixed length ("Letter spacing",
+   "Corner radius") next to a stepper that cannot shrink, so it gets the larger
+   share of a narrower panel. At 40% every label ellipsised to "Letter ...". */
+#editor-col-list  { flex: 1 1 54%; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+#editor-col-props { flex: 0 0 45%; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+
+/* An inset well rather than a bare divider line. Recessing the settings gives
+   the panel a second depth plane, which is most of what stops a glass surface
+   reading as flat. */
+#editor-col-props {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: calc(1.0 * var(--w));
+    padding: 0.9cqh calc(0.75 * var(--w));
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+#editor-col-props .ed-colhead {
+    /* The caption names the element being tuned, so it can be long. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(244, 244, 242, 0.55);
+}
+
+#editor-props {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12cqh;
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.ed-prop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(0.5 * var(--w));
+    padding: 0.42cqh calc(0.4 * var(--w));
+    border-radius: calc(0.5 * var(--w));
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.ed-prop:hover { background: rgba(255, 255, 255, 0.045); }
+.ed-prop.sel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+.ed-prop.off { opacity: 0.35; pointer-events: none; }
+
+/* The Follow/Own switch. Only the eleven rows that really inherit carry one --
+   see INHERITS in app.js. Following is the quieter of the two states because it
+   is the default and the common one; Own is the row that has been taken over,
+   so it reads in the accent like every other changed value. */
+.ed-follow {
+    flex: 0 0 auto;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    font-size: calc(0.68 * var(--w));
+    padding: 0.3cqh calc(0.42 * var(--w));
+    border-radius: calc(0.35 * var(--w));
+    letter-spacing: 0.02em;
+    color: var(--g-accent);
+    background: rgba(95, 216, 200, 0.10);
+    border: 1px solid rgba(95, 216, 200, 0.34);
+}
+.ed-follow.on {
+    color: rgba(244, 244, 242, 0.5);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+.ed-follow:hover { color: var(--text); background: rgba(255, 255, 255, 0.14); }
+.ed-follow:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+/* A following row's VALUE is not this element's own, so it is dimmed to say so
+   -- the number is real and live, it just belongs to the parent. */
+.ed-prop.following .ed-pval { color: rgba(244, 244, 242, 0.62); }
+
+.ed-plabel {
+    /* Trimmed with the panel: these labels are fixed strings ("Letter
+       spacing", "Corner radius") and ellipsising them costs more than a
+       hairline of size does. */
+    font-size: calc(0.82 * var(--w));
+    color: rgba(244, 244, 242, 0.68);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.ed-prop.sel .ed-plabel { color: var(--text); }
+/* A row that carries an explanation says so, rather than hiding it behind a
+   hover nobody thinks to try. */
+.ed-plabel.has-hint { cursor: help; border-bottom: 1px dotted rgba(244, 244, 242, 0.28); }
+/* A row that is no longer at its default gets its label lit, matching the dot
+   in the element list. */
+.ed-prop.changed .ed-plabel { color: var(--g-accent); }
+
+/* − value + as ONE control. Three loose children read as three buttons; the
+   grouped capsule reads as a stepper acting on the number inside it. */
+.ed-step {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    border-radius: calc(0.5 * var(--w));
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+    overflow: hidden;
+}
+.ed-step button {
+    font: inherit;
+    font-size: calc(0.92 * var(--w));
+    line-height: 1;
+    padding: 0.3cqh calc(0.5 * var(--w));
+    border: 0;
+    background: transparent;
+    color: rgba(244, 244, 242, 0.8);
+    cursor: pointer;
+}
+.ed-step button:hover { background: rgba(255, 255, 255, 0.15); color: var(--text); }
+.ed-step button:active { background: rgba(255, 255, 255, 0.24); }
+.ed-step button:focus-visible { outline: 2px solid var(--g-accent); outline-offset: -2px; }
+
+/* The value between the − and the + is a real text field on every numeric row.
+   It has to look like the label it replaced — a stepper that suddenly sprouts a
+   chrome input in the middle would read as a different control — so the UA
+   appearance is stripped and the two side borders of the capsule are kept. */
+input.ed-pval {
+    -webkit-appearance: none;
+    appearance: none;
+    border-top: 0;
+    border-bottom: 0;
+    background: transparent;
+    font-family: inherit;
+    width: calc(5.6 * var(--w));
+    cursor: text;
+}
+input.ed-pval:focus {
+    outline: none;
+    /* Editing is a state worth seeing: until you commit, this number is not yet
+       what the HUD is doing. */
+    background: rgba(95, 216, 200, 0.16);
+    color: #fff;
+}
+input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
+
+.ed-pval {
+    font-size: calc(0.84 * var(--w));
+    color: var(--text);
+    min-width: calc(4.6 * var(--w));
+    padding: 0 calc(0.15 * var(--w));
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid rgba(255, 255, 255, 0.09);
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* -----------------------------------------------------------------------------
+   Minimap centre crosshair (/hudcross)
+   Sits on the centre of the rect client.lua publishes for the map. If the
+   player arrow does not land on it, the gap is the thing to measure.
+   -------------------------------------------------------------------------- */
+#map-cross {
+    position: absolute;
+    left: calc(var(--map-left, 1.75cqw) + (var(--map-width, 15.8cqw) / 2));
+    bottom: calc(var(--map-bottom-edge, 2.6cqh) + (var(--map-height, 15.4cqh) / 2));
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 60;
+}
+#map-cross::before,
+#map-cross::after {
+    content: '';
+    position: absolute;
+    background: #ff2ea6;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85);
+}
+/* Horizontal arm */
+#map-cross::before {
+    left: -3cqw;
+    top: -0.075cqh;
+    width: 6cqw;
+    height: 0.15cqh;
+}
+/* Vertical arm */
+#map-cross::after {
+    top: -2.4cqh;
+    left: -0.04cqw;
+    width: 0.08cqw;
+    height: 4.8cqh;
+}
+
+/* -----------------------------------------------------------------------------
+   Skills
+   -----------------------------------------------------------------------------
+   Two pieces with opposite jobs.
+
+   #skillup is a TOAST. It is the only part most players will ever see, so it
+   has to be readable in a glance and gone before it becomes furniture. It
+   borrows the map panels' arrival animation rather than inventing a second one.
+
+   #skills is a SCREEN you deliberately open. It sits outside .stage, like the
+   editor, because it is not a HUD element and must not inherit the offsets and
+   scales the editor applies to the HUD.
+   -------------------------------------------------------------------------- */
+/* The level-up card ----------------------------------------------------------
+   The one moment in this HUD worth marking, so it is the same glass as the
+   editor with a single warm accent — a gold rim light and a gold numeral —
+   rather than a second visual language invented for it.
+
+   Laid out as icon / copy / number on one line. The earlier version stacked
+   three centred lines of different sizes, which is a shape that says "a system
+   generated this" rather than "something happened".
+   -------------------------------------------------------------------------- */
+#skillup {
+    position: absolute;
+    left: 50%;
+    bottom: 22cqh;
+    /* Placement only. The card inside does the moving. */
+    transform: translateX(-50%)
+               translate(var(--off-skillup-x, 0cqw), var(--off-skillup-y, 0cqh))
+               scale(var(--sc-skillup-x, 1), var(--sc-skillup-y, 1));
+    transform-origin: center bottom;
+    opacity: var(--op-skillup, 1);
+}
+
+#skillup-card {
+    display: flex;
+    align-items: center;
+    gap: calc(0.9 * var(--w) * var(--sp-skillup, 1));
+    padding: 1.15cqh calc(1.25 * var(--w));
+    border-radius: calc(0.85 * var(--w) * var(--rad-skillup, 1));
+    /* The warm note, laid over the shared rim rather than replacing it: the
+       card is the same material as everything else, lit differently. */
+    border-color: rgba(232, 197, 106, 0.42);
+    box-shadow:
+        0 2.6cqh 7cqh rgba(0, 0, 0, 0.55),
+        0 0.5cqh 1.6cqh rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 240, 205, 0.42),
+        0 0 calc(2.2 * var(--w)) rgba(232, 197, 106, 0.16);
+    font-family: var(--ff-skillup, inherit);
+    transform-origin: center bottom;
+}
+
+#skillup-icon {
+    flex: 0 0 auto;
+    width: calc(1.9 * var(--w) * var(--ic-skillup, 1));
+    height: calc(1.9 * var(--w) * var(--ic-skillup, 1));
+    display: block;
+}
+#skillup-icon svg { width: 100%; height: 100%; display: block; }
+#skillup-icon path {
+    fill: var(--g-gold);
+    /* Its own glow, so the star reads as the lit thing rather than as a shape
+       that happens to be yellow. */
+    filter: drop-shadow(0 0 calc(0.3 * var(--w)) rgba(232, 197, 106, 0.55));
+}
+
+#skillup-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15cqh;
+    min-width: 0;
+    text-align: var(--al-skillup, left);
+}
+#skillup-label {
+    font-size: calc(0.95 * var(--w) * var(--fs-skillup, 1));
+    font-weight: var(--fw-skillup, 500);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--g-gold);
+    white-space: nowrap;
+}
+#skillup-blurb {
+    font-size: calc(0.82 * var(--w) * var(--fs-skillup, 1));
+    color: rgba(244, 244, 242, 0.62);
+    white-space: nowrap;
+}
+#skillup-level {
+    flex: 0 0 auto;
+    margin-left: calc(0.4 * var(--w));
+    padding-left: calc(0.9 * var(--w));
+    border-left: 1px solid var(--g-line);
+    font-size: calc(2.15 * var(--w) * var(--fs-skillup, 1));
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    text-shadow: 0 0 calc(0.6 * var(--w)) rgba(232, 197, 106, 0.35),
+                 var(--ink-shadow);
+}
+
+/* The CARD animates, never the outer element — see the note in index.html. */
+@keyframes skillUpIn {
+    from { opacity: 0; transform: translateY(45%) scale(0.92); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+#skillup.slot-in #skillup-card {
+    animation: skillUpIn 520ms cubic-bezier(0.16, 1.28, 0.38, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+    #skillup.slot-in #skillup-card { animation: none; }
+}
+
+#skills {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* A scrim IS right here, unlike the editor: this is a screen you opened to
+       read, not a tool for positioning the things behind it. */
+    background: radial-gradient(120% 100% at 50% 45%,
+        rgba(6, 6, 12, 0.55) 0%, rgba(3, 3, 7, 0.82) 100%);
+    font-family: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+                 Inter, Roboto, sans-serif;
+}
+#skills.hidden { display: none !important; }
+
+#skills-panel {
+    width: calc(44 * var(--w));
+    min-width: 520px;
+    max-width: min(70vw, 860px);
+    max-height: 78cqh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Surface comes from .glass on the element itself. What is left here is
+       only what is specific to this panel. Hand-rolling a second near-miss of
+       the same colours is what made these look related rather than identical. */
+    border-radius: calc(1.4 * var(--w));
+    color: var(--text);
+}
+#skills-head {
+    display: flex;
+    align-items: baseline;
+    gap: calc(0.8 * var(--w));
+    padding: 1.5cqh calc(1.4 * var(--w)) 1.1cqh;
+    border-bottom: 1px solid var(--g-line);
+}
+#skills-title { font-size: calc(1.32 * var(--w)); font-weight: 600; }
+#skills-sub { font-size: calc(0.88 * var(--w)); color: rgba(244,244,242,0.55); }
+#skills-close {
+    margin-left: auto;
+    cursor: pointer;
+    font: inherit;
+    font-size: calc(0.95 * var(--w));
+    line-height: 1;
+    padding: 0.45cqh calc(0.6 * var(--w));
+    border-radius: calc(0.4 * var(--w));
+    color: rgba(244, 244, 242, 0.7);
+    background: var(--g-fill);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+}
+#skills-close:hover { color: var(--text); background: var(--g-fill-hi); }
+
+#skills-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.8cqh calc(1.4 * var(--w));
+}
+.sk { padding: 0.85cqh 0; }
+.sk + .sk { border-top: 1px solid var(--g-line); }
+.sk-head { display: flex; align-items: baseline; gap: calc(0.6 * var(--w)); }
+.sk-name { font-size: calc(1.0 * var(--w)); font-weight: 500; flex: 1 1 auto; }
+.sk-level {
+    font-size: calc(1.15 * var(--w));
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--g-gold);
+}
+.sk.maxed .sk-level { font-size: calc(0.86 * var(--w)); letter-spacing: 0.12em; }
+.sk-track {
+    height: 0.62cqh;
+    margin: 0.55cqh 0 0.4cqh;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    overflow: hidden;
+}
+.sk-fill {
+    height: 100%;
+    width: 100%;
+    /* scaleX from the left, like the status bars — animating width leaves the
+       fill stuck at whatever value it first received. */
+    transform-origin: left center;
+    background: linear-gradient(90deg, rgba(232, 197, 106, 0.8), var(--g-gold));
+    transition: transform 260ms ease;
+}
+.sk.maxed .sk-fill { background: linear-gradient(90deg, #7fd6a2, #4fc27b); }
+.sk-sub {
+    font-size: calc(0.8 * var(--w));
+    color: rgba(244, 244, 242, 0.5);
+    font-variant-numeric: tabular-nums;
+}
+#skills-foot {
+    padding: 1.0cqh calc(1.4 * var(--w));
+    border-top: 1px solid var(--g-line);
+    font-size: calc(0.8 * var(--w));
+    color: rgba(244, 244, 242, 0.45);
+}
+#skills-list::-webkit-scrollbar { width: calc(0.34 * var(--w)); }
+#skills-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+}
+#skills-list::-webkit-scrollbar-track { background: transparent; }
+
+/* -----------------------------------------------------------------------------
+   Police light editor  (/hudpolice edit)
+   -----------------------------------------------------------------------------
+   Deliberately much smaller than #editor: it has one purpose (drag sliders,
+   watch the edges of the screen) and does not need a list, drag-to-move, or a
+   collapse state. Reuses the same .glass surface and text tokens as the HUD
+   editor and skills panel so it doesn't read as a fourth, slightly-different
+   material.
+   -------------------------------------------------------------------------- */
+#police-editor {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 4cqw;
+    pointer-events: none;
+    font-family: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+                 'SF Pro Text', Inter, Roboto, sans-serif;
+}
+#police-editor.hidden { display: none !important; }
+
+#pol-ed-panel {
+    width: calc(30 * var(--w));
+    min-width: 320px;
+    max-width: min(60vw, 460px);
+    pointer-events: auto;
+    border-radius: calc(1.5 * var(--w));
+    color: var(--text);
+    font-size: calc(0.96 * var(--w));
+}
+
+#pol-ed-head {
+    padding: 1.4cqh calc(1.5 * var(--w)) 1.0cqh;
+    border-bottom: 1px solid var(--g-line);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2cqh;
+}
+#pol-ed-title { font-size: calc(1.2 * var(--w)); font-weight: 600; letter-spacing: -0.01em; }
+#pol-ed-sub { font-size: calc(0.8 * var(--w)); color: rgba(244, 244, 242, 0.5); }
+
+/* Which of the two rendering modes (four edges, or one lamp tracking the
+   exact bearing) the sliders below are shaping. Both modes share every
+   slider, so this is the only control that needs its own row. */
+#pol-ed-modes {
+    display: flex;
+    gap: calc(0.4 * var(--w));
+    margin-top: 0.6cqh;
+}
+.pol-mode-btn {
+    font: inherit;
+    font-size: calc(0.84 * var(--w));
+    font-weight: 500;
+    padding: 0.5cqh calc(0.9 * var(--w));
+    border-radius: calc(0.5 * var(--w));
+    cursor: pointer;
+    color: rgba(244, 244, 242, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.045);
+}
+.pol-mode-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.09); }
+.pol-mode-btn.active {
+    color: var(--text);
+    background: linear-gradient(180deg, rgba(95, 216, 200, 0.34), rgba(95, 216, 200, 0.17));
+    border-color: rgba(95, 216, 200, 0.4);
+}
+
+#pol-ed-body {
+    padding: 1.2cqh calc(1.5 * var(--w));
+    display: flex;
+    flex-direction: column;
+    gap: 1.1cqh;
+    max-height: 52cqh;
+    overflow-y: auto;
+}
+.pol-ed-group {
+    font-size: calc(0.76 * var(--w));
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(244, 244, 242, 0.4);
+    margin-top: 0.4cqh;
+}
+.pol-ed-group:first-child { margin-top: 0; }
+#pol-ed-body::-webkit-scrollbar { width: calc(0.34 * var(--w)); }
+#pol-ed-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 999px; }
+#pol-ed-body::-webkit-scrollbar-track { background: transparent; }
+.pol-ed-row {
+    display: grid;
+    grid-template-columns: calc(8 * var(--w)) 1fr calc(3.6 * var(--w));
+    align-items: center;
+    gap: calc(0.7 * var(--w));
+}
+.pol-ed-row label { font-size: calc(0.88 * var(--w)); color: rgba(244, 244, 242, 0.78); }
+.pol-ed-val {
+    font-size: calc(0.84 * var(--w));
+    font-variant-numeric: tabular-nums;
+    color: rgba(244, 244, 242, 0.6);
+    text-align: right;
+}
+.pol-ed-row input[type="range"] {
+    width: 100%;
+    accent-color: rgb(95, 216, 200);
+}
+#pol-ed-white-row {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--w));
+    font-size: calc(0.88 * var(--w));
+    color: rgba(244, 244, 242, 0.78);
+    cursor: pointer;
+}
+#pol-ed-white-row input { accent-color: rgb(95, 216, 200); }
+
+#pol-ed-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: calc(0.6 * var(--w));
+    padding: 1.1cqh calc(1.5 * var(--w));
+    border-top: 1px solid var(--g-line);
+}
+#pol-ed-actions button {
+    font: inherit;
+    font-size: calc(0.9 * var(--w));
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 0.82cqh calc(1.1 * var(--w));
+    border-radius: calc(0.62 * var(--w));
+    cursor: pointer;
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: linear-gradient(180deg, var(--g-fill-hi), var(--g-fill));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+#pol-ed-actions button.ghost {
+    color: rgba(244, 244, 242, 0.72);
+    background: rgba(255, 255, 255, 0.045);
+    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.12);
+}
+#pol-ed-actions button.primary {
+    background: linear-gradient(180deg, rgba(95, 216, 200, 0.34), rgba(95, 216, 200, 0.17));
+    border-color: rgba(95, 216, 200, 0.4);
+}

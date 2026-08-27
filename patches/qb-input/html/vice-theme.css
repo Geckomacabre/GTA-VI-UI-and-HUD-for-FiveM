@@ -1,0 +1,275 @@
+/* -----------------------------------------------------------------------------
+   vice_hud map-panel plate for qb-input   (added by vice_hud; safe to delete)
+   -----------------------------------------------------------------------------
+   qb-input draws its own NUI page, so the patch in ox_lib does not reach it --
+   SendNUIMessage delivers to the calling resource's page only. This is the
+   equivalent for this resource, and the sibling of the ones in ox_target and
+   qb-menu. Still reached by sn_lib, jim_bridge, tk_drugs and um_lumber.
+
+   WHICH MATERIAL THIS IS -- see the long note at the top of
+   [ox]/ox_target/web/vice-theme.css. Short version: vice_hud has two surfaces,
+   and this is .slot (the zone bar and vehicle panel plate: warm purple-grey at
+   0.88, hairline INSET edge, top-lit line, two-gradient sheen, no specular
+   cap), not .glass (the near-black popup material ox_lib uses). Do not unify
+   the two.
+
+   Like qb-menu, this stylesheet is built on Material custom properties, so
+   remapping tokens reaches every rule that reads them and the plate block only
+   adds the material Material Design has no token for.
+
+   UNITS: the recipe is restated in px at the 16:9 reference (1cqh = 10.8px,
+   1cqw = 19.2px at 1080p) because this page establishes no container for cq
+   units to resolve against.
+
+   ONE THING THAT IS SPECIFIC TO THIS RESOURCE
+   qb-input's index.html carries NO stylesheet link. script.js injects one at
+   runtime (`SET_STYLE` appends ./styles/<name>.css to <head>), which means the
+   stock sheet always lands AFTER this file in document order no matter where
+   the link is placed. Losing a tie on source order is therefore not an option
+   here, and every rule below wins on specificity instead: the `html[data-vice-*]`
+   prefix puts each one above the bare class selectors in default.css. Do not
+   "simplify" that prefix away -- the rule stops applying, and it stops applying
+   only once a dialog is opened, so it looks like it works when tested cold.
+
+   Every rule is gated behind an attribute that only vice-theme.js sets, so if
+   vice_hud is not running this file changes nothing.
+
+   NO backdrop-filter, deliberately -- on a transparent NUI page CEF has no
+   backdrop to sample and rasterises the region as opaque black.
+   -------------------------------------------------------------------------- */
+
+/* Served from THIS resource rather than fetched from vice_hud over nui://: the
+   cross-resource URL made these dialogs depend on another resource being
+   started to render their own text, and a font 404 fails silently. 240kB for
+   the two cuts, cached after the first download.
+
+   Regenerate with:
+     cp '[standalone]/vice_hud/html/fonts/GTAArtDeco*.ttf' '[qbx]/qb-input/html/fonts/'
+
+   TrueType; the format() hint has to match the file or the browser rejects it
+   silently. Two cuts, because the family has two. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+:root {
+    /* Fallbacks are vice_hud's own measured values. */
+    --vice-plate: rgba(57, 53, 59, 0.88);
+    --vice-plate-edge: rgba(255, 255, 255, 0.10);
+    --vice-plate-toplit: rgba(255, 255, 255, 0.055);
+    --vice-plate-band: rgba(255, 255, 255, 0.052);
+    --vice-plate-barrier: rgba(255, 255, 255, 0.16);
+    --vice-line: rgba(255, 255, 255, 0.10);
+    /* Stock qb-input values, so a half-filled theme degrades to the old look. */
+    --vice-text: #e6e1e5;
+    --vice-text-dim: #79747e;
+    --vice-accent: #f44336;
+    /* 0.30cqw at 16:9 -- vice_hud's --r-md, the zone bar's radius. */
+    --vice-radius: 6px;
+}
+
+/* ---- palette ------------------------------------------------------------
+   Remapping qb-input's own Material tokens rather than rewriting its rules.
+   Applies whether or not the plate material is on, because a palette is not a
+   material.
+
+   --md-success-container is the SUBMIT BUTTON hover fill in stock, a flat
+   green. Pointing it at the accent is what makes "the affirmative control" the
+   same colour as every other affirmative control on the server. */
+html[data-vice-accent] {
+    --md-on-surface: var(--vice-text);
+    --md-outline: var(--vice-accent);
+    --md-outline-variant: var(--vice-line);
+    --md-primary: var(--vice-accent);
+    --md-secondary: var(--vice-accent);
+    --md-surface: var(--vice-plate);
+    --md-surface-container: var(--vice-plate);
+    --md-surface-container-low: var(--vice-plate);
+    --md-surface-container-lowest: var(--vice-plate);
+    --md-surface-container-high: var(--vice-plate);
+    --md-surface-container-highest: var(--vice-plate);
+    --md-success-container: var(--vice-accent);
+    /* The submit button's hover TEXT. Stock pairs it with the green fill, and
+       left alone it stays a dark green that is unreadable on the accent. */
+    --md-on-success-container: var(--vice-text);
+    /* The dimmed scrim behind the dialog. */
+    --md-scrim: rgba(0, 0, 0, 0.55);
+}
+
+/* ---- the plate ----------------------------------------------------------
+   .slot's recipe, applied to each PANEL rather than once to the wrapper:
+   qb-input builds a dialog out of independently painted blocks -- the header,
+   one group per input, the button -- and a single panel behind them would leave
+   every one of those still drawing its own flat fill on top.
+
+   `.form-control` covers the text/number/password fields, which are the same
+   surface as the blocks around them rather than a hole cut in one.
+
+   The two gradients over the plate colour are #vehicle::after's sheen; the edge
+   is an INSET ring rather than a border, as .slot does it, so it costs no
+   layout width on controls whose width default.css pins to 100%. */
+html[data-vice-glass='1'] .heading,
+html[data-vice-glass='1'] .form-input-group,
+html[data-vice-glass='1'] .select-title,
+html[data-vice-glass='1'] .label,
+html[data-vice-glass='1'] .btn,
+html[data-vice-glass='1'] .form-select,
+html[data-vice-glass='1'] .form-control[type='text'],
+html[data-vice-glass='1'] .form-control[type='number'],
+html[data-vice-glass='1'] .form-control[type='password'],
+html[data-vice-glass='1'] .form-control[type='color'] {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    border: none;
+    border-radius: var(--vice-radius);
+    /* --shadow-sm plus .slot's two insets. */
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px var(--vice-plate-edge),
+        inset 0 1px 0 var(--vice-plate-toplit);
+    color: var(--vice-text);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.88);
+}
+
+/* The header takes the vehicle panel's own band treatment: #veh-foot separates
+   the pip strip from the name with a lighter fill and a hairline barrier, and a
+   dialog title separating itself from its fields is the same job. The barrier is
+   a border-BOTTOM here because the heading sits above its fields where #veh-foot
+   sits below its name. */
+html[data-vice-glass='1'] .heading {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        /* The band as a GRADIENT, not a colour. The `background` shorthand
+           takes at most one background-color and it must be the final layer,
+           so a bare var(--vice-plate-band) here made the whole declaration
+           invalid and the header silently fell back to no background at all.
+           A two-stop gradient of one colour is a flat fill that is legal in
+           any layer position. */
+        linear-gradient(var(--vice-plate-band), var(--vice-plate-band)),
+        var(--vice-plate);
+    border-bottom: 1px solid var(--vice-plate-barrier);
+}
+
+/* Focus is the one place the accent gets to be a hard edge rather than a tint.
+   Stock already draws a 2px ring here (`box-shadow: 0 0 0 2px --md-outline`);
+   this keeps that idiom and only restates it because the plate rule above
+   replaced the box-shadow it was riding on. Drawn as an inset ring so it
+   replaces the hairline rather than sitting outside it and doubling the edge. */
+html[data-vice-glass='1'] .form-control[type='text']:focus,
+html[data-vice-glass='1'] .form-control[type='number']:focus,
+html[data-vice-glass='1'] .form-control[type='password']:focus,
+html[data-vice-glass='1'] .form-control[type='color']:focus,
+html[data-vice-glass='1'] .form-select:focus,
+html[data-vice-glass='1'] .form-select:focus-visible {
+    outline: none;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px var(--vice-accent),
+        inset 0 1px 0 var(--vice-plate-toplit);
+}
+
+/* The submit button. Stock swaps to a flat green on hover; this turns the
+   plate's own sheen up exactly as ox_target's rows and qb-menu's do, then puts
+   the accent on the hairline because this button is the affirmative action
+   rather than just another block. */
+html[data-vice-glass='1'] .btn:hover {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.13) 0%,
+            rgba(255, 255, 255, 0.05) 42%,
+            rgba(0, 0, 0, 0.06) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.075) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px var(--vice-accent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    color: var(--vice-text);
+}
+
+/* There is deliberately no ::before anywhere in this file. The glass surface
+   uses one for its radial specular cap; the map panels have no cap, and adding
+   one would be the single change that makes this stop looking like the panel on
+   the map. It would also have had to be kept off the inputs regardless -- an
+   ::before on a text field sits over the caret and the text. */
+
+/* An option list is drawn by the browser's own widget, not by the page, so it
+   gets a flat readable fill rather than the plate -- a gradient behind native
+   option rows renders inconsistently and cannot take a border-radius anyway.
+   Opaque, because the dropdown is painted outside the page's own compositing
+   and a translucent plate there samples the desktop rather than the game. */
+html[data-vice-glass='1'] .form-select option {
+    background: #39353b;
+    color: var(--vice-text);
+    text-shadow: none;
+}
+
+/* The scrollbar, which stock paints in Material greys that survive the token
+   remap only as flat plate-on-plate. */
+html[data-vice-glass='1'] ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html[data-vice-glass='1'] ::-webkit-scrollbar-thumb {
+    background: var(--vice-plate-barrier);
+    border-radius: var(--vice-radius);
+}
+
+/* ---- display font ------------------------------------------------------
+   Kept out of the plate rule so the font still applies with the material
+   switched off; /hudtheme exposes them as two separate rows.
+
+   default.css sets `font-family: var(--font-primary) !important` on `*` and
+   repeats it on several inner elements. Remapping --font-primary is the only
+   thing that reaches all of those -- a competing declaration would lose to the
+   !important on `*` no matter how specific it was -- and it is one line rather
+   than a list that goes stale the moment qb-input adds an element.
+
+   Font Awesome is not loaded by this page at all, so unlike ox_target's copy
+   there is no icon font to exclude. */
+html[data-vice-font='1'] {
+    --font-primary: 'GTAArtDeco', 'Exo 2', 'Segoe UI', Arial, sans-serif;
+}
+
+/* The map panels set their one piece of display type -- the vehicle make -- in
+   tracked-out caps (.vname: 0.075em, weight 700, uppercase). A dialog title is
+   the same job, so it gets the same treatment.
+
+   Deliberately NOT applied to labels, field text or the button: tracked caps at
+   body size in a display face is where this stops being legible, and the map
+   panels only ever set one line that way. */
+html[data-vice-font='1'] .heading h1 {
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    font-weight: 700;
+}

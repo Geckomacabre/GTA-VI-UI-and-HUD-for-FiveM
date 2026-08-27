@@ -1,0 +1,156 @@
+/* -----------------------------------------------------------------------------
+   vice_hud surface for ox_lib popups   (added by vice_hud; safe to delete)
+   -----------------------------------------------------------------------------
+   NAME IS HISTORICAL. This file used to carry the .glass recipe and now carries
+   the .plate one -- the MAP PANEL material. The filename is unchanged on
+   purpose: it is referenced by web/build/index.html and is named in the
+   restore-after-an-update notes as one of the five vice_hud patches, and
+   renaming it would leave those pointing at a file that no longer exists.
+
+   Loaded from index.html alongside ox_lib's own stylesheet. Every value below
+   is a CSS custom property with a fallback, and the fallbacks are ox_lib's
+   stock appearance -- so if vice_hud is not running and nothing ever sets the
+   variables, this file changes nothing.
+
+   WHY .vice-surface AND NOT REAL SELECTORS
+   ox_lib's UI is Mantine styled through emotion: the class names that reach the
+   DOM are build-specific hashes (`css-1a2b3c`), not `mantine-Paper-root`. There
+   is no stable selector to write here, and a guessed one would fail silently.
+   vice-glass.js therefore tags each popup surface with .vice-surface as it
+   appears, and this file styles that. See the comment in that file for how the
+   tagging decides what is a surface.
+
+   NO backdrop-filter, deliberately -- same reason as vice_hud's own style.css:
+   on a transparent NUI page CEF has no backdrop to sample and rasterises the
+   region as opaque black.
+
+   UNITS
+   vice_hud sizes the real panels in cqh/cqw against a container it establishes
+   itself. This page has no such container, so the recipe is restated in px at
+   the 16:9 reference (1cqh = 10.8px, 1cqw = 19.2px at 1080p) -- byte-matched
+   with the copies in ox_target, qb-menu and qb-input. Change the recipe and all
+   five surfaces have to move together.
+   -------------------------------------------------------------------------- */
+
+/* The HUD's display face, so popups read as part of the same UI.
+
+   Loaded straight out of vice_hud over nui:// rather than copied in here: the
+   files are already in that resource's files{} block, they are byte-identical,
+   and one copy means they cannot drift apart. If vice_hud is not running the
+   URL 404s and the stack below falls back to Roboto, which is what ox_lib
+   ships anyway.
+
+   (The three own-ui_page resources copy the TTFs in instead, because a menu
+   that cannot render its own text without another resource running is a worse
+   trade there. Here ox_lib and vice_hud are already inseparable -- vice_hud
+   declares ox_lib as a dependency -- so the link costs nothing.)
+
+   TrueType, not OpenType -- the format() hint has to match the file or the
+   browser rejects it and falls back silently. Two @font-face rules for two
+   real cuts; do not add weights the family does not have, or the browser
+   synthesises a bold and it looks nothing like the HUD. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('nui://vice_hud/html/fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('nui://vice_hud/html/fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+:root {
+    /* Fallbacks are vice_hud's own measured values, so a half-filled theme
+       still lands on the plate rather than on nothing. */
+    --vice-plate: rgba(57, 53, 59, 0.88);
+    --vice-plate-edge: rgba(255, 255, 255, 0.10);
+    --vice-plate-toplit: rgba(255, 255, 255, 0.055);
+    --vice-text: inherit;
+    --vice-text-dim: inherit;
+    --vice-accent: currentColor;
+    /* 0.30cqw at 16:9 -- vice_hud's --r-md, the zone bar's radius. */
+    --vice-radius: 6px;
+}
+
+/* The plate recipe, mirrored from .slot in vice_hud/html/style.css.
+
+   Three differences from the .glass recipe this replaced, all deliberate:
+     · the measured plate colour, not the near-black tint;
+     · a hairline INSET ring instead of a 1px border, so it costs no layout
+       width -- which matters on a notification whose width Mantine pins;
+     · #vehicle::after's two-gradient sheen baked in as background layers.
+
+   Do not flatten the layered gradients to one colour to simplify -- the flat
+   version is just a grey box. And do not add a radial specular cap: .glass had
+   one, the map panels do not, and adding it here is the single change that
+   would stop these popups reading as the same material as the zone bar. */
+html[data-vice-glass='1'] .vice-surface {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate) !important;
+    border: none !important;
+    border-radius: var(--vice-radius) !important;
+    /* --shadow-md rather than .slot's --shadow-sm: a popup floats over the
+       whole screen and has to sit further off it than a panel lying on the
+       map. Then .slot's two insets: the hairline edge all round, and a
+       brighter line along the top as if lit from above. */
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.46),
+        inset 0 0 0 1px var(--vice-plate-edge),
+        inset 0 1px 0 var(--vice-plate-toplit) !important;
+    color: var(--vice-text) !important;
+}
+
+/* Applied to the surface AND everything on it, because ox_lib sets a font on
+   its inner text elements too and inheritance alone would not reach them.
+   Kept out of the plate rule above so the font still applies with the material
+   switched off.
+
+   Icon elements are excluded by NOT MATCHING them, rather than by overriding
+   them back afterwards. The override version was tried first and does not
+   work: font-family is an inherited property, so `font-family: revert` on an
+   icon resolves to the value inherited from the surface -- the display face we
+   are trying to keep off it. Not matching leaves Font Awesome's own rule as
+   the only declaration on the element, and a matching declaration beats
+   inheritance, so the icon keeps its glyph font. Verified against a page
+   carrying FA's stylesheet.
+
+   `fa-` catches Font Awesome, `icon-` catches the Tabler set ox_lib also uses.
+   SVG icons are unaffected either way -- paths do not read font-family -- but
+   any icon that IS a font would come out as tofu without this. */
+html[data-vice-font='1'] .vice-surface,
+html[data-vice-font='1'] .vice-surface *:not([class*="fa-"]):not([class*="icon-"]) {
+    font-family: 'GTAArtDeco', 'Roboto', 'Segoe UI', Arial, sans-serif !important;
+}
+
+/* There is deliberately no nested-surface rule. The tagger stops descending as
+   soon as it finds a pane, so a .vice-surface inside a .vice-surface never
+   occurs and such a rule would be dead. Content inside a popup -- context menu
+   rows, dialog sections -- keeps ox_lib's own styling, which sits on the plate
+   correctly because the plate is behind it. */
+
+/* ox_lib's own notification type colours. These three are the only stable,
+   ox_lib-authored class names in the build, so they can be targeted directly.
+   They are the accent stripe on a notification, not its background. */
+html[data-vice-accent] .toast-inform { background-color: var(--vice-inform) !important; }
+html[data-vice-accent] .toast-success { background-color: var(--vice-success) !important; }
+html[data-vice-accent] .toast-error { background-color: var(--vice-error) !important; }
+
+/* NOTE: the progress bar FILL and secondary text are deliberately not styled
+   here. Both would need a selector the surface heuristic cannot produce -- it
+   finds panes, not the parts inside them -- and a rule that matches nothing is
+   worse than no rule, because it reads as though it were handled. They keep
+   ox_lib's oxred accent, which ox.cfg already matches to ox_inventory. */

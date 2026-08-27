@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!--
+    Snarf. Food delivery, parody.
+    Named away from "Gobblr" because that sat too close to "Goober"; two apps on
+    one home screen have to be tellable apart at a glance, which is as true of
+    the mark as of the name. Hot pink, and a bite taken out of a circle.
+    Our own geometry: evocative of every delivery app, a copy of none.
+    NOTE: no double hyphens anywhere in this file. XML forbids them inside a
+    comment, and an invalid SVG renders as nothing at all.
+  -->
+  <defs>
+    <linearGradient id="sn" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4f9a"/>
+      <stop offset="1" stop-color="#c2185b"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="27" fill="url(#sn)"/>
+  <circle cx="60" cy="56" r="32" fill="#ffffff" opacity="0.95"/>
+  <circle cx="88" cy="38" r="16" fill="#e5397f"/>
+  <circle cx="52" cy="50" r="4.5" fill="#c2185b"/>
+  <circle cx="66" cy="64" r="3" fill="#c2185b"/>
+  <circle cx="47" cy="66" r="2.5" fill="#c2185b"/>
+  <text x="60" y="110" font-family="Arial Black, Arial, sans-serif" font-size="19"
+        font-weight="900" text-anchor="middle" fill="#ffffff" letter-spacing="1">SNARF</text>
+</svg>

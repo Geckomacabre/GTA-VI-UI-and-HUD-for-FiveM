@@ -1,0 +1,36 @@
+# Test tooling only — fengari (Lua VM) and jsdom, used by tools/*.test.js and
+# the NUI checks. NOTHING at runtime imports these: the resource has no build
+# step and FiveM never looks in here. Reinstall with `npm i` in this folder.
+node_modules/
+
+# NOTE: layout.json is deliberately TRACKED, not ignored.
+#
+# It is what /hudpublish writes, and it is the shipped HUD: the element offsets
+# AND the per-aspect minimap profiles, which between them are the tuning this
+# resource is worth installing for. server.lua loads it on start, so shipping
+# it is what makes a fresh install look like the screenshots instead of like
+# the raw stylesheet. Config.DefaultLayout mirrors the offsets half as the
+# /hudreset fallback.
+#
+# Running /hudpublish on your own server rewrites it, which git will show as a
+# modified file. That is expected -- commit it if you want your tuning to be
+# the project's default, otherwise leave it dirty or check it out again.
+
+# Per-server popup theme, written by /themepublish. Not tracked: unlike the
+# layout there is no shipped design here worth distributing.
+theme.json
+
+# Python build tooling leftovers.
+__pycache__/
+*.py[cod]
+
+# Working copies of stream assets. The shipped .ytd files in stream/ ARE
+# tracked; this is the pre-conversion original kept next to them by hand.
+*.orig-rgbonly
+
+# Editor / OS noise.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

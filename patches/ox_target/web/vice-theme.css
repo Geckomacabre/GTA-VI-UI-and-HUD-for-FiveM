@@ -1,0 +1,227 @@
+/* -----------------------------------------------------------------------------
+   vice_hud map-panel plate for ox_target   (added by vice_hud; safe to delete)
+   -----------------------------------------------------------------------------
+   ox_target draws its own NUI page -- the eye and the option list are NOT
+   ox_lib popups, so the patch in ox_lib/web/build/vice-glass.css does not reach
+   them. This is the equivalent for this resource.
+
+   WHICH MATERIAL THIS IS, AND WHY IT IS NOT THE ONE ox_lib USES
+   vice_hud has two surfaces and they are deliberately different:
+
+     .glass   what the HUD puts on top of ITSELF -- the editor, the skills
+              screen, the level-up card. A near-black tint at 0.82 with a 1px
+              rim and a radial specular cap. This is what ox_lib's popups use.
+     .slot    what the MAP PANELS are made of -- the zone bar and the vehicle
+              make/model panel. A warm purple-grey plate at 0.88, a hairline
+              INSET edge instead of a border, a top-lit inset line, and a
+              two-gradient sheen. No specular cap.
+
+   The target menu is drawn a few hundred pixels from the map panels and is read
+   alongside them, so it is built out of .slot, not .glass. Do not "unify" this
+   with the ox_lib patch by switching it back to the glass recipe -- that is the
+   difference this file exists to express.
+
+   The plate colour is measured, not chosen: sampled across 113 frames of
+   reference footage, median #3c393d over typical scenery. It arrives from
+   vice_hud's theme.lua so the two cannot drift.
+
+   UNITS
+   vice_hud sizes the real panels in cqh/cqw against a container it establishes
+   itself. This page has no such container, so the recipe is restated in px at
+   the 16:9 reference (1cqh = 10.8px, 1cqw = 19.2px at 1080p). The conversions
+   are noted inline; do not "fix" them back to cq units, which would resolve
+   against the viewport here and come out an order of magnitude wrong.
+
+   Every value is a custom property with ox_target's STOCK value as the
+   fallback, and every rule is gated behind an attribute that only
+   vice-theme.js sets. If vice_hud is not running nothing sets either, and this
+   file changes nothing.
+
+   NO backdrop-filter, deliberately -- same reason as vice_hud's own style.css:
+   on a transparent NUI page CEF has no backdrop to sample and rasterises the
+   region as opaque black.
+   -------------------------------------------------------------------------- */
+
+/* The HUD's display face, served from THIS resource rather than fetched from
+   vice_hud over nui://. The cross-resource URL worked but made the target menu
+   depend on another resource being started to render its own text, and a font
+   404 fails silently -- the menu just comes out in Nunito and nothing says why.
+   The two cuts are 240kB together, downloaded once and then cached.
+
+   Regenerate with:
+     cp '[standalone]/vice_hud/html/fonts/GTAArtDeco*.ttf' '[ox]/ox_target/web/fonts/'
+
+   TrueType, and the format() hint has to match the file or the browser rejects
+   it and falls back silently. Two @font-face rules for the two real cuts; do
+   not add weights the family does not have, or the browser synthesises a bold
+   that looks nothing like the HUD. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+:root {
+    /* Fallbacks are vice_hud's own measured values, so the plate is right even
+       if a theme arrives half-filled. */
+    --vice-plate: rgba(57, 53, 59, 0.88);
+    --vice-plate-edge: rgba(255, 255, 255, 0.10);
+    --vice-plate-toplit: rgba(255, 255, 255, 0.055);
+    /* Stock ox_target values, not `inherit`. The accent block below feeds these
+       into ox_target's own --color-default / --color-hover, and `inherit` there
+       would resolve against <html> rather than reproducing the stock grey. */
+    --vice-text: white;
+    --vice-text-dim: #cfd2da;
+    --vice-accent: #cfd2da;
+    /* 0.30cqw at 16:9, which is vice_hud's --r-md -- the zone bar's radius. */
+    --vice-radius: 6px;
+}
+
+/* ---- text colours -------------------------------------------------------
+   These apply whether or not the plate material is on, because they are a
+   palette rather than a material. `--color-default` / `--color-hover` are
+   ox_target's own variables; overriding them here reaches every rule in
+   style.css that already reads them, rather than restating those rules. */
+html[data-vice-accent] {
+    --color-default: var(--vice-text-dim);
+    --color-hover: var(--vice-text);
+}
+
+/* The icon carries the accent. It is the only coloured element in the list, so
+   it is what makes an ox_target menu read as the same UI as a progress bar or a
+   context menu using the same preset.
+
+   Not applied when the option sets its own iconColor: createOptions.js writes
+   that inline, and an inline style beats this. That is the right outcome -- a
+   script that deliberately colours its icon red means it. */
+html[data-vice-accent] .option-icon {
+    color: var(--vice-accent);
+}
+
+/* The eye's hover fill. Stock is `--color-default`, a flat grey; the accent
+   makes "you are looking at something" the same colour everywhere. */
+html[data-vice-accent] .eye-hover {
+    fill: var(--vice-accent);
+}
+
+/* ---- the plate ----------------------------------------------------------
+   .slot's recipe, applied per ROW rather than to the list as a whole: the rows
+   animate independently on hover (stock slides them right), and a single panel
+   behind them cannot follow that.
+
+   The stock look is a gradient that fades out to the right, which was doing the
+   job of an edge. The plate's own hairline does it properly and is what the map
+   panels use, so the fade is replaced rather than layered under -- two edges
+   read as a mistake.
+
+   The two gradients over the plate colour are #vehicle::after's sheen: a soft
+   top-down wash plus a wide diagonal highlight. They are what reads as
+   "material" rather than a solid swatch, and dropping either one leaves a flat
+   grey box. In the HUD they are a pseudo-element because a manufacturer badge
+   has to sit between them and the plate; there is no badge here, so they are
+   background layers and the ::before stays free.
+
+   The edge is an INSET ring, not a border, exactly as .slot does it: it costs
+   no layout width, which matters on a row whose width the stock stylesheet
+   pins. */
+html[data-vice-glass='1'] .option-container {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    border-radius: var(--vice-radius);
+    /* --shadow-sm (0 0.12cqh 0.34cqh) plus .slot's two insets: the hairline
+       edge all round, and a brighter line along the top as if lit from above. */
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px var(--vice-plate-edge),
+        inset 0 1px 0 var(--vice-plate-toplit);
+    color: var(--vice-text);
+    /* --ink-shadow (0 0.10cqh 0.22cqh). The map panels set their labels on a
+       textured plate and this is what keeps them legible over the bright end
+       of it. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.88);
+
+    /* Stock is a hard `width: 150pt`, which with a defined edge leaves a short
+       label sitting in a mostly empty box. Growing to the content keeps the
+       panel tight; the min-width holds the old size as the floor so a menu of
+       short labels still lines up into a column rather than a ragged edge.
+       `white-space: nowrap` on body means neither version wraps. */
+    width: fit-content;
+    min-width: 150pt;
+    padding-right: 8pt;
+    box-sizing: border-box;
+}
+
+/* Stock brightens the fill and slides the row right by 2pt. Both are kept --
+   the slide is ox_target's own idiom and there is no reason to lose it -- and
+   the sheen and the hairline lift together so the whole panel responds rather
+   than just its middle.
+
+   The map panels have no hover state to copy, because nothing on the map is
+   pointed at. This is the plate's own sheen turned up rather than a new
+   material, which is the nearest thing to an answer the reference gives. */
+html[data-vice-glass='1'] .option-container:hover {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.13) 0%,
+            rgba(255, 255, 255, 0.05) 42%,
+            rgba(0, 0, 0, 0.06) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.075) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* There is deliberately no ::before here. The glass surface uses one for its
+   radial specular cap; the map panels have no cap, and adding one would be the
+   single change that makes this stop looking like the panel above it. */
+
+/* ---- display font ------------------------------------------------------
+   Kept out of the plate rule so the font still applies with the material
+   switched off -- /hudtheme exposes them as two separate rows.
+
+   Icons are excluded by NOT MATCHING them rather than by overriding them back:
+   font-family is inherited, so `font-family: revert` on an icon resolves to the
+   value inherited from the row, which is the face we are trying to keep off it.
+   Not matching leaves Font Awesome's own rule as the only declaration on the
+   element, and a matching declaration beats inheritance.
+
+   `fa-` catches Font Awesome, which is what ox_target's index.html loads. The
+   eye is an inline SVG path and does not read font-family either way. */
+html[data-vice-font='1'] .option-container,
+html[data-vice-font='1'] .option-container *:not([class*="fa-"]):not([class*="icon-"]) {
+    font-family: 'GTAArtDeco', 'Nunito', 'Segoe UI', Arial, sans-serif;
+}
+
+/* The map panels set their one piece of display type -- the vehicle make -- in
+   tracked-out caps (.vname: 0.075em, weight 700, uppercase). Carrying that to
+   the option label is what makes the two read as the same UI rather than as the
+   same colour scheme. Only under the font switch, because tracked caps in
+   Nunito is a different and worse idea. */
+html[data-vice-font='1'] .option-label {
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    font-weight: 700;
+}

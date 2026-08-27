@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Snarf</title>
+<link rel="stylesheet" href="app.css" />
+<style>
+  :root {
+    --accent: #e5397f;
+    --on-accent: #ffffff;
+    --accent-text: #ff7ab0;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div id="brand">Snarf</div>
+    <div id="tagline">Be your own boss. Hours not guaranteed.</div>
+    <div id="rating"></div>
+  </header>
+
+  <div id="warn"></div>
+  <div id="list"></div>
+  <div id="actions">
+    <button id="duty">Go on duty</button>
+    <button id="refresh">Refresh</button>
+  </div>
+
+<script>
+  window.GIG_APP  = 'snarf';
+  window.GIG_COPY = { name: 'Snarf', tagline: 'Be your own boss. Hours not guaranteed.', lowRating: 'Your rating is below 4.50. Higher-value deliveries are reserved for Partners in good standing.', dutyOff: 'Go on duty', dutyOn: 'On duty · tap to stop', accept: 'Accept delivery' };
+
+  // lb-phone renders custom apps in an iframe and posts 'componentsLoaded' when
+  // it is ready. Staying hidden until then stops the page flashing up as a
+  // full-screen NUI before the phone has framed it -- same pattern lonelymans
+  // uses, and the reason app.js is attached here rather than in <head>.
+  //
+  // The message is the preferred start, not the only one. body is hidden by CSS
+  // and app.js is what fetches the offers, so if componentsLoaded never lands --
+  // or landed before this listener existed -- the app is a permanently blank
+  // screen that never asks the server for anything. The timeout is the floor.
+  var booted = false;
+
+  function boot() {
+    if (booted) return;
+    booted = true;
+    document.body.style.visibility = 'visible';
+    var s = document.createElement('script');
+    s.src = 'app.js';
+    document.body.appendChild(s);
+  }
+
+  window.addEventListener('message', function (e) {
+    if (e.data === 'componentsLoaded') boot();
+  });
+
+  setTimeout(boot, 1500);
+</script>
+</body>
+</html>

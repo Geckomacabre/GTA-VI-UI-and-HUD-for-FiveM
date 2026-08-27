@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vice_hud</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="stage" id="stage">
+
+    <!-- Status bars ------------------------------------------------------- -->
+    <div id="status">
+        <!-- The health track carries a second reading: `scap` is the
+             hunger/thirst cap, a darkened tail growing in from the right over
+             health that cannot be healed back into. It sits AFTER the fill so it
+             layers on top -- a full bar under a cap has to still read as full,
+             dimmed at the end, rather than as a short bar. -->
+        <div class="srow hidden" id="s-health">
+            <div class="sic">&#9829;</div>
+            <div class="strack">
+                <div class="sfill" style="width:100%"></div>
+                <div class="scap"></div>
+            </div>
+        </div>
+        <div class="srow hidden" id="s-stamina">
+            <div class="sic">&#9889;</div>
+            <div class="strack"><div class="sfill" style="width:100%"></div></div>
+        </div>
+        <div class="srow hidden" id="s-focus">
+            <div class="sic">&#128065;</div>
+            <div class="strack"><div class="sfill" style="width:100%"></div></div>
+        </div>
+    </div>
+
+    <!-- Top right --------------------------------------------------------- -->
+    <!-- Right-aligned stack. Items appear only when relevant, so an unarmed
+         player with no wanted level leaves this corner empty, and whatever IS
+         showing naturally rises to the top. -->
+    <div id="topright">
+        <div id="stars"></div>
+        <div id="tells" class="hidden"></div>
+        <div id="ammo" class="hidden">
+            <span id="ammo-clip">0</span><span id="ammo-reserve">0</span>
+        </div>
+        <img id="weapon-icon" class="hidden" alt="">
+        <div id="money">
+            <div class="money-row hidden" id="cash-row">
+                <span class="money-amt" id="cash">$0</span>
+                <span class="money-ic money-ic-cash" title="Cash">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="2" y="6" width="20" height="12" rx="2"/>
+                        <circle cx="12" cy="12" r="3.1" class="hole"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="money-row hidden" id="bank-row">
+                <span class="money-amt" id="bank">$0</span>
+                <span class="money-ic money-ic-bank" title="Bank">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="2" y="5" width="20" height="14" rx="2"/>
+                        <rect x="2" y="8.5" width="20" height="2.6" class="stripe"/>
+                    </svg>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minimap frame -------------------------------------------------------
+         A rounded outline drawn exactly over the native minimap's rect. The
+         mask texture alone can only fade the map out at its edges; it cannot
+         give it a crisp boundary, which is why the map read as a soft blob.
+         Drawing the border here means the edge is defined regardless of how
+         the mask feathers. -->
+    <div id="map-frame" class="hidden" aria-hidden="true"></div>
+
+    <!-- Crosshair on the exact centre of the minimap's published rect. A
+         measuring tool, not decoration: the player blip should sit dead on it.
+         Whatever gap you see is the number to report. /hudcross -->
+    <div id="map-cross" class="hidden" aria-hidden="true"></div>
+
+    <!-- Component outlines (/hudrects) --------------------------------------
+         One labelled outline per engine minimap component, drawn from the same
+         numbers Lua hands SetMinimapComponentPosition. A measuring tool for
+         when something drawn ON the map does not line up with the map. -->
+    <div id="map-rects" class="hidden" aria-hidden="true"></div>
+
+    <!-- Minimap slot stack ------------------------------------------------ -->
+    <div id="slots">
+        <!-- column-reverse: FIRST in source sits CLOSEST to the map.
+             Order on screen, map upward: nav bar, zone bar, vehicle panel. -->
+        <!-- Turn-by-turn nav popup ----------------------------------------
+             FIRST in source, so column-reverse puts it at the BOTTOM of the
+             stack -- sitting directly on the map, with the zone bar and the
+             vehicle panel above it. That is the reference's order, and it
+             puts the turn you are about to take next to the map you are
+             reading it against.
+
+             Shown only while a GPS waypoint is set AND the next junction is
+             close (Config.Nav.nearTurnMetres). The manoeuvre comes from the
+             game's own route via GENERATE_DIRECTIONS_TO_COORD -- see the nav
+             block in client.lua.
+
+             ONE bar, not two. There used to be a street-name plate stacked
+             above this one; it was removed because it read as a stray
+             floating strip above the popup, and the street name is already
+             on the map itself. -->
+        <div id="nav-popup" class="slot hidden" aria-hidden="true">
+            <div id="nav-turn" class="plate">
+                <div id="nav-turn-copy">
+                    <span id="nav-turn-text"></span>
+                    <span id="nav-turn-dist"></span>
+                </div>
+                <!-- Two paths, one shown at a time via [data-dir] in CSS: a
+                     plain up-arrow for "straight", and a hooked turn glyph
+                     for left/right/u-turn -- mirrored/rotated with a single
+                     transform rather than authored three times. -->
+                <div id="nav-turn-arrow">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path class="arrow-straight" d="M12 20 L12 5 M12 5 L6.5 10.5 M12 5 L17.5 10.5"/>
+                        <path class="arrow-turn" d="M12 20 L12 12 Q12 5 5 5 L2 5 M2 5 L5.5 1.5 M2 5 L5.5 8.5"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="slot hidden" id="zone"><span id="zone-text"></span></div>
+        <div class="slot hidden" id="vehicle">
+            <!-- Two bands, not one stack.
+                 The head carries the names and the manufacturer badge; the foot
+                 is a full-width strip in a slightly lighter grey holding the
+                 status icons. The barrier between them is the foot's own
+                 border-top, so it runs edge to edge by construction rather than
+                 by a width that has to be kept in sync with the plate. -->
+            <div id="veh-head">
+                <!-- The badge is clipped to the HEAD. It is oversized and meant
+                     to run off the top and bottom of the plate, but it must not
+                     bleed through the barrier into the status strip -- that is
+                     what makes the strip read as a separate band. -->
+                <span id="veh-logo-clip" aria-hidden="true">
+                    <img id="veh-logo" alt="">
+                </span>
+                <span class="vname" id="veh-make"></span>
+                <span class="vname" id="veh-model"></span>
+            </div>
+            <div id="veh-foot">
+                <!-- Lock, engine, fuel.
+                     Engine and fuel carry a RING that fills to the real reading,
+                     because "how much" is the question you actually have about
+                     them; the lock has no quantity, so it gets no ring and says
+                     what it has to say in colour alone. -->
+                <div id="veh-pips">
+                    <div class="pip unknown" id="pip-lock" title="lock">
+                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="4.2" y="10" width="15.6" height="10.8" rx="2.2"/>
+                            <path d="M8 10V7.2a4 4 0 0 1 8 0V10"/>
+                        </svg>
+                    </div>
+                    <div class="pip unknown gauge" id="pip-engine" title="engine">
+                    <!-- The gauge. pathLength="100" is the whole trick: it
+                         relabels the circle's own length as 100 units, so the
+                         dash offset is a percentage directly and nothing has to
+                         know the radius or carry 2*pi*r around. -->
+                    <svg class="pip-ring" viewBox="0 0 36 36" aria-hidden="true">
+                        <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
+                        <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
+                    </svg>
+                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3.2"/>
+                            <path d="M12 3.1v2.5M12 18.4v2.5M3.1 12h2.5M18.4 12h2.5
+                                     M5.8 5.8l1.8 1.8M16.4 16.4l1.8 1.8
+                                     M18.2 5.8l-1.8 1.8M7.6 16.4l-1.8 1.8"/>
+                        </svg>
+                    </div>
+                    <div class="pip unknown gauge" id="pip-fuel" title="fuel">
+                    <!-- The gauge. pathLength="100" is the whole trick: it
+                         relabels the circle's own length as 100 units, so the
+                         dash offset is a percentage directly and nothing has to
+                         know the radius or carry 2*pi*r around. -->
+                    <svg class="pip-ring" viewBox="0 0 36 36" aria-hidden="true">
+                        <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
+                        <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
+                    </svg>
+                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3.9 20.8V5.6A2.6 2.6 0 0 1 6.5 3h4.4a2.6 2.6 0 0 1 2.6 2.6v15.2"/>
+                            <path d="M2.6 20.8h12.2"/>
+                            <rect x="6.2" y="6.1" width="5" height="3.6" rx="0.7"/>
+                            <path d="M13.5 10.6h3.2a1.3 1.3 0 0 1 1.3 1.3v5.3a1.9 1.9 0 0 0 3.8 0V8.5l-2.5-2.5"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Nav remaining-distance figure -----------------------------------------
+         Sits in the map's own top-left corner, the way the reference puts it
+         -- ON the map rather than in the panel stack above it, so it is
+         anchored to the same live --map-* rect #map-frame reads, not to
+         #slots. A mirror of client.lua's whole-route `remaining` figure. -->
+    <div id="nav-compass" class="slot hidden" aria-hidden="true">
+        <span id="nav-compass-dist"></span>
+    </div>
+
+    <!-- Wanted notification ----------------------------------------------- -->
+    <div id="wanted" class="hidden">
+        <div id="wanted-line">
+            <span id="wanted-copy">The cops are searching for you<br>and they have your description</span>
+            <svg id="wanted-star" class="star searching" viewBox="0 0 100 100" aria-hidden="true">
+                <path d="M50 5 L61 38 L96 38 L68 59 L79 92 L50 71 L21 92 L32 59 L4 38 L39 38 Z"/>
+            </svg>
+        </div>
+        <div id="wanted-tells"></div>
+    </div>
+
+    <!-- Honor change indicator ---------------------------------------------
+         Centre screen, shown briefly when honor moves: a sign and the face for
+         the DIRECTION of the change. The corner panel below is separate and
+         shows where honor currently stands. -->
+    <div id="honor-pop" class="hidden" aria-hidden="true">
+        <span id="honor-pop-sign"></span><span id="honor-pop-face"></span>
+    </div>
+
+    <!-- Honor standing ------------------------------------------------------- -->
+    <div id="honor" class="hidden">
+        <div id="honor-mug">
+            <img id="honor-img" alt="">
+            <span id="honor-badge"></span>
+        </div>
+        <div id="honor-copy">
+            <span id="honor-title"></span>
+            <span id="honor-sub"></span>
+        </div>
+    </div>
+
+    <!-- Reputation change popup ----------------------------------------------
+         Centre screen, shown briefly when a track moves. Reputation only ever
+         goes UP (qbx_reputation's tracks are floor-0, deltas are always
+         positive) so unlike honor-pop there is no down state to draw — one
+         sign, one icon. -->
+    <div id="reputation-pop" class="hidden" aria-hidden="true">
+        <span id="reputation-pop-sign"></span><span id="reputation-pop-face"></span>
+    </div>
+
+    <!-- Reputation standing ---------------------------------------------------
+         Shows whichever track most recently changed: its icon, name, value/
+         tier and the reason it moved. No mugshot — reputation is not a moral
+         axis like honor, it is three progression counters. -->
+    <div id="reputation" class="hidden">
+        <span id="reputation-icon" aria-hidden="true"></span>
+        <div id="reputation-copy">
+            <span id="reputation-title"></span>
+            <span id="reputation-sub"></span>
+        </div>
+    </div>
+
+    <!-- Exhaustion vignette -------------------------------------------------
+         Breathes in as the stamina bar empties, so running yourself out is
+         something you feel rather than just watch. Outside .stage because it
+         hugs the physical screen edges. -->
+    <div id="exhaust" aria-hidden="true"></div>
+
+    <!-- Focus vignette ---------------------------------------------------
+         Fixed to the physical screen like the exhaustion vignette above, so
+         it isn't nudged by any HUD panel's own offset. The colour glow is
+         the noticeable part -- the eyeball icon alone was too easy to miss
+         mid-fight. -->
+    <div id="focus-fx" aria-hidden="true"></div>
+
+    <!-- Directional police glow --------------------------------------------
+         One layer per screen edge. Each holds a red and a blue gradient that
+         cross-fade, so the edge pulses like a light bar. Opacity per edge is
+         driven from client.lua by siren bearing + distance. -->
+    <div id="police" aria-hidden="true">
+        <div class="pol pol-top"><span class="pol-r"></span><span class="pol-b"></span><span class="pol-w"></span></div>
+        <div class="pol pol-right"><span class="pol-r"></span><span class="pol-b"></span><span class="pol-w"></span></div>
+        <div class="pol pol-bottom"><span class="pol-r"></span><span class="pol-b"></span><span class="pol-w"></span></div>
+        <div class="pol pol-left"><span class="pol-r"></span><span class="pol-b"></span><span class="pol-w"></span></div>
+    </div>
+
+    <!-- Radius police glow ---------------------------------------------------
+         Alternative to the four-edge layout above: one lamp pair that tracks
+         the exact bearing to the siren around the screen's perimeter, so a
+         car to the south-west actually lights the bottom-left corner instead
+         of splitting into a separate left-edge glow and bottom-edge glow.
+         Toggled from /hudpolice edit; only one of the two is ever visible. -->
+    <div id="police-radius" aria-hidden="true">
+        <span class="polr-r"></span><span class="polr-b"></span><span class="polr-w"></span>
+    </div>
+
+    <!-- Skill level-up -------------------------------------------------------
+         Transient, like the honor indicator: it fires on a change and clears
+         itself. The panel below is the place to go and LOOK at your skills;
+         this only ever says "that just went up". -->
+    <!-- Two elements, not one. The OUTER carries the placement the editor
+         writes; the INNER carries the glass and the arrival animation. Putting
+         both on one element means the animation's transform throws away the
+         editor's offset for its duration, which is the bug the honor popup
+         already had once. -->
+    <div id="skillup" class="hidden" aria-hidden="true">
+        <div id="skillup-card" class="plate">
+            <span id="skillup-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3 L14.6 9.2 L21 9.9 L16.2 14.2 L17.6 20.5 L12 17.3 L6.4 20.5 L7.8 14.2 L3 9.9 L9.4 9.2 Z"/></svg>
+            </span>
+            <span id="skillup-copy">
+                <span id="skillup-label"></span>
+                <span id="skillup-blurb"></span>
+            </span>
+            <span id="skillup-level"></span>
+        </div>
+    </div>
+
+    <!-- Action prompts ---------------------------------------------------- -->
+    <div id="prompts"></div>
+
+</div>
+
+<!-- Skills panel ------------------------------------------------------------
+     Opened with /skills. Outside .stage for the same reason the editor is: it
+     is a screen you open, not a HUD element, and it must not inherit the
+     offsets and scales the editor applies to the HUD. -->
+<div id="skills" class="hidden">
+    <div id="skills-panel" class="plate">
+        <div id="skills-head">
+            <span id="skills-title">Skills</span>
+            <span id="skills-sub">Doing a thing makes you better at it.</span>
+            <button type="button" id="skills-close" aria-label="close">&#10005;</button>
+        </div>
+        <ul id="skills-list"></ul>
+        <div id="skills-foot">Each level is written straight into your character&rsquo;s
+            stats, so it changes how the game plays &mdash; not just what this panel says.</div>
+    </div>
+</div>
+
+<!-- Police light editor -----------------------------------------------------
+     Opened with /hudpolice edit. A small standalone panel rather than another
+     row in /movehud: it tunes the shape of an effect, not a position, and
+     nothing here is draggable or scalable the way an element is. -->
+<div id="police-editor" class="hidden">
+    <div id="pol-ed-panel" class="plate">
+        <div id="pol-ed-head">
+            <span id="pol-ed-title">Police Lights</span>
+            <span id="pol-ed-sub">Drag the sliders &mdash; changes apply live.</span>
+            <div id="pol-ed-modes">
+                <button type="button" class="pol-mode-btn" data-mode="edges">Edges</button>
+                <button type="button" class="pol-mode-btn" data-mode="radius">Radius</button>
+                <button type="button" class="pol-mode-btn" data-mode="custom">Custom</button>
+            </div>
+        </div>
+        <div id="pol-ed-body">
+            <div class="pol-ed-group">Brightness &amp; flash</div>
+            <div class="pol-ed-row" data-k="maxOpacity">
+                <label>Brightness</label>
+                <input type="range" min="0.1" max="1" step="0.01">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="flashMs">
+                <label>Flash speed</label>
+                <input type="range" min="400" max="1600" step="10">
+                <span class="pol-ed-val"></span>
+            </div>
+            <label id="pol-ed-white-row">
+                <input type="checkbox" id="pol-ed-white"> White takedown flash
+            </label>
+            <div class="pol-ed-row" data-k="whiteA">
+                <label>White intensity</label>
+                <input type="range" min="0" max="1" step="0.05">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="whiteLampA">
+                <label>White width</label>
+                <input type="range" min="6" max="30" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="whiteLampB">
+                <label>White height</label>
+                <input type="range" min="10" max="40" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+
+            <div class="pol-ed-group">Lamp shape</div>
+            <div class="pol-ed-row" data-k="lampA">
+                <label>Lamp width</label>
+                <input type="range" min="6" max="30" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="lampB">
+                <label>Lamp height</label>
+                <input type="range" min="10" max="40" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="spread">
+                <label>Spread apart</label>
+                <input type="range" min="4" max="40" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="softness">
+                <label>Edge softness</label>
+                <input type="range" min="40" max="85" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="focus">
+                <label>Edge focus</label>
+                <input type="range" min="0.5" max="4" step="0.1">
+                <span class="pol-ed-val"></span>
+            </div>
+
+            <div class="pol-ed-group">Movement</div>
+            <div class="pol-ed-row" data-k="sweepAmt">
+                <label>Movement</label>
+                <input type="range" min="0" max="5" step="0.1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="sweepMs">
+                <label>Movement speed</label>
+                <input type="range" min="800" max="6000" step="50">
+                <span class="pol-ed-val"></span>
+            </div>
+
+            <div class="pol-ed-group">Detection</div>
+            <div class="pol-ed-row" data-k="maxDistance">
+                <label>Detection range</label>
+                <input type="range" min="30" max="300" step="5">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row" data-k="fullDistance">
+                <label>Full brightness at</label>
+                <input type="range" min="5" max="100" step="5">
+                <span class="pol-ed-val"></span>
+            </div>
+
+            <div class="pol-ed-group pol-ed-radius-only">Preview</div>
+            <div class="pol-ed-row pol-ed-radius-only" data-k="previewAngle">
+                <label>Preview angle</label>
+                <input type="range" min="-180" max="180" step="5" value="-135">
+                <span class="pol-ed-val"></span>
+            </div>
+
+            <!-- Custom mode ignores bearing entirely — each lamp sits exactly
+                 where you put it, so overlapping them or building a totally
+                 different arrangement is fair game. -->
+            <div class="pol-ed-group pol-ed-custom-only">Red position</div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customRx">
+                <label>Red X</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customRy">
+                <label>Red Y</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-group pol-ed-custom-only">Blue position</div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customBx">
+                <label>Blue X</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customBy">
+                <label>Blue Y</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-group pol-ed-custom-only">White position</div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customWx">
+                <label>White X</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+            <div class="pol-ed-row pol-ed-custom-only" data-k="customWy">
+                <label>White Y</label>
+                <input type="range" min="0" max="100" step="1">
+                <span class="pol-ed-val"></span>
+            </div>
+        </div>
+        <div id="pol-ed-actions">
+            <button type="button" id="pol-ed-reset" class="ghost">Reset</button>
+            <button type="button" id="pol-ed-close" class="primary">Done</button>
+        </div>
+    </div>
+</div>
+
+<!-- HUD editor ------------------------------------------------------------
+     Opened with /movehud. Lives OUTSIDE .stage so it is never affected by the
+     offsets it is editing. -->
+<div id="editor" class="hidden">
+    <div id="editor-panel" class="plate">
+        <div id="editor-head">
+            <div id="editor-titlerow">
+                <span id="editor-title">Move HUD</span>
+                <span id="editor-sub">Pick a piece on the left, tune it on the right.</span>
+                <!-- Drag the title bar to move the panel; this folds it down to
+                     just that bar. Both exist because the editor sits on top of
+                     the HUD it is editing and will always cover something. -->
+                <button type="button" id="ed-collapse" title="Collapse (H)"
+                        aria-label="collapse the editor">&#9652;</button>
+            </div>
+            <!-- The shortcuts used to be one long run-on sentence, which is the
+                 least readable way to present a dozen bindings. Grouped chips
+                 scan in a glance and wrap cleanly at any panel width. -->
+            <div id="editor-keys">
+                <span class="kg"><kbd>&#8592;</kbd><kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8594;</kbd><i>move</i></span>
+                <span class="kg"><kbd>Ctrl</kbd><span class="kx">+</span><kbd>&#8592;&#8594;&#8593;&#8595;</kbd><i>resize</i></span>
+                <span class="kg"><kbd>Tab</kbd><i>next piece</i></span>
+                <span class="kg"><kbd>[</kbd><kbd>]</kbd><i>pick setting</i></span>
+                <span class="kg"><kbd>&#8722;</kbd><kbd>+</kbd><i>change it</i></span>
+                <span class="kg"><kbd>click a value</kbd><i>type any number</i></span>
+                <span class="kg"><kbd>Shift</kbd><i>bigger steps</i></span>
+                <span class="kg"><kbd>H</kbd><i>collapse panel</i></span>
+                <span class="kg"><kbd>Space</kbd><i>hold to see through</i></span>
+                <span class="kg"><kbd>drag</kbd><i>the title bar to move it</i></span>
+                <span class="kg"><kbd>drag</kbd><i>the corner to resize it</i></span>
+                <span class="kg"><kbd>Enter</kbd><i>save</i></span>
+                <span class="kg"><kbd>Esc</kbd><i>cancel</i></span>
+            </div>
+        </div>
+        <div id="editor-body">
+            <div id="editor-col-list">
+                <div class="ed-colhead">Element</div>
+                <ul id="editor-list"></ul>
+            </div>
+            <div id="editor-col-props">
+                <div class="ed-colhead"><span id="editor-propfor">Settings</span></div>
+                <div id="editor-props"></div>
+            </div>
+        </div>
+        <div id="editor-actions">
+            <div class="ed-actgroup">
+                <button type="button" id="ed-reset" class="ghost">Reset this</button>
+                <button type="button" id="ed-resetall" class="ghost">Reset all</button>
+            </div>
+            <div class="ed-actgroup ed-actgroup-end">
+                <button type="button" id="ed-cancel" class="ghost">Cancel</button>
+                <button type="button" id="ed-save" class="primary">Save &amp; close</button>
+            </div>
+        </div>
+        <!-- Resize grip. The settings column is a fixed share of the panel's
+             width and its labels ellipsise, so on a narrow panel "Font
+             smoothing" and "Corner radius" were being cut off with no way to
+             widen anything. Dragging this corner is that way. Sized and
+             persisted alongside the drag position. -->
+        <div id="ed-resize" role="separator" aria-label="resize the editor"
+             title="Drag to resize"></div>
+    </div>
+</div>
+
+<!-- Manufacturer palette. Loaded BEFORE app.js, which reads it the first
+     time a vehicle panel is drawn -- a generated table with no side
+     effects of its own, so order is the whole of the contract. -->
+<script src="makes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

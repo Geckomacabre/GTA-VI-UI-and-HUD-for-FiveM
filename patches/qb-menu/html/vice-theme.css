@@ -1,0 +1,261 @@
+/* -----------------------------------------------------------------------------
+   vice_hud map-panel plate for qb-menu   (added by vice_hud; safe to delete)
+   -----------------------------------------------------------------------------
+   qb-menu draws its own NUI page, so the patch in ox_lib does not reach it --
+   SendNUIMessage delivers to the calling resource's page only. This is the
+   equivalent for this resource, and the sibling of the one in ox_target.
+
+   qb-menu is still reached by sn_lib, jim_bridge, loaf_billing, lb-phone and
+   rcore_prison, so these menus really do appear next to the HUD. Left alone
+   they are Material-red on flat charcoal.
+
+   WHICH MATERIAL THIS IS -- see the long note at the top of
+   [ox]/ox_target/web/vice-theme.css. Short version: vice_hud has two surfaces,
+   and this is .slot (the zone bar and vehicle panel plate: warm purple-grey at
+   0.88, hairline INSET edge, top-lit line, two-gradient sheen, no specular
+   cap), not .glass (the near-black popup material ox_lib uses). Do not unify
+   the two.
+
+   HOW THIS DIFFERS FROM THE ox_target COPY
+   qb-menu's stylesheet is already built on custom properties (--md-surface-
+   container, --md-primary, ...). Remapping those tokens reaches every rule in
+   style.css that reads them without restating any of those rules, so the token
+   block below does most of the work and the plate block only has to add the
+   material Material Design has no token for.
+
+   UNITS: the recipe is restated in px at the 16:9 reference (1cqh = 10.8px,
+   1cqw = 19.2px at 1080p) because this page establishes no container for cq
+   units to resolve against.
+
+   Every rule is gated behind an attribute that only vice-theme.js sets, so if
+   vice_hud is not running this file changes nothing.
+
+   NO backdrop-filter, deliberately -- on a transparent NUI page CEF has no
+   backdrop to sample and rasterises the region as opaque black.
+   -------------------------------------------------------------------------- */
+
+/* Served from THIS resource rather than fetched from vice_hud over nui://: the
+   cross-resource URL made this menu depend on another resource being started to
+   render its own text, and a font 404 fails silently. 240kB for the two cuts,
+   cached after the first download.
+
+   Regenerate with:
+     cp '[standalone]/vice_hud/html/fonts/GTAArtDeco*.ttf' '[qbx]/qb-menu/html/fonts/'
+
+   TrueType; the format() hint has to match the file or the browser rejects it
+   silently. Two cuts, because the family has two -- more weights just make the
+   browser synthesise a bold that looks nothing like the HUD. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+:root {
+    /* Fallbacks are vice_hud's own measured values. */
+    --vice-plate: rgba(57, 53, 59, 0.88);
+    --vice-plate-edge: rgba(255, 255, 255, 0.10);
+    --vice-plate-toplit: rgba(255, 255, 255, 0.055);
+    --vice-plate-band: rgba(255, 255, 255, 0.052);
+    --vice-plate-barrier: rgba(255, 255, 255, 0.16);
+    --vice-line: rgba(255, 255, 255, 0.10);
+    /* Stock qb-menu values, so a half-filled theme degrades to the old look. */
+    --vice-text: #e6e1e5;
+    --vice-text-dim: #79747e;
+    --vice-accent: #f44336;
+    /* 0.30cqw at 16:9 -- vice_hud's --r-md, the zone bar's radius. */
+    --vice-radius: 6px;
+}
+
+/* ---- palette ------------------------------------------------------------
+   Remapping qb-menu's own Material tokens rather than rewriting its rules.
+   These apply whether or not the plate material is on, because a palette is
+   not a material.
+
+   --md-primary is the button HOVER background in stock, a full-strength red
+   fill. That is not how the HUD says anything -- the map panels lift their
+   sheen -- so the plate block below overrides the hover fill outright, and
+   this mapping only carries the accent to the places that should be tinted. */
+html[data-vice-accent] {
+    --md-on-surface: var(--vice-text);
+    --md-outline: var(--vice-text-dim);
+    --md-outline-variant: var(--vice-line);
+    --md-primary: var(--vice-accent);
+    --md-secondary: var(--vice-accent);
+    --md-surface: var(--vice-plate);
+    --md-surface-container: var(--vice-plate);
+    --md-surface-container-low: var(--vice-plate);
+    --md-surface-container-high: var(--vice-plate);
+    --md-surface-container-highest: var(--vice-plate);
+    /* Disabled rows keep a distinct, flatter fill: with every container token
+       pointed at the same plate they would otherwise be indistinguishable from
+       a live row, and `disabled` has to read as disabled. */
+    --md-surface-container-lowest: rgba(0, 0, 0, 0.45);
+}
+
+/* The icon carries the accent, as it does in ox_target's option list. It is the
+   one coloured element in the row, and that is what makes a qb-menu read as the
+   same UI as everything else using the same preset.
+
+   Scoped to the <i> only. qb-menu's markup emits an <img> and an <i> for every
+   row and removes whichever one fails to load, so the icon may be an image --
+   and tinting an image is not something this can do. */
+html[data-vice-accent] .icon i {
+    color: var(--vice-accent);
+}
+
+/* ---- the plate ----------------------------------------------------------
+   .slot's recipe, applied per ROW. Both selectors are listed because qb-menu
+   uses two classes for the same shape -- `.title` is a header row, `.button` is
+   a selectable one -- and they are the same panel with different contents.
+
+   The two gradients over the plate colour are #vehicle::after's sheen: a soft
+   top-down wash plus a wide diagonal highlight. Dropping either leaves a flat
+   grey box. The edge is an INSET ring rather than a border, as .slot does it,
+   so it costs no layout width. */
+html[data-vice-glass='1'] .button,
+html[data-vice-glass='1'] .title {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    border-radius: var(--vice-radius);
+    /* --shadow-sm plus .slot's two insets: the hairline edge all round, and a
+       brighter line along the top as if lit from above. */
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px var(--vice-plate-edge),
+        inset 0 1px 0 var(--vice-plate-toplit);
+    /* --ink-shadow, which is what keeps a label legible over the bright end of
+       the sheen. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.88);
+}
+
+/* Replaces the stock red fill: the plate's own sheen turned up, matching
+   ox_target's rows so hovering means the same thing in both. The map panels
+   have no hover state to copy -- nothing on the map is pointed at -- so this
+   is the nearest thing to an answer the reference gives. */
+html[data-vice-glass='1'] .button:hover {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.13) 0%,
+            rgba(255, 255, 255, 0.05) 42%,
+            rgba(0, 0, 0, 0.06) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.075) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* A header row is not clickable and must not respond. It also takes the vehicle
+   panel's own header treatment: #veh-foot separates the pip strip from the name
+   with a lighter band and a hairline barrier, and a menu title separating itself
+   from its rows is the same job. The barrier is a border-BOTTOM here because the
+   title sits above its rows where #veh-foot sits below its name. */
+html[data-vice-glass='1'] .title {
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        /* The band as a GRADIENT, not a colour. The `background` shorthand
+           takes at most one background-color and it must be the final layer,
+           so a bare var(--vice-plate-band) here made the whole declaration
+           invalid and the header silently fell back to no background at all.
+           A two-stop gradient of one colour is a flat fill that is legal in
+           any layer position. */
+        linear-gradient(var(--vice-plate-band), var(--vice-plate-band)),
+        var(--vice-plate);
+    border-bottom: 1px solid var(--vice-plate-barrier);
+}
+
+/* A disabled row is not clickable either. style.css puts `.disabled` and
+   `.button` on the same element, so without this the hover rule above still
+   fires on it. */
+html[data-vice-glass='1'] .button.disabled,
+html[data-vice-glass='1'] .button.disabled:hover {
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 0 0 1px var(--vice-line);
+    text-shadow: none;
+}
+
+/* There is deliberately no ::before here. The glass surface uses one for its
+   radial specular cap; the map panels have no cap, and adding one would be the
+   single change that makes this stop looking like the panel on the map. */
+
+/* The hover preview image gets the plate's edge and radius, so it reads as part
+   of the same panel set rather than as a bare screenshot. */
+html[data-vice-glass='1'] #image {
+    border-radius: var(--vice-radius);
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.40),
+        0 0 0 1px var(--vice-plate-edge);
+}
+
+/* The scrollbar, which stock paints in Material greys that survive the token
+   remap only as flat plate-on-plate. */
+html[data-vice-glass='1'] ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html[data-vice-glass='1'] ::-webkit-scrollbar-thumb {
+    background: var(--vice-plate-barrier);
+    border-radius: var(--vice-radius);
+}
+
+/* ---- display font ------------------------------------------------------
+   Kept out of the plate rule so the font still applies with the material
+   switched off; /hudtheme exposes them as two separate rows.
+
+   style.css sets `font-family: var(--font-primary)` on `*` and repeats it on
+   several inner elements, and both of those are direct declarations rather than
+   inheritance -- so unlike ox_lib's page this cannot be won at the container
+   level on specificity alone. Remapping --font-primary is what actually reaches
+   all of them, and it is one declaration instead of a list that would go stale
+   the moment qb-menu adds an element.
+
+   Font Awesome is excluded automatically here: its own `.fa` rule sets
+   font-family directly, which beats the `*` rule regardless of what
+   --font-primary holds. That is why there is no :not() selector in this file
+   and there is one in ox_target's -- there the font is applied by inheritance,
+   which an icon's own declaration does not automatically beat. */
+html[data-vice-font='1'] {
+    --font-primary: 'GTAArtDeco', 'Exo 2', 'Segoe UI', Arial, sans-serif;
+}
+
+/* The map panels set their one piece of display type -- the vehicle make -- in
+   tracked-out caps (.vname: 0.075em, weight 700, uppercase). A menu header is
+   the same job, so it gets the same treatment. The stock underline goes: the
+   HUD separates a heading with a barrier, not a rule under the words, and the
+   .title block above already draws one. */
+html[data-vice-font='1'] .title > div.column > div.header {
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-decoration: none !important;
+}

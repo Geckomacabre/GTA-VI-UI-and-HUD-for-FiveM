@@ -1,0 +1,14 @@
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# vice_hud's own dev/test tooling, if it's ever regenerated in place
+resources/vice_hud/node_modules/
+resources/vice_hud/tools/__pycache__/
+resources/vice_hud/**/*.orig-rgbonly
+
+# Per-server runtime state, not shipped defaults
+resources/vice_hud/theme.json

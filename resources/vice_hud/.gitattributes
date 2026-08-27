@@ -1,0 +1,20 @@
+# This working copy is CRLF throughout (it was authored on Windows). Without
+# this file every clone on Linux/macOS would either see CRLF in every line or
+# rewrite the whole tree on first commit, and the test suites that match source
+# with regexes are sensitive to it -- tools/aspect.test.js looked for `\nend\n`
+# and reported the function "not found in client.lua" on a CRLF checkout.
+#
+# Normalise to LF in the REPOSITORY; Git still checks out whatever the platform
+# wants locally.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png    binary
+*.otf    binary
+*.ttf    binary
+*.ytd    binary
+*.orig-rgbonly binary
+
+# Collapse generated files in PR diffs -- html/makes.js is written by
+# tools/make_makes.py and reviewing it by hand is never the point.
+html/makes.js linguist-generated=true

@@ -1,0 +1,96 @@
+/* Shared skin for both gig apps. Each app sets --accent and --ink on :root
+   via its own inline block, so one stylesheet dresses two companies. */
+
+/* Arista Pro (trial cut). Registered so it is available to any element that
+   asks for it, but neither app points --font-body at it by default -- Ryde
+   Me still uses GTAArtDeco and Snarf still uses the system stack. */
+@font-face {
+    font-family: 'Arista Pro';
+    src: url('fonts/arista-pro.pro-trial-regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+    visibility: hidden;                 /* revealed on componentsLoaded */
+    /* Each app can override --font-body; Ryde Me points this at GTAArtDeco,
+       Snarf leaves it at the default. The brand wordmark is a separate font
+       set directly on #brand, so it is unaffected either way. */
+    font-family: var(--font-body, 'Inter', system-ui, -apple-system, sans-serif);
+    background: var(--bg, #101014);
+    color: var(--ink, #f4f4f2);
+    font-size: 14px;
+}
+header {
+    padding: 18px 16px 12px;
+    background: var(--accent);
+    color: var(--on-accent, #fff);
+}
+#brand { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
+#tagline { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+#rating {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 12px; font-size: 13px;
+}
+.stars { letter-spacing: 2px; }
+.num { opacity: 0.8; }
+#warn {
+    display: none;
+    margin: 10px 12px 0; padding: 9px 11px;
+    background: rgba(255,77,77,0.14);
+    border: 1px solid rgba(255,77,77,0.35);
+    border-radius: 9px;
+    font-size: 11.5px; line-height: 1.4;
+}
+#list { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+#list.busy { opacity: 0.45; pointer-events: none; }
+.card {
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 13px;
+    padding: 12px;
+}
+.row { display: flex; justify-content: space-between; align-items: baseline; }
+.pay { font-size: 21px; font-weight: 800; color: var(--accent-text, var(--accent)); }
+.dist { font-size: 11px; opacity: 0.6; }
+.detail { margin-top: 6px; font-size: 13px; }
+.note { margin-top: 4px; font-size: 11.5px; opacity: 0.65; font-style: italic; }
+.leg { margin-top: 7px; font-size: 12px; opacity: 0.9; }
+.tag {
+    display: inline-block; min-width: 38px;
+    font-size: 9px; font-weight: 800; letter-spacing: 1px;
+    opacity: 0.5;
+}
+button {
+    width: 100%; margin-top: 11px; padding: 10px;
+    border: 0; border-radius: 9px;
+    background: var(--accent); color: var(--on-accent, #fff);
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    cursor: pointer;
+}
+button:active { transform: translateY(1px); }
+button.danger { background: #c0392b; }
+.empty { padding: 34px 18px; text-align: center; opacity: 0.75; }
+.empty .sub { font-size: 11.5px; opacity: 0.7; margin-top: 6px; }
+/* Duty and Refresh share the footer row. Duty is the primary of the two, so it
+   carries the accent once it is on and stays quiet while it is off. */
+#actions {
+    display: flex; gap: 8px;
+    margin: 0 12px 16px;
+}
+#actions button { margin-top: 0; }
+#refresh {
+    flex: 0 0 38%;
+    background: rgba(255,255,255,0.09); color: var(--ink, #f4f4f2);
+}
+#duty {
+    flex: 1 1 auto;
+    background: rgba(255,255,255,0.09); color: var(--ink, #f4f4f2);
+}
+#duty.on {
+    background: var(--accent-text, var(--accent));
+    color: #0d0d0f;
+}

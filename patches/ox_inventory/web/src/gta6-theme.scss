@@ -1,0 +1,698 @@
+// GTA6-inspired reskin for ox_inventory's F2 screen.
+// Pure presentation layer — no drag/drop, slot, or networking logic lives here.
+// Colors are exposed as CSS custom properties so a server owner can retheme
+// without touching component code.
+//
+// ---------------------------------------------------------------------------
+// UNITS
+// ---------------------------------------------------------------------------
+// The layout was measured off 2000x1124 reference frames as percentages of the
+// viewport. Those two axes are handled differently on purpose:
+//
+//   * POSITION  -> raw percentages of the viewport (`left: 35.08%` etc). The
+//                  composition then lands exactly where it was measured.
+//   * SIZE/FONT -> `vh`, converted from the measured width-percentages at the
+//                  reference aspect ratio via pw(). Sizing off viewport HEIGHT
+//                  is what keeps slot boxes square-ish and text legible on
+//                  ultrawide and 4:3 displays instead of stretching with width.
+//
+// pw(x) converts "x% of the reference viewport width" into vh.
+$gta6-ref-aspect: 1.77936; // 2000 / 1124
+
+@function pw($pct) {
+  @return $pct * $gta6-ref-aspect * 1vh;
+}
+
+// ph(x) is a straight pass-through for "x% of viewport height" -> vh.
+@function ph($pct) {
+  @return $pct * 1vh;
+}
+
+:root {
+  --gta6-slot-bg: rgba(150, 140, 134, 0.22);
+  --gta6-slot-border: rgba(255, 255, 255, 0.1);
+  --gta6-slot-equipped-bg: rgba(150, 140, 134, 0.24);
+  --gta6-slot-equipped-border: rgba(255, 255, 255, 0.16);
+  --gta6-slot-selected-bg: rgba(196, 186, 180, 0.42);
+  --gta6-slot-selected-border: rgba(252, 250, 248, 0.95);
+  --gta6-slot-selected-line: rgba(255, 96, 130, 0.95);
+
+  --gta6-badge-bg: rgba(178, 172, 168, 0.55);
+  --gta6-badge-border: rgba(255, 255, 255, 0.3);
+
+  --gta6-glow: rgba(84, 232, 208, 0.9);
+
+  --gta6-strip-bg: rgba(20, 18, 22, 0.55);
+  --gta6-footer-bg: rgba(20, 18, 22, 0.5);
+
+  --gta6-text: #ffffff;
+  --gta6-text-dim: #b7b4ad;
+  --gta6-caption-sub: #cdc6b6;
+  --gta6-dot: #efeeec;
+
+  --gta6-health: #ff4d6d;
+  --gta6-stamina: #2fe6c4;
+  --gta6-armor: #a06bff;
+
+  --gta6-tab-active-bg: #ebeae7;
+  --gta6-tab-active-text: #17181b;
+  --gta6-tab-inactive-bg: rgba(34, 32, 36, 0.9);
+  --gta6-tab-inactive-text: #dcdcda;
+
+  // Pad face-button tints for the prompt glyphs.
+  --gta6-pad-a: #4caf50;
+  --gta6-pad-b: #e53935;
+  --gta6-pad-x: #2196f3;
+  --gta6-pad-y: #fdd835;
+}
+
+// ---------------------------------------------------------------------------
+// Full-screen overlay
+// ---------------------------------------------------------------------------
+// Only applied to `.inventory-wrapper` (which lives inside the Fade), NOT to
+// `.app-wrapper` — the latter is mounted permanently for the hotbar and would
+// dim the whole game.
+.inventory-wrapper {
+  position: relative;
+  width: 100%;
+  // Kept deliberately translucent: the reference frames show the game world
+  // clearly through the overlay. The previous edge stop (0.94) rendered as a
+  // near-solid black wall on anything wider than 16:9, because the ellipse's
+  // outer stop covers most of an ultrawide screen.
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    rgba(6, 6, 9, 0.18) 0%,
+    rgba(4, 4, 7, 0.46) 58%,
+    rgba(2, 2, 4, 0.68) 100%
+  );
+  // NO backdrop-filter here. A FiveM NUI page is a transparent overlay with
+  // nothing behind it *inside the page*, and CEF composites backdrop-filter
+  // against that void — which renders as a solid black wall over the game
+  // instead of a blur of the world. This was the cause of the black F2 screen.
+
+  // The wheel occupies the middle of the screen, so push the secondary
+  // inventory + transfer controls out of its way. border-box is required:
+  // width:100% plus this padding was overflowing the viewport by the padding
+  // amount (1958px on a 1920px screen), which pushed the right-hand grid
+  // partly off-screen.
+  box-sizing: border-box;
+  justify-content: flex-end;
+  padding-right: 2vw;
+  overflow: hidden;
+}
+
+// The composition is authored against 1920x1080. Rather than positioning
+// children as percentages of the raw viewport — which spreads them apart on an
+// ultrawide until the wheel is flung to the screen edges — everything is
+// anchored to a 16:9 "stage" derived from viewport HEIGHT and centred
+// horizontally. On a 16:9 display the stage is the whole screen and nothing
+// changes; on 21:9 or 32:9 the composition stays 1920x1080-shaped in the
+// middle, which is what GTA itself does with its safe-zone HUD.
+//
+// --gta6-hud-offset-x lets a widescreen player nudge the whole thing sideways.
+.gta6-left-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100vw, calc(100vh * 16 / 9));
+  transform: translateX(calc(-50% + var(--gta6-hud-offset-x, 0px)));
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dot + tab switcher
+// ---------------------------------------------------------------------------
+.gta6-wheel-dot {
+  position: absolute;
+  left: 50.25%;
+  top: 8.19%;
+  transform: translate(-50%, -50%);
+  width: pw(1.3);
+  height: pw(1.3);
+  border-radius: 50%;
+  background: var(--gta6-dot);
+  pointer-events: none;
+}
+
+.gta6-tabs {
+  position: absolute;
+  left: 50.3%;
+  top: 12.1%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.gta6-tab {
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: pw(0.95);
+  letter-spacing: 0.045em;
+  line-height: 1;
+  height: ph(2.85);
+  padding: 0;
+  border-radius: 0;
+  background: var(--gta6-tab-inactive-bg);
+  color: var(--gta6-tab-inactive-text);
+  transition: background 150ms ease, color 150ms ease;
+
+  &:active {
+    transform: none;
+  }
+}
+
+.gta6-tab-weapons {
+  width: pw(6);
+}
+
+.gta6-tab-items {
+  width: pw(4.6);
+}
+
+.gta6-tab-active {
+  background: var(--gta6-tab-active-bg);
+  color: var(--gta6-tab-active-text);
+}
+
+.gta6-tab-bar {
+  width: pw(0.3);
+  background: #ffffff;
+}
+
+// ---------------------------------------------------------------------------
+// Slot shells
+// ---------------------------------------------------------------------------
+// Shared rules for every gta6 slot shell: the real <InventorySlot> is stretched
+// to fill the shell (so drag/drop + right-click hit the whole box), its default
+// chrome is hidden, and its item art is constrained via content-box background
+// origin. Decoration is layered on top with pointer-events: none.
+@mixin gta6-slot-shell($pad-x, $pad-top, $pad-bottom) {
+  position: absolute;
+  border-radius: 3px;
+  border: 1px solid var(--gta6-slot-border);
+  background: var(--gta6-slot-bg);
+  box-sizing: border-box;
+
+  .inventory-slot {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: none !important;
+    border-radius: 3px !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-origin: content-box;
+    background-size: contain;
+    padding: $pad-top $pad-x $pad-bottom;
+    box-sizing: border-box;
+
+    &:hover {
+      background-color: transparent !important;
+    }
+  }
+
+  // Keep the wrapper (it owns the tooltip mouseenter/leave timers) but hide
+  // the stock weight/count header and label plate, which don't belong here.
+  .item-slot-wrapper {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+  }
+
+  .item-slot-header-wrapper,
+  .item-hotslot-header-wrapper,
+  .inventory-slot-label-box {
+    display: none !important;
+  }
+}
+
+// Equipped weapon — separate slot pinned top-centre, NOT part of the ring.
+// 9.85% x 11.12% of the viewport. Art box: pw(5.6) wide, 62% of slot height.
+$gta6-eq-w: pw(9.85);
+$gta6-eq-h: ph(11.12);
+$gta6-art-w: pw(5.6);
+
+.gta6-equipped-slot {
+  @include gta6-slot-shell(
+    calc((#{$gta6-eq-w} - #{$gta6-art-w}) / 2),
+    ph(1),
+    calc(#{$gta6-eq-h} - #{ph(1)} - (#{$gta6-eq-h} * 0.62))
+  );
+
+  left: 50.35%;
+  top: 23.35%;
+  transform: translate(-50%, -50%);
+  width: $gta6-eq-w;
+  height: $gta6-eq-h;
+  background: var(--gta6-slot-equipped-bg);
+  border-color: var(--gta6-slot-equipped-border);
+}
+
+// Teal/cyan elliptical glow arc under the weapon art.
+.gta6-equipped-glow {
+  position: absolute;
+  left: 50%;
+  bottom: ph(2.9);
+  transform: translateX(-50%);
+  width: pw(6.4);
+  height: ph(2.2);
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 100%, var(--gta6-glow) 0%, rgba(84, 232, 208, 0) 72%);
+  opacity: 0.85;
+}
+
+.gta6-equipped-ammo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: ph(2.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: pw(0.5);
+  background: var(--gta6-strip-bg);
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+  pointer-events: none;
+}
+
+.gta6-ammo-mag {
+  font-size: pw(1.1);
+  font-weight: 700;
+  color: var(--gta6-text);
+  line-height: 1;
+}
+
+.gta6-ammo-reserve {
+  font-size: pw(0.95);
+  font-weight: 600;
+  color: var(--gta6-text-dim);
+  line-height: 1;
+}
+
+// Five scattered ring slots — 9.85% x 10.68% of the viewport.
+$gta6-ws-w: pw(9.85);
+$gta6-ws-h: ph(10.68);
+
+.gta6-wheel-slot {
+  @include gta6-slot-shell(
+    calc((#{$gta6-ws-w} - #{$gta6-art-w}) / 2),
+    ph(2),
+    calc(#{$gta6-ws-h} - #{ph(2)} - (#{$gta6-ws-h} * 0.62))
+  );
+
+  transform: translate(-50%, -50%);
+  width: $gta6-ws-w;
+  height: $gta6-ws-h;
+}
+
+.gta6-wheel-slot-selected {
+  background: var(--gta6-slot-selected-bg);
+  border: pw(0.14) solid var(--gta6-slot-selected-border);
+
+  // Pink/red highlight line along the top inside edge.
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: ph(0.36);
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 96, 130, 0) 0%,
+      var(--gta6-slot-selected-line) 50%,
+      rgba(255, 96, 130, 0) 100%
+    );
+  }
+}
+
+// Sub-category badge — see hasBadge() in WeaponWheel.tsx for what drives it.
+.gta6-slot-badge {
+  position: absolute;
+  top: pw(0.45);
+  right: pw(0.45);
+  width: pw(1.3);
+  height: pw(1.3);
+  border-radius: 50%;
+  background: var(--gta6-badge-bg);
+  border: 1px solid var(--gta6-badge-border);
+  pointer-events: none;
+  z-index: 2;
+}
+
+// ---------------------------------------------------------------------------
+// Centre caption — text only, deliberately no slot box behind it
+// ---------------------------------------------------------------------------
+.gta6-wheel-caption {
+  position: absolute;
+  left: 50.3%;
+  top: 48.7%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ph(1.5);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.gta6-wheel-caption-name {
+  font-size: pw(1.35);
+  font-weight: 700;
+  color: var(--gta6-text);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-shadow: 0 0.2vh 0.6vh rgba(0, 0, 0, 0.85);
+  line-height: 1;
+}
+
+.gta6-wheel-caption-sub {
+  font-size: pw(0.95);
+  font-weight: 600;
+  color: var(--gta6-caption-sub);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+// ---------------------------------------------------------------------------
+// Quick consumable slots (bottom-left) — portrait, taller than wide
+// ---------------------------------------------------------------------------
+$gta6-qs-w: pw(5.85);
+$gta6-qs-h: ph(12.46);
+
+.gta6-quickslots {
+  position: absolute;
+  left: 1.75%;
+  top: 80.34%;
+  display: flex;
+  gap: pw(0.55);
+}
+
+.gta6-quickslot {
+  // Art sits centred-upper, above the footer strip.
+  @include gta6-slot-shell(calc((#{$gta6-qs-w} - #{pw(4)}) / 2), ph(1.4), ph(5.4));
+
+  position: relative;
+  width: $gta6-qs-w;
+  height: $gta6-qs-h;
+}
+
+.gta6-quickslot-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: ph(3.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: pw(0.4);
+  background: var(--gta6-footer-bg);
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gta6-quickslot-count {
+  font-size: pw(0.9);
+  font-weight: 700;
+  color: var(--gta6-text);
+  line-height: 1;
+}
+
+.gta6-quickslot-pip {
+  width: pw(0.55);
+  height: pw(0.55);
+  border-radius: 50%;
+  background: var(--gta6-stamina);
+}
+
+// ---------------------------------------------------------------------------
+// Prompt glyphs
+// ---------------------------------------------------------------------------
+.gta6-prompt {
+  position: absolute;
+  top: 94.5%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gta6-prompt-primary {
+  left: 4.8%;
+}
+
+.gta6-prompt-secondary {
+  left: 11.35%;
+}
+
+.gta6-prompt-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-weight: 700;
+  line-height: 1;
+  color: #17181b;
+  background: rgba(235, 234, 231, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+// A single character sits in a circle at the measured diameter...
+.gta6-prompt-glyph-circle.gta6-prompt-glyph-lg {
+  width: pw(1.7);
+  height: pw(1.7);
+  border-radius: 50%;
+  font-size: pw(0.95);
+}
+
+.gta6-prompt-glyph-circle.gta6-prompt-glyph-sm {
+  width: pw(1.5);
+  height: pw(1.5);
+  border-radius: 50%;
+  font-size: pw(0.85);
+}
+
+// ...anything longer ("CTRL", "MOUSE1", "LB") gets a keycap instead, or it
+// would overflow the circle.
+.gta6-prompt-glyph-cap {
+  border-radius: pw(0.3);
+  padding: 0 pw(0.45);
+  letter-spacing: 0.04em;
+}
+
+.gta6-prompt-glyph-cap.gta6-prompt-glyph-lg {
+  height: pw(1.7);
+  min-width: pw(1.7);
+  font-size: pw(0.9);
+}
+
+.gta6-prompt-glyph-cap.gta6-prompt-glyph-sm {
+  height: pw(1.5);
+  min-width: pw(1.5);
+  font-size: pw(0.8);
+}
+
+// Pad face-button colours.
+.gta6-prompt-glyph-pad-a {
+  background: var(--gta6-pad-a);
+  color: #08210c;
+}
+
+.gta6-prompt-glyph-pad-b {
+  background: var(--gta6-pad-b);
+  color: #2a0505;
+}
+
+.gta6-prompt-glyph-pad-x {
+  background: var(--gta6-pad-x);
+  color: #041426;
+}
+
+.gta6-prompt-glyph-pad-y {
+  background: var(--gta6-pad-y);
+  color: #241f00;
+}
+
+// ---------------------------------------------------------------------------
+// Drop hint (bottom-right) + its hairline rule
+// ---------------------------------------------------------------------------
+.gta6-drop-rule {
+  position: absolute;
+  right: 1.3%;
+  bottom: 7.6%;
+  width: 20%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+
+.gta6-drop-hint {
+  position: absolute;
+  right: 1.3%;
+  bottom: 3.1%;
+  display: flex;
+  align-items: center;
+  gap: pw(0.6);
+  color: var(--gta6-text);
+  font-size: pw(1.1);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+// ---------------------------------------------------------------------------
+// Status bars (health / stamina / armor) — see PlayerStatusBars.tsx
+// ---------------------------------------------------------------------------
+.gta6-status-bars {
+  position: absolute;
+  top: 2.4%;
+  left: 1.75%;
+  display: flex;
+  flex-direction: column;
+  gap: ph(0.6);
+  width: pw(9);
+}
+
+.gta6-status-row {
+  display: flex;
+  align-items: center;
+  gap: pw(0.35);
+}
+
+.gta6-status-icon {
+  width: pw(0.9);
+  font-size: pw(0.8);
+  text-align: center;
+  line-height: 1;
+}
+
+.gta6-status-track {
+  flex: 1;
+  height: ph(0.55);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.gta6-status-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+
+.gta6-status-health .gta6-status-fill {
+  background: var(--gta6-health);
+}
+
+.gta6-status-stamina .gta6-status-fill {
+  background: var(--gta6-stamina);
+}
+
+.gta6-status-armor .gta6-status-fill {
+  background: var(--gta6-armor);
+}
+
+// ---------------------------------------------------------------------------
+// Grids
+// ---------------------------------------------------------------------------
+// The left grid holds everything that didn't fit on the wheel; it is parked in
+// the free column on the left, above the quickslots, so it never overlaps the
+// ring. The right-hand (secondary) grid keeps its normal flex placement.
+// The ITEMS tab shows the ordinary grid, centred in the same space the wheel
+// occupies on the WEAPONS tab. The two never render together, so they can share
+// the middle of the screen.
+.gta6-items-grid {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  max-height: 66vh;
+  overflow-y: auto;
+  pointer-events: auto;
+
+  .inventory-grid-wrapper {
+    width: auto;
+    max-height: none;
+  }
+}
+
+.inventory-slot {
+  background-color: rgba(150, 140, 134, 0.22) !important;
+  border-radius: 3px !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-style: solid !important;
+  transition: background-color 120ms ease, border-color 120ms ease;
+
+  &:hover {
+    background-color: rgba(196, 186, 180, 0.32) !important;
+  }
+}
+
+.inventory-grid-wrapper {
+  padding: 1.2vh 1.4vh;
+  border-radius: 4px;
+  background: rgba(18, 19, 26, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  // See the note on .inventory-wrapper — backdrop-filter paints black in NUI.
+}
+
+.inventory-slot-label-box {
+  background-color: rgba(10, 10, 14, 0.85) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   Equipped readout + equipped ring cell
+   -----------------------------------------------------------------------------
+   The top-centre card is no longer an InventorySlot. It used to render one for
+   whatever happened to be first in the inventory, which made it a drop target
+   for a slot it did not represent and labelled it IN HAND whether it was or
+   not. It is now a plain read-only image of the weapon client.lua reports as
+   actually equipped, so it needs the art sizing that InventorySlot brought with
+   it but none of the interaction.
+   -------------------------------------------------------------------------- */
+.gta6-equipped-readout {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  /* Matches the art box the slot shell reserves, so swapping the InventorySlot
+     out for this did not move the weapon art. */
+  background-size: $gta6-art-w auto;
+  pointer-events: none;
+  border: none;
+}
+
+/* The ring cell holding the weapon that is currently in hand.
+   Deliberately a ring rather than a fill: it has to read at the same time as
+   the white hover highlight, because you need to see where you ARE and where
+   you are ABOUT to be at once. */
+.gta6-wheel-slot-equipped {
+  box-shadow: inset 0 0 0 pw(0.12) var(--gta6-glow);
+}
