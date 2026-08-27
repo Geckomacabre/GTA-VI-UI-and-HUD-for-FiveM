@@ -44,17 +44,22 @@ interface WheelCell {
 }
 
 // Deliberately *not* evenly spaced on a circle — five of these are the
-// measured centres from the reference art. The two flagged below were added
-// to reach 8 total wheel slots and were NOT measured off reference art —
-// check them against a real screen before trusting them pixel-for-pixel.
+// measured centres from the reference art (cx 50.33%, cy 47.33%, rx 15.26%,
+// ry 26.34%, solved from those five). The two flagged below are NOT
+// independently measured off reference art — they were previously guessed
+// coordinates that landed well outside that ellipse (dx ~2x rx), which is
+// why they rendered nowhere near the ring. Replaced with points computed ON
+// the same fitted ellipse, at +-45 deg from top/12 o'clock (the top itself is
+// deliberately empty — see the "top" note below) — check them against a real
+// screen before trusting them pixel-for-pixel, same as before.
 const WHEEL_CELLS: WheelCell[] = [
   { role: 'free', position: { left: '35.08%', top: '48.49%' } }, // ~10 o'clock
   { role: 'fist', position: { left: '65.5%', top: '48.49%' } }, // 3 o'clock — always fist
   { role: 'melee', position: { left: '38.33%', top: '63.61%' } }, // ~8 o'clock
   { role: 'handheld', position: { left: '62.45%', top: '63.61%' } }, // ~4 o'clock
   { role: 'free', position: { left: '50.33%', top: '73.67%' } }, // 6 o'clock
-  { role: 'free', position: { left: '20%', top: '38%' } }, // ~10:30 — UNVERIFIED placement
-  { role: 'free', position: { left: '80.5%', top: '38%' } }, // ~1:30 — UNVERIFIED placement
+  { role: 'free', position: { left: '39.54%', top: '28.7%' } }, // ~10:30 — computed on-ellipse
+  { role: 'free', position: { left: '61.12%', top: '28.7%' } }, // ~1:30 — computed on-ellipse
 ];
 
 // Maps each non-fist cell, in order, onto inventory slots 1-6. The fist cell

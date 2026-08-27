@@ -191,14 +191,25 @@ networking logic is touched — `WeaponWheel.tsx` wraps the same
 alt+click use all keep working.
 
 The hotbar is a curved wheel (`WeaponWheel.tsx`) of 8 cells mapped onto
-inventory slots 1-6, not an evenly-spaced circle — each cell's position was
-measured off reference art (two of the eight are flagged in the source as
-unverified placements). Cells now have **roles**: `free` (any item, the
-original behaviour), `melee`, `handheld`, and a `fist` cell that isn't
+inventory slots 1-6, not an evenly-spaced circle — five cell positions were
+measured off reference art; the other two were originally guessed and landed
+well outside that ring entirely (their offset from centre was ~2x the fitted
+radius). They've been replaced with positions solved from the ellipse the
+five measured points define (centre 50.33%/47.33%, radii 15.26%/26.34%), at
+±45° either side of the empty top slot — still worth checking against real
+reference art rather than trusting pixel-for-pixel, same as before, but
+they're at least on the ring now. Cells have **roles**: `free` (any item,
+the original behaviour), `melee`, `handheld`, and a `fist` cell that isn't
 backed by an inventory slot at all — it's a fixed button that always shows
 the fist icon (`web/images/fist.png`) and holsters whatever's equipped
 (`onDisarm.ts`). `wheelCategories.ts` defines what counts as melee/handheld/
 medical. The bottom-left quickslots are now medical-items-only (2 slots).
+
+`fist.png` is padded onto a 1000x1000 transparent canvas (fist content at
+85%/55% width/height) rather than the original 851x548 canvas with zero
+internal margin — every other item icon has a several-percent transparent
+border baked in, and the fist rendered oversized next to them at matching
+`background-size` until it had the same kind of margin.
 
 There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`
 over a `setHonor` NUI message — see `store/honor.ts`. **This half isn't
@@ -234,7 +245,7 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-5ac00c0a.js
+patches/ox_inventory/web/build/assets/index-070efbd5.js
 patches/ox_inventory/web/build/assets/index-613ba0e8.css
 patches/ox_inventory/web/build/index.html
 ```
