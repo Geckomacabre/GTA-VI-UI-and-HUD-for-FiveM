@@ -7,7 +7,7 @@ inventory screen — organized as a standalone, installable package.
 
 Visual direction throughout this set — the HUD layout, the neon/Art Deco
 color language, the general "leaked GTA VI trailer" feel — was inspired by
-CyberLeek's videos.
+CyberLeek's videos and GTA VI Extended Look.
 
 > [!NOTE]
 > **Work in progress.** This is built and tuned against one live server, not
@@ -141,6 +141,13 @@ than embedded because neither publishes a license covering redistribution:
   wanted-search overlay sit on top of whatever map style is loaded, so the
   two work together with no extra configuration. Grab it from the link
   above rather than from a copy in this repo.
+- **[wasabi_backpack](https://github.com/wasabirobby/wasabi_backpack)** by
+  wasabirobby — an ox_inventory bag item with its own per-bag stash.
+  `vice_hud`'s Duffle Bag Value row (`Config.Duffle`) reads whatever's inside
+  it, priced against what a fence/pawn shop would actually pay. Rename its
+  item to `dufflebag` (or change `Config.Duffle.item` to match whatever you
+  call it) — this repo's own server renamed it from the stock `backpack` to
+  fit a duffle bag re-skin, and the two names need to agree.
 
 ## The arista-pro font
 

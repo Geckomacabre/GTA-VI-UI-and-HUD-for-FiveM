@@ -248,6 +248,18 @@
         show($('bank-row'), d.show !== false && d.bank != null);
     }
 
+    /* What the duffle bag on the player's back is worth at a fence/pawn shop
+       right now (see wasabi_backpack's server-side value sum). `value` absent
+       means "not carrying one" -- the row hides rather than showing $0, same
+       convention as cash/bank above. `value === 0` (carrying an empty or
+       all-junk bag) still shows, so the number itself answers "worth robbing
+       me for this?" at a glance. */
+    function onDuffle(d) {
+        var v = $('duffle');
+        if (d.value != null && v) v.textContent = money(d.value);
+        show($('duffle-row'), d.value != null);
+    }
+
     /* Equipped weapon: icon plus, for ranged weapons, clip/reserve counts.
        Melee shows the icon alone — the frames confirm no ammo row for a wrench. */
     function onWeapon(d) {
@@ -2525,6 +2537,7 @@
                        tells: ['outfit', 'voice', 'vehicle'] });
             onWeapon({ armed: true, clip: 12, reserve: 84 });
             onCash({ cash: 28163, bank: 154200, show: true });
+            onDuffle({ value: 4820 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
             /* Fuel and engine are pushed into their WARNING bands, and the
                lock pip's event window is held open, so all three discs are on
@@ -2905,6 +2918,7 @@
         status: onStatus,
         wanted: onWanted,
         cash: onCash,
+        duffle: onDuffle,
         weapon: onWeapon,
         mapRect: onMapRect,
         mapDebug: onMapDebug,
@@ -2974,6 +2988,7 @@
     if (typeof GetParentResourceName === 'undefined') {
         onStatus({ health: 66, focus: 40, stamina: 58 });
         onCash({ cash: 28163, bank: 154200, show: true });
+        onDuffle({ value: 4820 });
         onWanted({ active: true, stars: 2, maxStars: 6, tells: ['outfit', 'voice', 'vehicle'] });
         onWeapon({ armed: true, clip: 20, reserve: 80 });
         // Keep these in step with Config.Minimap in config.lua.

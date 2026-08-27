@@ -411,6 +411,32 @@ Config.StatusBarShape = 'square'
 Config.MaxStars = 6
 
 -- =============================================================================
+-- Duffle bag value
+-- =============================================================================
+-- What the duffle bag on the player's back is worth at a fence/pawn shop
+-- right now, shown next to cash/bank. wasabi_backpack owns the item and the
+-- stash it opens into; this only asks it "what's the sellable stuff in there
+-- worth", via lib.callback since that's a cross-inventory read the client
+-- can't answer on its own. Entirely optional: if wasabi_backpack isn't
+-- running, or the player isn't carrying the item, the row just hides.
+Config.Duffle = {
+    enable = true,
+
+    -- Resource that owns the item, the per-bag stash, and the
+    -- 'wasabi_backpack:getDuffleValue' callback that sums it.
+    resource = 'wasabi_backpack',
+
+    -- ox_inventory item name to check for. Matches data/items.lua's
+    -- ['dufflebag'] entry -- change both together if you rename it.
+    item = 'dufflebag',
+
+    -- How often (ms) to ask the server. This is a network round trip, unlike
+    -- the cash/bank row above (read straight off qbx_core's client cache), so
+    -- it runs on its own slower thread rather than every main-loop tick.
+    pollMs = 3000,
+}
+
+-- =============================================================================
 -- Police search-radius overlay
 -- =============================================================================
 -- Two circles drawn on the native minimap while `fenix-police` reports it has

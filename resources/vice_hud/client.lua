@@ -2553,6 +2553,7 @@ end)
 
 local lastWanted = -1
 local lastSpotted = false
+local lastTellsKey = ''
 
 --- True when a police ped actually has line of sight to the player.
 --- This is what separates "they are hunting for you" (stars flash) from
@@ -2571,6 +2572,34 @@ local function copsCanSeeMe(ped)
     end
     return false
 end
+
+--- Which of the outfit/voice/vehicle tells are still live, as an array of
+--- strings matching html/app.js's TELL_SVG keys (array membership is the
+--- signal — see renderTells()).
+---
+--- Backed by fenix-police's FenixPursuit.tells() when it's running: a real
+--- comparison against what dispatch broadcast at the start of the pursuit
+--- (see pursuit.lua's callItIn/tells), so changing clothes or switching cars
+--- actually clears the matching tell. Falls back to "all three, always" —
+--- this resource's original placeholder — when fenix-police isn't installed,
+--- so a server without it sees the same thing this always showed.
+local function getWantedTells(wanted)
+    if wanted <= 0 then return {} end
+
+    if GetResourceState('fenix-police') == 'started' then
+        local ok, t = pcall(function() return exports['fenix-police']:GetTells() end)
+        if ok and type(t) == 'table' then
+            local out = {}
+            if t.outfit then out[#out + 1] = 'outfit' end
+            if t.voice then out[#out + 1] = 'voice' end
+            if t.vehicle then out[#out + 1] = 'vehicle' end
+            return out
+        end
+    end
+
+    return { 'outfit', 'voice', 'vehicle' }
+end
+
 local lastCash = nil
 
 -------------------------------------------------------------------------------
@@ -2645,6 +2674,46 @@ end)
 
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() then clearSearchBlips() end
+end)
+
+-------------------------------------------------------------------------------
+-- Duffle bag value (fed by wasabi_backpack's per-stash sell-price sum)
+-------------------------------------------------------------------------------
+CreateThread(function()
+    local cfgD = Config.Duffle
+    if not cfgD or not cfgD.enable then return end
+
+    local lastDuffleValue = 'unset' -- distinct from nil, so the first hide still fires ui()
+
+    local function pushDuffle(value)
+        if value == lastDuffleValue then return end
+        lastDuffleValue = value
+        ui('duffle', { value = value })
+    end
+
+    while true do
+        Wait(cfgD.pollMs or 3000)
+
+        if GetResourceState(cfgD.resource) ~= 'started' then
+            pushDuffle(nil)
+            goto continue
+        end
+
+        -- Cheap local check first: no point round-tripping to the server for
+        -- a player who isn't even carrying the item.
+        local ok, count = pcall(function() return exports.ox_inventory:Search('count', cfgD.item) end)
+        if not ok or not count or count < 1 then
+            pushDuffle(nil)
+            goto continue
+        end
+
+        local ok2, value = pcall(function()
+            return lib.callback.await('wasabi_backpack:getDuffleValue', 500)
+        end)
+        pushDuffle((ok2 and type(value) == 'number') and value or nil)
+
+        ::continue::
+    end
 end)
 
 CreateThread(function()
@@ -2727,18 +2796,19 @@ CreateThread(function()
         -- ---- wanted -------------------------------------------------------
         local wanted = GetPlayerWantedLevel(playerId)
         local spotted = wanted > 0 and copsCanSeeMe(ped) or false
-        if wanted ~= lastWanted or spotted ~= lastSpotted then
-            lastWanted, lastSpotted = wanted, spotted
+        -- Computed every tick, not just when wanted/spotted change: a tell
+        -- can clear (or reappear) mid-pursuit purely from the player changing
+        -- clothes or vehicles, with wanted level and spotted state untouched.
+        local tells = getWantedTells(wanted)
+        local tellsKey = table.concat(tells, ',')
+        if wanted ~= lastWanted or spotted ~= lastSpotted or tellsKey ~= lastTellsKey then
+            lastWanted, lastSpotted, lastTellsKey = wanted, spotted, tellsKey
             ui('wanted', {
                 active = wanted > 0,
                 stars = wanted,
                 maxStars = Config.MaxStars or 6,
                 spotted = spotted,
-                -- The outfit/voice/vehicle "tells" have no real source in this
-                -- codebase yet; they are shown together while wanted so the
-                -- layout matches the reference. Feed real flags here when a
-                -- dispatch/description system exists.
-                tells = wanted > 0 and { 'outfit', 'voice', 'vehicle' } or {},
+                tells = tells,
             })
         end
 

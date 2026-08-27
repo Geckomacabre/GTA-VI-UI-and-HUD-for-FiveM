@@ -600,8 +600,9 @@ html, body {
 .money-ic .hole { fill: rgba(0, 0, 0, 0.38); }
 .money-ic .stripe { fill: rgba(0, 0, 0, 0.42); }
 
-.money-ic-cash { color: #4fc27b; }   /* green banknote */
-.money-ic-bank { color: #4f8fd6; }   /* blue card      */
+.money-ic-cash   { color: #4fc27b; }   /* green banknote */
+.money-ic-bank   { color: #4f8fd6; }   /* blue card      */
+.money-ic-duffle { color: #3ddbe0; }   /* cyan duffle bag */
 
 /* Ammo readout. Measured: text spans 4.3% of width, cap height ~1.76% of
    height, clip and reserve separated by ~0.78%. Pricedown is GTA's own display
