@@ -501,12 +501,19 @@ Config.Nav = {
     -- speed from flashing up and vanishing again inside a few hundred ms.
     minHoldMs = 2500,
 
-    -- Recolours the waypoint cross AND the GPS route line drawn on the
-    -- native minimap (both follow the waypoint blip's colour). nil keeps the
-    -- game's default yellow. This RGB is an eyeballed match against a
-    -- reference screenshot, not a sampled pixel value -- nudge it in-game
-    -- and adjust here if it doesn't look right.
-    waypointColour = { r = 255, g = 20, b = 147 },
+    -- Recolours the waypoint cross AND the GPS route line (both minimap and
+    -- pause-menu map). nil keeps the game's default yellow.
+    --
+    -- A real HUD_COLOUR_* palette index, NOT an RGB triple -- SET_BLIP_COLOUR
+    -- and SET_BLIP_ROUTE_COLOUR both only accept the game's own named
+    -- colours, there is no custom-RGB passthrough for either despite
+    -- community claims otherwise (confirmed wrong in-game: the route line
+    -- ignored a custom RGB entirely and stayed default purple). 24 is
+    -- HUD_COLOUR_PINK, verified against FiveM's own HudColor enum
+    -- (github.com/d0p3t/fivem-js, src/enums/HudColor.ts) rather than guessed.
+    -- Other options nearby in that same enum: 21 purple, 22 purple (light),
+    -- 23 purple (dark), 126 pink (light).
+    waypointColour = 24,
 }
 
 -- =============================================================================
