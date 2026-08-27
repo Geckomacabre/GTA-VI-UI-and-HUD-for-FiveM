@@ -337,7 +337,11 @@ $gta6-ws-h: ph(10.68);
   background-repeat: no-repeat;
   background-position: center;
   background-origin: content-box;
-  background-size: contain;
+  // Matches every other slot's art box ($gta6-art-w, same convention
+  // .gta6-equipped-readout uses) instead of `contain`, which scaled the
+  // tightly-cropped fist.png to fill more of the box than a properly-padded
+  // item icon does and made it look oversized next to the others.
+  background-size: $gta6-art-w auto;
 }
 
 .gta6-wheel-slot-selected {

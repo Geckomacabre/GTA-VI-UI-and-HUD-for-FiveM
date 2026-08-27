@@ -234,8 +234,8 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-dfcb990c.js
-patches/ox_inventory/web/build/assets/index-bcccb513.css
+patches/ox_inventory/web/build/assets/index-5ac00c0a.js
+patches/ox_inventory/web/build/assets/index-613ba0e8.css
 patches/ox_inventory/web/build/index.html
 ```
 
