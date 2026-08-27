@@ -24,6 +24,7 @@ local function trace(src, fmt, ...)
 end
 
 local honorCache = {}   -- [src] = last known honor value (avoids redundant GetPlayer calls on read-heavy callers)
+local brokenCache = {}  -- [src] = last known metadata.honorBroken (same reasoning)
 local hookState = {}    -- [src][hookName] = {last = GetGameTimer(), moved = total absolute honor moved this session}
 
 local function clamp(value)
@@ -80,11 +81,36 @@ local function AdjustHonor(src, delta, reason)
     trace(src, 'AdjustHonor %s -> %s (%s)', tostring(current), tostring(newValue), tostring(reason))
     honorCache[src] = newValue
 
+    -- The unrepairable floor. Latches once and is never unset by anything in
+    -- this file — see Config's "Unrepairable floor" section for why. Checked
+    -- against the ALREADY-cached flag so a character that hit the floor last
+    -- session, then logged back in, doesn't re-trigger the write (and the
+    -- trace line) on every subsequent honor change for no reason.
+    local wasBroken = brokenCache[src]
+    if wasBroken == nil then
+        wasBroken = player.PlayerData.metadata.honorBroken == true
+    end
+
+    local nowBroken = wasBroken
+    if not wasBroken and newValue <= Config.MinHonor then
+        nowBroken = true
+        brokenCache[src] = true
+
+        local brokeWrote, brokeErr = pcall(function()
+            exports.qbx_core:SetMetadata(src, 'honorBroken', true)
+        end)
+        if not brokeWrote then
+            print(('^1[qbx_honor] SetMetadata(honorBroken) failed for %s: %s^7'):format(tostring(src), tostring(brokeErr)))
+        else
+            trace(src, 'honor hit the floor (%s) - permanently broken from here', tostring(Config.MinHonor))
+        end
+    end
+
     -- Always tell the client a hook fired, even when clamping left the value
     -- unchanged (e.g. already at the floor/ceiling) - the player still did the
     -- thing, and staying silent about that is what made "honor already at -100"
     -- indistinguishable from "the hook never fired" in the first place.
-    TriggerClientEvent('qbx_honor:client:honorUpdated', src, newValue, current, reason)
+    TriggerClientEvent('qbx_honor:client:honorUpdated', src, newValue, current, reason, nowBroken)
 
     return newValue
 end
@@ -197,6 +223,23 @@ local function GetHonor(src)
 end
 exports('GetHonor', GetHonor)
 
+---Whether this player's honor has permanently latched at the unrepairable
+---floor. See Config's "Unrepairable floor" section — this never goes back to
+---false once true, regardless of what GetHonor()/the raw value do afterward.
+---@param src number
+---@return boolean
+local function IsHonorBroken(src)
+    src = tonumber(src)
+    if not src then return false end
+    if brokenCache[src] ~= nil then return brokenCache[src] end
+
+    local ok, player = pcall(function() return exports.qbx_core:GetPlayer(src) end)
+    if not ok or not player then return false end
+
+    return player.PlayerData.metadata.honorBroken == true
+end
+exports('IsHonorBroken', IsHonorBroken)
+
 -- ============================================================================
 -- First-load initialization
 -- qbx_core's own player.lua does not know about `honor`, so this resource is
@@ -215,6 +258,17 @@ AddEventHandler('QBCore:Server:PlayerLoaded', function(player)
     else
         honorCache[src] = player.PlayerData.metadata.honor
     end
+
+    -- honorBroken defaults false, exactly like honor defaults to
+    -- Config.DefaultHonor above — a brand new character has not hit the
+    -- floor yet. Once qbx_core writes it the first time it is never absent
+    -- again, so this branch only ever runs once per character.
+    if player.PlayerData.metadata.honorBroken == nil then
+        exports.qbx_core:SetMetadata(src, 'honorBroken', false)
+        brokenCache[src] = false
+    else
+        brokenCache[src] = player.PlayerData.metadata.honorBroken == true
+    end
 end)
 
 -- ============================================================================
@@ -229,11 +283,12 @@ RegisterNetEvent('qbx_honor:server:requestHonor', function()
     local src = source
     local value = GetHonor(src)
     if value == nil then return end
-    TriggerClientEvent('qbx_honor:client:syncHonor', src, value)
+    TriggerClientEvent('qbx_honor:client:syncHonor', src, value, IsHonorBroken(src))
 end)
 
 AddEventHandler('playerDropped', function()
     honorCache[source] = nil
+    brokenCache[source] = nil
     hookState[source] = nil
 end)
 

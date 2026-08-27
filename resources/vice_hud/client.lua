@@ -1606,13 +1606,21 @@ end)
 -- every player would get an indicator the moment they connected.
 local lastHonor = nil
 
+-- Whether honor has permanently latched at qbx_honor's unrepairable floor
+-- (see its README's "Unrepairable floor" section). Sticky like lastHonor:
+-- once a caller passes broken=true it stays true regardless of what later
+-- calls pass, since qbx_honor itself never un-latches it either. Purely a
+-- RENDER flag -- it does not change which emoji honorEmoji() picks, only how
+-- that emoji is drawn (see onHonor() in html/app.js).
+local lastHonorBroken = false
+
 local function honorEmoji(honor)
     if honor >= Config.Honor.angelAt then return Config.Honor.angel
     elseif honor <= Config.Honor.devilAt then return Config.Honor.devil end
     return Config.Honor.neutral
 end
 
-local function ShowHonorToast(mugshot, honor, emoji, reason)
+local function ShowHonorToast(mugshot, honor, emoji, reason, broken)
     local value = tonumber(honor)
 
     -- The face in the corner reflects where honor STANDS.
@@ -1625,6 +1633,9 @@ local function ShowHonorToast(mugshot, honor, emoji, reason)
         delta = value - lastHonor
     end
     if value then lastHonor = value end
+    -- Sticky, not a straight assignment: nil/false from a caller that simply
+    -- didn't pass the argument must not un-break something that already was.
+    if broken == true then lastHonorBroken = true end
 
     ui('honor', {
         mugshot = mugshot,
@@ -1632,6 +1643,7 @@ local function ShowHonorToast(mugshot, honor, emoji, reason)
         reason  = reason,
         honor   = value,
         delta   = delta,
+        broken  = lastHonorBroken,
         -- The centre indicator shows the face for the DIRECTION of the change,
         -- which is not necessarily the face for the current standing.
         angelEmoji = Config.Honor.angel,
@@ -1650,9 +1662,10 @@ end
 --- as a change from nothing and draws no indicator. Doing that through
 --- ShowHonorToast instead would flash the panel at a player who has not done
 --- anything yet, which is exactly the clutter the hold timer exists to avoid.
-exports('SetHonorStanding', function(honor)
+exports('SetHonorStanding', function(honor, broken)
     local value = tonumber(honor)
     if value then lastHonor = value end
+    if broken == true then lastHonorBroken = true end
 end)
 
 --- Force the centre indicator, for callers that know the direction but not the
@@ -1683,7 +1696,7 @@ end)
 -- Accept the event qbx_honor already fires, so no change is needed there.
 RegisterNetEvent('vice_hud:honor', function(data)
     if type(data) ~= 'table' then return end
-    ShowHonorToast(data.mugshot, data.honor, data.emoji, data.reason)
+    ShowHonorToast(data.mugshot, data.honor, data.emoji, data.reason, data.broken)
 end)
 
 -- =============================================================================

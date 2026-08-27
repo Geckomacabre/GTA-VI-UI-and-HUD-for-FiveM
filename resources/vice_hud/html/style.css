@@ -1255,6 +1255,22 @@ html, body {
     line-height: 1;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
+/* Unrepairable floor (qbx_honor's honorBroken): the badge desaturates and a
+   crack overlay draws on top, permanently -- see onHonor() in app.js. Stacks
+   with, not instead of, the drop-shadow above. */
+#honor-badge.broken {
+    filter: grayscale(1) brightness(0.72) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+#honor-crack {
+    position: absolute;
+    left: 50%;
+    bottom: -1.1cqh;
+    transform: translateX(-50%);
+    width: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
+    height: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
+    pointer-events: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
 #honor-copy { display: flex; flex-direction: column; gap: 0.15cqh; }
 #honor-title { font-size: calc((calc(1.08 * var(--w))) * var(--fs-honor, 1)); font-weight: var(--fw-honor, 700); color: var(--text); letter-spacing: var(--ls-honor, 0.01em); text-shadow: var(--ink-shadow); }
 #honor-sub { font-size: calc((calc(0.92 * var(--w))) * var(--fs-honor, 1)); color: var(--text-dim); text-shadow: var(--ink-shadow); }

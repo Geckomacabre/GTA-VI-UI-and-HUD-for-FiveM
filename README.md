@@ -68,8 +68,11 @@ included here.
 
 - **`qbx_honor`** — An RDR2-style persistent honor stat, purpose-built to
   draw its devil/angel toast and centre-screen indicator on vice_hud's NUI
-  (see its own `README.md`'s "vice_hud" section). Small and self-contained
-  enough to ship whole rather than as a patch. Depends on `qbx_core`,
+  (see its own `README.md`'s "vice_hud" section). Hitting the honor floor
+  permanently latches an unrepairable flag (see its README's "Unrepairable
+  floor" section) — the devil badge renders grey and cracked from then on,
+  independent of whatever the honor number does afterward. Small and
+  self-contained enough to ship whole rather than as a patch. Depends on `qbx_core`,
   `ox_target`.
 
 ### `patches/`

@@ -1088,6 +1088,16 @@
         var badge = $('honor-badge');
         if (badge) badge.textContent = d.emoji || '';
 
+        // qbx_honor's unrepairable floor: once broken, always broken for this
+        // session -- classList.toggle only ever turns this ON here because
+        // the caller (ShowHonorToast/SetHonorStanding in client.lua) already
+        // enforces the same one-way latch, so `d.broken` is never sent false
+        // after having been sent true.
+        if (d.broken) {
+            if (badge) badge.classList.add('broken');
+            show($('honor-crack'), true);
+        }
+
         // With showValue off this is the reference treatment: the corner panel
         // is the mugshot and its face, nothing else. With it on the panel also
         // reads out the standing, which is the only place the exact number is
@@ -2550,7 +2560,7 @@
                         fuel: 18, engineOn: true, engineHealth: 420,
                         lockState: 'locked' });
             onHonor({ emoji: '😈', honor: -50, showValue: true,
-                      reason: 'Killed a bystander', duration: 9e6 });
+                      reason: 'Killed a bystander', duration: 9e6, broken: true });
             onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
                             showValue: true, reason: 'Robbed an armoured truck',
                             holdMs: 9e6 });
@@ -2998,7 +3008,7 @@
                 instruction: 'Turn Left', dir: 'left', distance: '130 ft' });
         onVehicle({ show: true, make: 'Pegassi', model: 'Bati 801', fuel: 72,
                     engineOn: true, engineHealth: 900, lockState: 'locked' });
-        onHonor({ emoji: '😈', honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999 });
+        onHonor({ emoji: '😈', honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999, broken: true });
         onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
                         showValue: true, reason: 'Robbed an armoured truck', holdMs: 999999 });
         // Nothing wires an action prompt today — the export exists for other

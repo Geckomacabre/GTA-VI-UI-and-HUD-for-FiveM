@@ -238,6 +238,18 @@
         <div id="honor-mug">
             <img id="honor-img" alt="">
             <span id="honor-badge"></span>
+            <!-- Shown only once qbx_honor reports the unrepairable floor has
+                 been hit (see onHonor() in app.js) -- overlaid on top of
+                 whatever tier badge is drawing, which is also greyscaled by
+                 the same flag. Never removed once shown for this session. -->
+            <svg id="honor-crack" class="hidden" viewBox="0 0 40 40" aria-hidden="true">
+                <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                      fill="none" stroke="#0a0a0a" stroke-width="2.6"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                      fill="none" stroke="#dcdcdc" stroke-width="1.1"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
         </div>
         <div id="honor-copy">
             <span id="honor-title"></span>

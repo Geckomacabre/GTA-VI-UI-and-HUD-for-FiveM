@@ -100,6 +100,7 @@ exports.qbx_honor:AdjustHonor(source, delta)   -- signed
 
 exports.qbx_honor:GetHonor(source)
 exports.qbx_honor:GetBadgeTier(value)          -- 'angel' | 'devil' | nil
+exports.qbx_honor:IsHonorBroken(source)        -- see "Unrepairable floor" below
 ```
 
 ## Client exports
@@ -111,10 +112,28 @@ exports.qbx_honor:GetHonor()
 
 -- 'angel' | 'devil' | nil for a given value, defaulting to the local player's honor.
 exports.qbx_honor:GetBadgeTier(value)
+
+-- Same story as GetHonor() -- cached client-side, no round-trip.
+exports.qbx_honor:IsHonorBroken()
 ```
 
 `qbx_vehiclekeys` reads these client-side to scale how long a window smash takes and how
 likely the police alert is.
+
+## Unrepairable floor
+
+Hitting `Config.MinHonor` isn't just "very devil" -- it's permanent. The moment
+`AdjustHonor` clamps a character's honor to the floor, `metadata.honorBroken` latches
+`true` and **never clears**, not even if honor is later raised back up by good conduct.
+It's a wall, not a second threshold: there's nothing to tune here beyond `MinHonor` itself
+and the hooks that move honor toward it.
+
+`IsHonorBroken()` is deliberately a separate question from `GetHonor()` / `GetBadgeTier()`
+-- the honor number can still move for anything else that reads it, only "can this
+character's reputation ever look normal again" is permanently answered. vice_hud reads
+this flag alongside the honor value (`ShowHonorToast`/`SetHonorStanding`'s trailing
+`broken` argument, both now accept one) and renders the devil badge grey and cracked from
+then on, independent of whatever the raw number does afterward.
 
 ## vice_hud
 

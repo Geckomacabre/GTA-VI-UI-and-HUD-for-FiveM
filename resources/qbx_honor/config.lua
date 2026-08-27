@@ -30,6 +30,26 @@ Config.AngelEmoji = '😇'
 Config.DevilEmoji = '😈'
 
 -- ============================================================================
+-- Unrepairable floor
+--
+-- Hitting Config.MinHonor isn't just "very devil" — it's permanent. The
+-- moment a character's honor is clamped to the floor, metadata.honorBroken
+-- latches true and NEVER clears, not even if honor is later raised back up
+-- by good conduct. vice_hud reads this separately from the honor value/tier
+-- (see IsHonorBroken() below and its own honor panel) and renders the devil
+-- badge grey and cracked from then on, regardless of what the number does
+-- afterward — the number can still move for other systems that read it
+-- (qbx_vehiclekeys' tier scaling, etc.), only the "can this ever look normal
+-- again" question is permanently answered.
+--
+-- This is deliberately a wall, not a second threshold to tune: it fires at
+-- exactly Config.MinHonor, so a server owner who wants it easier/harder to
+-- hit tunes MinHonor and the hooks that move honor toward it, not a
+-- second number here.
+-- ============================================================================
+
+
+-- ============================================================================
 -- Feedback
 --
 -- The HUD panel is transient and owned by another resource, so when it does not

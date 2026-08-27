@@ -22,6 +22,9 @@ local function trace(fmt, ...)
 end
 
 local currentHonor = Config.DefaultHonor
+-- Permanently latches true once the server reports it; see Config's
+-- "Unrepairable floor" section. Never manually reset to false in this file.
+local currentHonorBroken = false
 
 -- Forward declarations: defined in the vice_hud section at the bottom of this
 -- file, but called from the sync handler above it.
@@ -40,6 +43,14 @@ local function getHonor()
 end
 exports('GetHonor', getHonor)
 
+---Whether this character's honor has permanently latched at the
+---unrepairable floor. Never goes back to false once true.
+---@return boolean
+local function isHonorBroken()
+    return currentHonorBroken
+end
+exports('IsHonorBroken', isHonorBroken)
+
 ---@param value number? defaults to the local player's current honor
 ---@return 'angel' | 'devil' | nil
 local function getBadgeTier(value)
@@ -55,16 +66,17 @@ RegisterNetEvent('qbx_honor:client:trace', function(line)
     if Config.Debug then print('^5[qbx_honor/server]^7 ' .. tostring(line)) end
 end)
 
-RegisterNetEvent('qbx_honor:client:syncHonor', function(value)
+RegisterNetEvent('qbx_honor:client:syncHonor', function(value, broken)
     if type(value) ~= 'number' then return end
 
     currentHonor = value
+    if broken == true then currentHonorBroken = true end
 
     -- Tell vice_hud where honor stands WITHOUT drawing anything. It measures the
     -- delta that fires the +/- indicator against the last value it saw, so it
     -- needs the spawn value; but a player who has not done anything yet should
     -- not have a panel pop up at them for it.
-    seedHud(value)
+    seedHud(value, currentHonorBroken)
 end)
 
 local function requestHonorSync()
@@ -169,8 +181,11 @@ function pushToHud(honor, reason, delta)
     if GetResourceState('vice_hud') == 'started' then
         -- No emoji argument on purpose: vice_hud picks the tier face from its
         -- own thresholds, and the direction face for the indicator separately.
+        -- currentHonorBroken IS passed explicitly -- unlike the tier, that is
+        -- not something vice_hud can derive from the honor number alone (see
+        -- Config's "Unrepairable floor" section).
         local ok, err = pcall(function()
-            exports['vice_hud']:ShowHonorToast(getMugshot(), honor, nil, reason)
+            exports['vice_hud']:ShowHonorToast(getMugshot(), honor, nil, reason, currentHonorBroken)
         end)
 
         drew = ok
@@ -191,16 +206,17 @@ end
 ---Tells vice_hud where honor stands without drawing anything, so the next real
 ---change reports a correct delta. Assigns the forward-declared local above.
 ---@param honor number
-function seedHud(honor)
+---@param broken? boolean
+function seedHud(honor, broken)
     if type(honor) ~= 'number' then return end
     if GetResourceState('vice_hud') ~= 'started' then return end
 
     pcall(function()
-        exports['vice_hud']:SetHonorStanding(honor)
+        exports['vice_hud']:SetHonorStanding(honor, broken)
     end)
 end
 
-RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHonor, reason)
+RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHonor, reason, broken)
     trace('honorUpdated received: %s -> %s (%s)', tostring(previousHonor), tostring(newHonor), tostring(reason))
 
     if type(newHonor) ~= 'number' then
@@ -209,6 +225,10 @@ RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHon
     end
 
     currentHonor = newHonor
+    if broken == true then
+        if not currentHonorBroken then trace('honor just hit the floor - permanently broken from here') end
+        currentHonorBroken = true
+    end
 
     -- A hook can fire and still leave honor numerically unchanged (already at
     -- Config.MinHonor/MaxHonor). That still deserves a panel - just with no
@@ -226,7 +246,7 @@ AddEventHandler('onClientResourceStart', function(resourceName)
 
     -- Give vice_hud a moment to wire up before talking to it.
     SetTimeout(2000, function()
-        if LocalPlayer.state.isLoggedIn then seedHud(currentHonor) end
+        if LocalPlayer.state.isLoggedIn then seedHud(currentHonor, currentHonorBroken) end
     end)
 end)
 
