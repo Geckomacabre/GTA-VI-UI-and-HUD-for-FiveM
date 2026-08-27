@@ -20,8 +20,6 @@ CyberLeek's videos.
 | ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
 | `um_gigs` — Ryde Me driver profile | Driver profile, close up |
 
-<img src="docs/screenshots/vice_hud-nav-panel-crop.png" width="260" alt="vice_hud nav panel crop"> <img src="docs/screenshots/rydeme-wordmark-crop.png" width="260" alt="Ryde Me wordmark crop">
-
 ## What's in here
 
 ```
