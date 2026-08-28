@@ -31,6 +31,11 @@ local pushes = {}
 local now, radar = 0, nil
 function GetGameTimer() return now end
 function DisplayRadar(v) radar = v end
+-- The poll loop no longer calls DisplayRadar directly: it goes through
+-- setRadar, which also tells the page so the frame/badge/compass come down
+-- with the map (see tools/radarchrome.test.js, which tests that half). This
+-- slice does not include it, so stand in for it here.
+function setRadar(v) DisplayRadar(v) end
 function fuelLevel() return 55 end
 function GetIsVehicleEngineRunning() return true end
 function lockState() return 1 end

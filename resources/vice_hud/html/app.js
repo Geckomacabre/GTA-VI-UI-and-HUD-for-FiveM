@@ -80,26 +80,6 @@
         if (ic.textContent !== want) ic.textContent = want;
     }
 
-    /* The hunger/thirst cap on the health track. `cap` is the highest percentage
-       the player can heal to; its absence means no cap at all, the same
-       absence-is-the-signal convention oxygen uses on the stamina row. The tail
-       covers everything above it, and `capCause` tints it so the bar answers
-       "eat or drink?" without a second row to read. */
-    function setHealthCap(cap, cause) {
-        var row = $('s-health');
-        if (!row) return;
-        var tail = row.querySelector('.scap');
-        if (!tail) return;
-        var capped = cap != null;
-        // Grown from the RIGHT: the tail is the unreachable end of the track,
-        // so it has to stay pinned there as it widens.
-        var pct = capped ? Math.max(0, Math.min(100, 100 - cap)) : 0;
-        tail.style.transform = 'scaleX(' + (pct / 100).toFixed(4) + ')';
-        tail.classList.toggle('hunger', capped && cause !== 'thirst' && cause !== 'health');
-        tail.classList.toggle('thirst', capped && cause === 'thirst');
-        tail.classList.toggle('health', capped && cause === 'health');
-    }
-
     function onStatus(d) {
         var health = d.health == null ? 100 : d.health;
         var focus = d.focus == null ? 100 : d.focus;
@@ -113,7 +93,6 @@
         var cap = d.cap == null ? null : d.cap;
 
         setFill('s-health', health);
-        setHealthCap(cap, d.capCause);
         setFill('s-focus', focus);
         if (focusRow) focusRow.classList.toggle('active', focusActive);
         var focusFx = $('focus-fx');
@@ -619,6 +598,26 @@
 
     var mapFrameOn = false;
     var mapCrossOn = false;
+    /* Is the ENGINE drawing the radar right now? The frame, the corner badge
+       and the nav compass are all NUI drawn over where the map is, so they have
+       to come down with it -- otherwise hiding the map on foot leaves an empty
+       outlined box with a logo in it. client.lua's setRadar() is the single
+       place that toggles the radar and it reports every transition here. */
+    var mapVisible = true;
+    /* What the badge would show if the map were up. onNav owns this (it steps
+       aside for the compass); applyMapChrome owns whether it is ACTUALLY shown,
+       so the two cannot fight over the same element. */
+    var mapBadgeWanted = true;
+
+    function applyMapChrome() {
+        var fr = $('map-frame');
+        if (fr) show(fr, mapVisible && mapFrameOn);
+        show($('map-cross'), mapVisible && mapCrossOn);
+        show($('map-badge'), mapVisible && mapBadgeWanted);
+        // The compass rides the map's own top edge, so it goes too. Vanish, not
+        // hide: it is a .slot and fades like the rest of that family.
+        if (!mapVisible) slotVanish($('nav-compass'));
+    }
 
     /* The last map rect we were told about, kept so the panel stack can be
        re-snapshotted on demand (Follow map, or Reset on the Map panels row)
@@ -710,11 +709,10 @@
         applyPanelRect(lastMapRect);
 
         // The frame only helps when it sits exactly on the map; off by default.
-        var fr = $('map-frame');
         if (d.showFrame != null) mapFrameOn = d.showFrame === true;
-        if (fr) show(fr, mapFrameOn);
         if (d.showCross != null) mapCrossOn = d.showCross === true;
-        show($('map-cross'), mapCrossOn);
+        if (d.visible != null) mapVisible = d.visible === true;
+        applyMapChrome();
     }
 
     /* --- component outlines (/hudrects) -----------------------------------
@@ -1040,12 +1038,12 @@
         // The compass figure sits up in the map's corner, same neighbourhood
         // as the badge -- so the badge steps aside rather than fighting it
         // for the same real estate.
-        var badge = $('map-badge');
         if (!el) return;
         if (!d || !d.active || !d.near) {
             slotVanish(el);
             slotVanish(compass);
-            show(badge, true);
+            mapBadgeWanted = true;
+            applyMapChrome();
             return;
         }
         var turnText = $('nav-turn-text');
@@ -1061,7 +1059,8 @@
         fitAll();
         slotAppear(el);
         slotAppear(compass);
-        show(badge, false);
+        mapBadgeWanted = false;
+        applyMapChrome();
     }
 
     /* --- vehicle panel --------------------------------------------------- */
@@ -2939,7 +2938,9 @@
             // onNav just hid the badge the way it does whenever nav is active
             // -- correct in normal play, wrong here: editor preview wants
             // every piece on screen at once, badge included, so it can be
-            // selected and positioned like everything else.
+            // selected and positioned like everything else. Same for the frame
+            // above: applyMapChrome would otherwise re-hide both, since the
+            // editor forces the radar on regardless of what setRadar last said.
             show($('map-badge'), true);
             // Forced ON for the duration of editing, same reasoning as the
             // rest of this function: an effect that only shows for a few
@@ -2960,9 +2961,10 @@
              'reputation', 'reputation-pop', 'skillup', 'nav-popup', 'nav-compass'].forEach(function (id) {
                 show($(id), false);
             });
-            // The frame was forced on for the preview; put it back to whatever
-            // the config actually asked for.
-            var fr = $('map-frame'); if (fr) show(fr, mapFrameOn);
+            // The frame and badge were forced on for the preview; put the whole
+            // map chrome back to whatever the config and the live radar state
+            // actually ask for.
+            applyMapChrome();
             // Clear the fake money/weapon readouts. The client re-pushes the
             // real values on its next tick (see resetPushCaches in client.lua).
             onCash({ show: false });
@@ -3346,10 +3348,6 @@
         hudOffset: onOffset,
         layout: onLayout,
         openEditor: openEditor,
-        hudConfig: function (d) {
-            if (!stage) return;
-            stage.classList.toggle('bars-square', d.barShape === 'square');
-        },
         hudVisible: function (d) { if (stage) stage.style.display = d.show === false ? 'none' : ''; }
     };
 

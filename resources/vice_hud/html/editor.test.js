@@ -54,7 +54,7 @@ console.log('\n-- grouped element list --');
 const groups = [...d.querySelectorAll('#editor-list .ed-group')].map(n => n.textContent);
 const items = [...d.querySelectorAll('#editor-list .ed-item')];
 ok(groups.join(' | ') === 'HUD | Minimap | Other resources', 'three group headings, in order', groups.join(' | '));
-ok(items.length === 25, '25 selectable elements', items.length);
+ok(items.length === 26, '26 selectable elements', items.length); // Weapon wheel and Equip wheel retired; ox_inventory owns the wheel now
 ok(d.querySelectorAll('#editor-list .ed-group').length + items.length === d.querySelectorAll('#editor-list li').length,
    'every li is either a heading or an item');
 ok(items[0].classList.contains('sel'), 'first item starts selected');

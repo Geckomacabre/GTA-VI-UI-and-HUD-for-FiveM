@@ -18,12 +18,36 @@ if it is present; if it is not, the icon is simply omitted.
 | --- | --- |
 | `config.lua` | Every tunable value, with the reasoning next to it |
 | `client.lua` | Gathers game state, pushes plain data to the NUI, owns the commands |
+| `client_vitals.lua` | Focus, stamina, oxygen, hunger/thirst, fatigue. Publishes `ViceVitals` |
+| `client_overlays.lua` | Crosshair, kill mark, lap timer, world actions, lockpick, interact menu |
 | `weapons.lua` | Weapon hash -> `ox_inventory` icon path |
 | `html/` | The NUI page. No framework and no build step — what is on disk is what runs |
 | `html/makes.js` | Manufacturer table: a vehicle's make -> its badge. **Generated** |
 | `html/logos/` | The manufacturer marks themselves, 51 of them. **Generated** |
 | `tools/` | Build and test tooling. Not in `files{}`, so clients never see it |
 | `stream/vice_minimap.ytd` | The rounded radar mask. On by default — GTA's own mask has square corners |
+
+**Why the client is three files.** A Lua chunk may declare at most **200
+top-level locals**, and going over is a *parse* error — the file does not load
+at all, which takes the whole HUD down rather than one feature, and the message
+only appears in the F8 client console. `client.lua` reached 192. Each `.lua`
+file is its own chunk with its own budget, so the two least-entangled
+subsystems moved out on 2026-08-28 (moved verbatim, not rewritten), leaving
+client.lua at 143.
+
+Nothing reaches across those boundaries except:
+
+- `ViceVitals` — seven functions published at the bottom of `client_vitals.lua`
+  and called by the main status loop. `focusMeter`/`focusActive` are functions
+  rather than values because a copied number would go stale crossing the file.
+- `ui()` — four lines, duplicated per file, exactly as `client_skills.lua`
+  already did it. A global would have been more ceremony than the thing itself.
+- `client_overlays.lua` publishes **nothing**: it is driven entirely from
+  outside through exports and commands.
+
+`tools/split.test.js` is the standing guard — it loads every client chunk in
+manifest order and fails if any is near the cap or if `client.lua` calls
+something `ViceVitals` does not publish.
 
 Every numeric layout decision lives in the CSS, so changing how the HUD looks
 never means touching Lua.

@@ -17,6 +17,15 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Split out of client.lua, and loaded BEFORE it so their published tables
+    -- exist by the time anything can call them. Each .lua file is its own Lua
+    -- chunk with its own 200-top-level-locals budget, which is the reason the
+    -- split happened at all -- client.lua was at 192 of 200 and a few features
+    -- from refusing to load, which takes the entire HUD down, not one feature.
+    -- Neither file reaches back into client.lua: see their headers for the
+    -- exact surface that crosses.
+    'client_vitals.lua',
+    'client_overlays.lua',
     'client.lua',
     -- After client.lua only because the exhaustion model there reads
     -- SkillFitness() from here, and that is guarded so load order cannot

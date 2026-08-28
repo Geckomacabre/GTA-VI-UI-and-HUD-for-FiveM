@@ -404,10 +404,6 @@ Config.MinimapComponent = {
     clipType = 0,
 }
 
--- Status bar corners: 'pill' (fully rounded caps) or 'square'.
--- Change live with /hudbars; the choice is remembered per player.
-Config.StatusBarShape = 'square'
-
 -- How many wanted star SLOTS the row shows.
 --
 -- Six, matching the GTA6 footage. GetPlayerWantedLevel only ever reports up to
@@ -509,35 +505,46 @@ Config.Nav = {
     -- speed from flashing up and vanishing again inside a few hundred ms.
     minHoldMs = 2500,
 
+    -- Turn-by-turn only while actually driving. On foot the popup announced
+    -- junctions for a route being walked, which is not what it is for. false
+    -- brings it back on foot as well.
+    vehicleOnly = true,
+
     -- Recolours the waypoint cross AND the GPS route line (both minimap and
-    -- pause-menu map). nil keeps the game's default yellow.
+    -- pause-menu map). nil leaves the game's own purple alone.
     --
-    -- A real HUD_COLOUR_* palette index, NOT an RGB triple -- SET_BLIP_COLOUR
-    -- and SET_BLIP_ROUTE_COLOUR both only accept the game's own named
-    -- colours, there is no custom-RGB passthrough for either despite
-    -- community claims otherwise (confirmed wrong in-game: the route line
-    -- ignored a custom RGB entirely and stayed default purple).
+    -- This is a list of PALETTE SLOTS to redefine, not a colour to hand a
+    -- blip. Two earlier approaches both failed in-game and are recorded here
+    -- so they don't get retried:
+    --   * SET_BLIP_COLOUR / SET_BLIP_SECONDARY_COLOUR with a custom RGB --
+    --     the cross responded, the route line ignored it entirely.
+    --   * SET_BLIP_ROUTE(blip, true) + SET_BLIP_ROUTE_COLOUR -- this drew a
+    --     SECOND route line a few pixels beside the vanilla one instead of
+    --     recolouring it, which is the "two lines on the map" bug. Adding a
+    --     route to a blip that already has one stacks, it does not replace.
     --
-    -- This used to point straight at 24 (HUD_COLOUR_PINK), the closest
-    -- STOCK shade available. It now points at 224 (HUD_COLOUR_PLACEHOLDER_01)
-    -- instead -- one of ten indices (224-233) Rockstar's own hudcolor.dat
-    -- ships as plain white and named exactly "placeholder", i.e. reserved
-    -- for this. waypointColourRGB below is what REPLACE_HUD_COLOUR_WITH_RGBA
-    -- redefines that index to, at resource start (see client.lua) -- so the
-    -- route gets the EXACT colour instead of "closest available", without
-    -- touching HUD_COLOUR_PINK itself for anything else on the server that
-    -- reads it. Full palette + the two indices this replaced verified
-    -- against docs.fivem.net/docs/game-references/hud-colors/ (Rockstar's
-    -- own common:/data/ui/hudcolor.dat), not the community fivem-js enum
-    -- this config previously cited.
+    -- What actually works is repainting the palette entries the engine
+    -- already draws the waypoint with, via REPLACE_HUD_COLOUR_WITH_RGBA (see
+    -- applyWaypointPalette in client.lua). Index 142 HUD_COLOUR_WAYPOINT is
+    -- the purple the route line and the cross are drawn in; 150/151 are its
+    -- LIGHT and DARK companions, redefined alongside it so the line's own
+    -- edging stays in the same family instead of staying purple around a pink
+    -- core. Indices and stock RGBs are Rockstar's own hudcolor.dat as
+    -- published at docs.fivem.net/docs/game-references/hud-colors/.
     --
-    -- The RGB itself is the same pink this HUD already uses as its one
-    -- accent colour elsewhere (the wheel selection wash, the lap timer's
-    -- checkpoint pips, the lockpick ring) -- #e8467a -- rather than a fresh
-    -- guess at the trailer's own waypoint shade, which was never pixel-
-    -- measured. Chosen for consistency across the HUD over a second guess.
-    waypointColour = 224,
-    waypointColourRGB = { 232, 70, 122 },
+    -- `stock` is what each slot is put back to on resource stop --
+    -- REPLACE_HUD_COLOUR_WITH_RGBA outlives this resource, so leaving them
+    -- pink would repaint waypoints for the rest of the client's session.
+    --
+    -- The pink itself is the accent colour this HUD already uses everywhere
+    -- else (wheel selection wash, lap-timer pips, lockpick ring) -- #e8467a --
+    -- with light/dark companions mixed to the same ratios Rockstar used for
+    -- 150/151 against 142 (55% toward white, 50% toward black).
+    waypointColour = {
+        { index = 142, rgb = { 232,  70, 122 }, stock = { 164,  76, 242 } }, -- HUD_COLOUR_WAYPOINT
+        { index = 150, rgb = { 245, 172, 195 }, stock = { 210, 166, 249 } }, -- HUD_COLOUR_WAYPOINTLIGHT
+        { index = 151, rgb = { 116,  35,  61 }, stock = {  82,  38, 121 } }, -- HUD_COLOUR_WAYPOINTDARK
+    },
 }
 
 Config.Crosshair = {

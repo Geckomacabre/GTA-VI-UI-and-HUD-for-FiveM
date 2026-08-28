@@ -108,19 +108,13 @@
    found so far, standing in until a better one turns up. Used with a black
    outline (see .item-select-outline below), because that is what the
    reference actually draws: white fill, a hard black stroke round it, no
-   drop shadow doing the separation instead.
-
-   NOT BUNDLED -- resolved from the player's own machine, same reasoning as
-   Helvetica Neue above: it's a commercial face and redistributing the .otf
-   in a public repository is not ours to do. Falls straight through to the
-   Helvetica Neue / sans-serif chain below on a machine that doesn't have it
-   installed locally. Bundle the .otf again in html/fonts/ (and restore the
-   url() source here) if you own a licence for it and want the exact cut. */
+   drop shadow doing the separation instead. */
 @font-face {
     font-family: 'BelleSansCondensed';
-    src: local('Belle Sans Extra Condensed Bold'), local('BelleSansCondensed-ExtraBold');
+    src: url('fonts/BelleSansExtraCondensedBold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
+    font-display: block;
 }
 
 /* The black-outline text treatment itself, kept separate from the @font-face
@@ -364,7 +358,11 @@ html, body {
     gap: 1.6cqh;
 }
 
-.srow { display: flex; align-items: center; gap: 0.57cqw; }
+/* A small but real gap -- the actual GTA VI reference (GTAVIHUD.png) has the
+   badge sitting clearly separate from the bar, not overlapping it. An
+   earlier pass here tried a negative-margin overlap off a much blurrier
+   crop and overcorrected. */
+.srow { display: flex; align-items: center; gap: 0.22cqw; }
 
 /* Icon: a dark disc with a glyph TINTED to match its bar (pink / teal /
    purple), per the reference stills. */
@@ -373,6 +371,9 @@ html, body {
     height: calc((calc(1.17 * var(--w))) * var(--ic-status, 1));
     border-radius: 50%;
     background: rgba(28, 26, 32, 0.72);
+    /* The thin ring is what reads as a "badge" rather than a flat disc --
+       the reference outlines every icon circle with a faint light edge. */
+    border: 0.045cqw solid rgba(255, 255, 255, 0.22);
     color: #fff;
     display: flex;
     align-items: center;
@@ -397,13 +398,30 @@ html, body {
    fills wash out completely against grass or concrete, which is why they read
    as "not working". */
 .strack {
-    height: 1.53cqh;
-    /* Pill by default; .bars-square on .stage switches to the squared-off
-       corners. Length and height are identical either way. */
-    border-radius: 999px;
+    /* Height is expressed against the bar's own WIDTH unit, not in cqh, so the
+       bar keeps the reference's proportions at every aspect ratio. Measured off
+       the reference crop: bar 220px long x 15px tall = 6.82% -- 0.0682 * 9.6cqw
+       = 0.655cqw. (An earlier pass measured the same thing as "1.53% of height"
+       and it was later overridden with a flat 2.0cqh "chunkier" value, which is
+       what made this bar read as a fat strip next to the real one. Mixing cqw
+       for length with cqh for height also meant the proportion drifted with the
+       display's aspect; it no longer does.) */
+    height: 0.655cqw;
+    /* Squared-off corners -- this used to switch between this and a fully
+       rounded pill via /hudbars and a Config.StatusBarShape toggle. Pill was
+       removed as a choice; square is now the only shape. Confirmed square in
+       the reference crop: the fill starts at the same x on the bar's top row
+       as on its middle row, so there is no corner inset to reproduce. */
+    border-radius: calc((0.06cqw) * var(--rad-status, 1));
     overflow: hidden;
     position: relative;
-    border: 0.055cqw solid rgba(226, 232, 231, 0.62);
+    /* A DARK stroke, not a light one. The reference outlines the bar in a
+       near-black rgb(29,26,31) that measures the same over a bright background
+       as over a dark one -- i.e. an opaque stroke, not a translucent white
+       edge. That outline is most of why the reference bar reads as a solid
+       object and this one used to read as a pale smear. Thickness: ~1.5px on a
+       15px-tall bar = 10% of bar height = 0.065cqw. */
+    border: 0.065cqw solid rgba(29, 26, 31, 0.95);
     box-shadow: 0 0.08cqh 0.20cqh rgba(0, 0, 0, 0.45);
 }
 
@@ -411,14 +429,14 @@ html, body {
    value it first received — the inline style kept updating but the rendered
    box never moved. Transform is cheap and reliable, so the bar scales from its
    left edge instead. */
-.stage.bars-square .strack { border-radius: calc((0.06cqw) * var(--rad-status, 1)); }
 
 .sfill {
     height: 100%;
     width: 100%;
-    /* Deliberately square: .strack has overflow:hidden, so the pill shape clips
-       this already. A radius here would be stretched into an ellipse by the
-       scaleX that drives the bar, giving a warped cap at low percentages. */
+    /* Deliberately square: .strack has overflow:hidden, so its own corner
+       radius clips this already. A radius here would be stretched into an
+       ellipse by the scaleX that drives the bar, giving a warped cap at low
+       percentages. */
     transform-origin: left center;
     transform: scaleX(1);
     transition: transform 200ms ease;
@@ -441,7 +459,7 @@ html, body {
 #s-stamina .strack { width: 5.6cqw; background: rgba(62, 92, 94, 0.62); }
 #s-focus   .strack { width: 5.8cqw; background: rgba(78, 70, 116, 0.62); }
 
-#s-health  .sic { color: #f6bcc6; }
+#s-health  .sic { color: #f5acc6; }
 #s-stamina .sic { color: #a3c6c4; }
 #s-focus   .sic { color: #bdaae6; }
 
@@ -459,35 +477,46 @@ html, body {
     50% { opacity: 0.55; }
 }
 
-/* The hunger/thirst cap: health that cannot be healed back into, darkened in
-   from the right end of the track. Translucent rather than opaque, so it DIMS
-   whatever is under it instead of replacing it -- a player at full health with a
-   cap must still read as a full bar with a spent end, not as a short bar. The
-   left border is the cap line itself, and is what makes the boundary legible
-   when the tail sits over the fill. */
+/* A fixed marker at the exact middle of the health bar, matching the GTA VI
+   reference pixel-for-pixel: a plain neutral two-tone line (dark line, white
+   hairline beside it via box-shadow), always shown, not tied to the actual
+   hunger/thirst cap value -- by explicit request, this no longer reflects
+   game state, just the reference's fixed placement. The hunger/thirst
+   mechanic itself (readNeeds/enforceCap in client.lua) is untouched and
+   still blocks passive regen; it just no longer has an on-screen marker.
+
+   A THIN fixed-width box, not the old scaleX-driven full-width one -- that
+   version's box-shadow duplicated the whole wide box instead of a hairline,
+   which is why the white side never showed, only the border-left did. */
 .scap {
     position: absolute;
     top: 0;
-    right: 0;
     bottom: 0;
-    width: 100%;
-    transform-origin: right center;
-    transform: scaleX(0);
-    transition: transform 200ms ease;
-    background: rgba(16, 14, 20, 0.62);
-    border-left: 0.09cqw solid rgba(236, 240, 240, 0.55);
+    left: 50%;
+    /* WHITE core with a dark line either side -- measured straight off the
+       reference crop, which runs dark / white / dark left-to-right across a
+       220px bar: ~2px each, i.e. 0.9% of bar length = 0.087cqw per line. This
+       used to be a dark core with white on its LEFT only, and at 0.16cqw each
+       (nearly double), which is why it read as a fat two-tone slab rather than
+       the reference's fine three-line tick.
+
+       Both flanks come from one box-shadow with two offsets rather than
+       borders, so the marker stays exactly centred on the 50% mark and the
+       flanks cannot change its layout width. */
+    width: 0.087cqw;
+    margin-left: -0.0435cqw;
+    background: rgb(255, 255, 255);
+    box-shadow: -0.087cqw 0 0 0 rgb(29, 26, 31),
+                 0.087cqw 0 0 0 rgb(29, 26, 31);
     pointer-events: none;
 }
 
-/* Which one to fix. Warm for food, cool for water -- and mild, because this is
-   a tint over a darkened area, not a bar of its own competing with the fill. */
-.scap.hunger { background: rgba(56, 30, 10, 0.62); border-left-color: rgba(240, 178, 92, 0.72); }
-.scap.thirst { background: rgba(12, 30, 52, 0.62); border-left-color: rgba(140, 196, 240, 0.72); }
-/* Flat passive-regen ceiling -- not a hunger/thirst state, so its own neutral
-   red rather than borrowing either tint and implying the wrong cause. */
-.scap.health { background: rgba(48, 12, 14, 0.62); border-left-color: rgba(224, 108, 108, 0.72); }
-
-#s-health  .sfill { background: #f6bcc6; }
+/* Measured across 1053 fill pixels of the reference crop: rgb(245,172,198).
+   The old #f6bcc6 was the same hue but 16 points lighter in green, which is
+   exactly the "washed out" difference -- the reference pink is more saturated,
+   not a different colour. The heart glyph samples identical to the fill in the
+   reference, so .sic above carries the same value. */
+#s-health  .sfill { background: #f5acc6; }
 #s-stamina .sfill { background: #a3c6c4; }
 #s-focus   .sfill { background: #bdaae6; }
 
@@ -2064,7 +2093,7 @@ html, body {
 #reputation     { gap: calc(0.8cqw  * var(--sp-reputation, 1)); }
 #reputation-pop { gap: calc(0.35cqw * var(--sp-reputationpop, 1)); }
 #prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
-.srow      { gap: calc(0.57cqw * var(--sp-status, 1)); }
+.srow      { gap: calc(0.22cqw * var(--sp-status, 1)); }
 
 /* -----------------------------------------------------------------------------
    Per-element typeface and text rasterisation (HUD editor)

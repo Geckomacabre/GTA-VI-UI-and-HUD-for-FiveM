@@ -2,10 +2,11 @@
  *
  *   npm i fengari jsdom && node tools/needs.test.js
  *
- * Hunger and thirst have no bars of their own. They cap the health bar: below a
- * threshold a darkened tail grows in from the right end, over health that cannot
- * be healed back into, and vice_hud actually enforces that by blocking passive
- * regeneration.
+ * Hunger and thirst have no bars of their own. Below a threshold they cap the
+ * health bar -- vice_hud enforces that by blocking passive regeneration, and
+ * the cap reveals the health row even at full health. (There used to be a
+ * darkened tail drawn over the un-healable part; that was removed by request,
+ * see the note above the DOM section below.)
  *
  * Enforcement is the part that can hurt a live server, so most of what follows
  * is about the clamp NOT firing when it shouldn't: it must never lower health,
@@ -24,7 +25,11 @@ const { lua, lauxlib, lualib, to_luastring } = require('fengari');
 const { JSDOM } = require('jsdom');
 
 const root = path.dirname(__dirname).replace(/\\/g, '/') + '/';
-const src = fs.readFileSync(root + 'client.lua', 'utf8');
+// Reads client_vitals.lua, not client.lua: focus/stamina/oxygen/needs/fatigue
+// were split out of client.lua on 2026-08-28 (Lua's 200-top-level-locals
+// per-chunk limit). The code itself is unchanged -- it was moved, not
+// rewritten -- so the slice markers below still match.
+const src = fs.readFileSync(root + 'client_vitals.lua', 'utf8');
 
 let fails = 0;
 function ok(cond, label, extra) {
@@ -281,10 +286,23 @@ console.log('\n-- a raised maximum health --');
 }
 
 /* =============================================================================
- * The tail
+ * What the cap does to the health row
  * ========================================================================== */
 
-console.log('\n-- the tail --');
+/* This section USED to assert a `.scap` tail: a darkened bar growing in from
+ * the right in proportion to the cap, tinted differently for hunger vs thirst.
+ * That is gone by explicit request -- `.scap` is now a FIXED two-tone marker at
+ * the 50% mark, matching the GTA VI reference's placement, and it no longer
+ * reflects game state at all. app.js has no cap-driven DOM code left, so those
+ * assertions tested nothing that exists and were deleted rather than left
+ * failing.
+ *
+ * The cap itself is NOT cosmetic-only, so what survives here is the part still
+ * wired up: `cap` in the status payload reveals the health row on its own, and
+ * the fill keeps reading HEALTH while it does. The enforcement half (blocking
+ * passive regen) is covered above, in Lua. */
+
+console.log('\n-- what the cap does to the health row --');
 
 const dom = new JSDOM(fs.readFileSync(root + 'html/index.html', 'utf8'),
                       { url: 'http://localhost/', runScripts: 'outside-only', pretendToBeVisual: true });
@@ -301,52 +319,33 @@ doc.dispatchEvent(new window.Event('DOMContentLoaded'));
 
 const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { data }));
 const row = doc.getElementById('s-health');
-const tail = row.querySelector('.scap');
 const scale = (el) => {
   const m = /scaleX\(([\d.]+)\)/.exec(el.style.transform || '');
   return m ? Math.round(parseFloat(m[1]) * 100) : null;
 };
-const tint = () => {
-  const cs = window.getComputedStyle(tail);
-  return cs.backgroundColor + ' | ' + cs.borderLeftColor;
-};
+const fill = () => scale(row.querySelector('.sfill'));
 
-// Fed and healthy: nothing at all.
-msg({ action: 'status', health: 100, armor: 0, stamina: 100 });
-ok(scale(tail) === 0, 'no cap, no tail', scale(tail));
-ok(!tail.classList.contains('hunger') && !tail.classList.contains('thirst'),
-   'and no cause tint');
+// Fed and healthy: the row is nominal, so it goes away.
+msg({ action: 'status', health: 50, armor: 0, stamina: 100 });
+ok(!row.classList.contains('hidden'),
+   'app.js listener is attached (the row shows at 50 health)');
 
 // Starving at FULL health. The row has to appear on the cap alone.
 msg({ action: 'status', health: 100, armor: 0, stamina: 100, cap: 70, capCause: 'hunger' });
 ok(!row.classList.contains('hidden'),
    'a cap shows the health row even at 100 health, which health alone never would');
-ok(scale(tail) === 30, 'the tail covers everything above the cap', scale(tail));
-ok(scale(row.querySelector('.sfill')) === 100,
-   'while the FILL stays full -- the cap dims the end of the bar, it does not ' +
-   'shorten it, or a capped player would look wounded when they are not',
-   scale(row.querySelector('.sfill')));
-ok(tail.classList.contains('hunger') && !tail.classList.contains('thirst'),
-   'tinted for food');
-const hungerTint = tint();
+ok(fill() === 100,
+   'while the FILL stays full -- the cap does not shorten the bar, or a capped ' +
+   'player would look wounded when they are not', fill());
 
-// Same cap, other cause.
-msg({ action: 'status', health: 100, armor: 0, stamina: 100, cap: 70, capCause: 'thirst' });
-ok(tail.classList.contains('thirst') && !tail.classList.contains('hunger'),
-   'tinted for water instead');
-ok(tint() !== hungerTint, 'and the two actually look different', tint() + ' vs ' + hungerTint);
-
-// Starving AND hurt: both readings on one row, independently.
+// Starving AND hurt: the fill reads health, never the cap.
 msg({ action: 'status', health: 55, armor: 0, stamina: 100, cap: 40, capCause: 'thirst' });
-ok(scale(row.querySelector('.sfill')) === 55 && scale(tail) === 60,
-   'fill reads health and tail reads the cap, at the same time and separately',
-   scale(row.querySelector('.sfill')) + ' / ' + scale(tail));
+ok(fill() === 55, 'the fill reads health, not the cap', fill());
 
-// Drank something.
+// Drank something, still hurt.
 msg({ action: 'status', health: 55, armor: 0, stamina: 100 });
-ok(scale(tail) === 0, 'the tail goes when the cap does', scale(tail));
-ok(!tail.classList.contains('thirst'), 'and takes its tint with it');
 ok(!row.classList.contains('hidden'), 'the row stays for the health that is still down');
+ok(fill() === 55, 'and the fill is unchanged by the cap clearing', fill());
 
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nall checks passed');
 process.exit(fails ? 1 : 0);

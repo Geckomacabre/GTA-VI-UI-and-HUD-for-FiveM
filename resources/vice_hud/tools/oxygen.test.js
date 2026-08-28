@@ -22,7 +22,11 @@ const { lua, lauxlib, lualib, to_luastring } = require('fengari');
 const { JSDOM } = require('jsdom');
 
 const root = path.dirname(__dirname).replace(/\\/g, '/') + '/';
-const src = fs.readFileSync(root + 'client.lua', 'utf8');
+// Reads client_vitals.lua, not client.lua: focus/stamina/oxygen/needs/fatigue
+// were split out of client.lua on 2026-08-28 (Lua's 200-top-level-locals
+// per-chunk limit). The code itself is unchanged -- it was moved, not
+// rewritten -- so the slice markers below still match.
+const src = fs.readFileSync(root + 'client_vitals.lua', 'utf8');
 
 let fails = 0;
 function ok(cond, label, extra) {
