@@ -29,6 +29,10 @@ CyberLeek's videos and GTA VI Extended Look.
 | `um_gigs` -- Ryde Me driver profile | Driver profile, close up |
 | ![ox_inventory weapon wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | |
 | `ox_inventory` -- GTA6 weapon wheel hotbar | |
+| ![vice_hud money close-up](docs/screenshots/vice_hud-money-closeup.png) | ![vice_hud minimap with frame and logo](docs/screenshots/vice_hud-minimap-frame-logo.png) |
+| Cash / bank / duffle bag value | Minimap with the outline frame and map badge on |
+| ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | |
+| Full HUD in a live scene | |
 
 ## What's in here
 
