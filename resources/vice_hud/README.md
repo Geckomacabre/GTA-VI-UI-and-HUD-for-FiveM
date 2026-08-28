@@ -6,7 +6,7 @@
 
 Status bars, wanted stars, weapon and ammo, money, zone bar, a vehicle panel
 with real manufacturer badges, honor standing, action prompts, directional
-police glow and exhaustion effects — with a full in-game layout editor.
+police glow and exhaustion effects -- with a full in-game layout editor.
 
 ![version](https://img.shields.io/badge/version-1.39.0-2f81f7?style=flat-square)
 ![framework](https://img.shields.io/badge/framework-Qbox-8957e5?style=flat-square)
@@ -24,7 +24,7 @@ police glow and exhaustion effects — with a full in-game layout editor.
 **No build step.** No bundler, no framework, no `dist/`. What is on disk is what
 runs, so a stale build can never ship and any change is one restart away.
 
-**Everything is tunable in game.** `/movehud` is a real editor — pick a piece on
+**Everything is tunable in game.** `/movehud` is a real editor -- pick a piece on
 the left, tune it on the right, drag the panel out of your way, save. It reaches
 elements in *other* resources too, and it can publish one layout to the whole
 server.
@@ -53,12 +53,12 @@ on entering                          for the rest of the drive
 
 - **51 real manufacturer badges**, stamped into the plate behind the names.
   Rockstar's own marks, normalised to one visual weight *and* one visual size
-  (`tools/normalize_logos.py`), keyed off the make the game reports — accents,
+  (`tools/normalize_logos.py`), keyed off the make the game reports -- accents,
   truncated spawn tokens and all.
 - **Gauge rings** on engine and fuel that fill to the actual reading, so the
   strip answers *how much* rather than only *is it bad yet*.
 - **The pips earn their place.** All three show while the panel is announcing
-  the car. After it collapses only the ones with something to say stay —
+  the car. After it collapses only the ones with something to say stay --
   fuel and engine in the amber or red bands, and the lock for a few seconds
   when it actually changes. A healthy car stops drawing a panel at all.
 - **A parked car goes monochrome.** Green, amber and red on a car nothing is
@@ -69,13 +69,10 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Status bars** | Health, armour, stamina. Auto-hide at full, with an anti-flicker hold |
-| **Health regen cap** | Two independent caps on passive healing — hunger/thirst (existing) and an optional flat ceiling (`Config.Needs.regenCeilingPct`) so regen alone never fully heals you; a deliberate heal (a consumable, a medic) still gets through either cap |
 | **Minimap** | Rounded corner mask with 14 baked radii, positioned and resized from the editor |
-| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route — so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
-| **Waypoint colour** | Recolours the GPS cross and route line (`Config.Nav.waypointColour`) instead of GTA's default yellow |
-| **Wanted** | Star row, plus the "cops are searching for you" notice and its outfit/voice/vehicle tells. The tells are real — not just decorative — when `fenix-police` is running: change clothes or vehicles since the pursuit started and the matching tell actually clears. Falls back to showing all three whenever wanted, same as always, without it |
-| **Wanted search overlay** | Two rings on the native minimap while `fenix-police` is searching for a lost suspect — a tight ring at the last-known position and a lighter one tracking its live, growing search radius. Nothing draws without `fenix-police` running |
-| **Money** | Cash, bank, and (with `wasabi_backpack` installed and its bag item carried) a Duffle Bag Value row — what the bag's contents would fetch at a fence/pawn shop right now. Hidden entirely without the bag |
+| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route -- so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
+| **Wanted** | Star row, plus the "cops are searching for you" notice and its tells |
+| **Money** | Cash and bank, in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
 | **Police glow** | Directional edge lighting driven by real siren bearing and distance. Three modes, with a live editor |
 | **Exhaustion** | A vignette that breathes in as stamina empties |
@@ -89,12 +86,10 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
-| **Optional** | `ox_inventory` — weapon icons, omitted cleanly if absent |
-| **Optional** | `qbx_core` — the money readout and skill XP persistence |
-| **Optional** | `qbx_honor` — the honor system |
-| **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
-| **Optional** | [`fenix-police`](https://github.com/Geckomacabre/fenix-police) — feeds the wanted-search overlay and the real outfit/voice/vehicle tells; without it the HUD falls back to the plain wanted-star row with all three tells always shown |
-| **Optional** | [`wasabi_backpack`](https://github.com/wasabirobby/wasabi_backpack) — feeds the Duffle Bag Value row. Not bundled (no upstream license covering redistribution, same reasoning as LS Map Lite below); install it separately and rename its item `dufflebag` to match `Config.Duffle.item` |
+| **Optional** | `ox_inventory` -- weapon icons, omitted cleanly if absent |
+| **Optional** | `qbx_core` -- the money readout and skill XP persistence |
+| **Optional** | `qbx_honor` -- the honor system |
+| **Optional** | `speedlimits`, `zseatbelt` -- positioned by the editor's *Other resources* rows |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
 the HUD simply leaves that piece out.
@@ -109,7 +104,7 @@ ensure vice_hud
 
 > [!IMPORTANT]
 > Adding new files to a running server needs `refresh` **before** `ensure`. A
-> FiveM server only rescans a resource folder on `refresh` — `restart` re-runs
+> FiveM server only rescans a resource folder on `refresh` -- `restart` re-runs
 > the scripts but keeps serving the file list from the last scan, so new files
 > 404 while everything else looks fine.
 
@@ -134,7 +129,7 @@ ensure vice_hud
 
 Click any value to type an exact number. Twenty elements, each with position,
 size, opacity, font, weight, letter spacing, alignment, smoothing, corner radius
-and child spacing — every one writing a single CSS custom property, with the
+and child spacing -- every one writing a single CSS custom property, with the
 shipped value as the `var()` fallback so an untouched setting renders exactly as
 designed.
 
@@ -166,7 +161,7 @@ exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, nee
 ```
 
 Prompts are cleaned up automatically when the resource that registered them
-stops, so a crashed script cannot strand one on screen — give ids the
+stops, so a crashed script cannot strand one on screen -- give ids the
 `yourresource:something` form for that to work.
 
 `vice_hud:honor` is also accepted as a net event, with the same fields as
@@ -181,7 +176,7 @@ stops, so a crashed script cannot strand one on screen — give ids the
 
 | | |
 | --- | --- |
-| `/movehud` | The editor — reach for this first |
+| `/movehud` | The editor -- reach for this first |
 | `/hudmove <element> <dx> <dy>` | The same by hand. `/hudmove list` prints the elements |
 | `/hudreset` | Back to the shipped layout |
 | `/hudexport` · `/hudimport <json>` | Dump / restore the whole tuned HUD |
@@ -220,7 +215,7 @@ stops, so a crashed script cannot strand one on screen — give ids the
 
 ## Development
 
-No build. Open `html/index.html` in a browser — `app.js` detects it is outside
+No build. Open `html/index.html` in a browser -- `app.js` detects it is outside
 FiveM and fills itself with representative data.
 
 ```bash
@@ -252,7 +247,7 @@ python tools/make_makes.py       # writes html/makes.js from what is there
 
 The two normalisation passes fix different problems and both are needed.
 `fetch_logos.py` flattens each mark to one ink weight, then crops it to its own
-edges — which leaves fifty-one wildly different *shapes*, so a single CSS rule
+edges -- which leaves fifty-one wildly different *shapes*, so a single CSS rule
 sizes a wide slab and a narrow upright completely differently (the ink area ran
 **9.9x** between the largest and smallest mark). `normalize_logos.py` scales
 each one to a constant ink area and centres it on one shared square canvas,
@@ -261,8 +256,8 @@ untouched originals in `tools/logos_raw/` and always re-reads from there, so it
 is safe to re-run and `CANVAS` can be retuned freely.
 
 Marks come from the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manufacturers).
-**A badge never spells the manufacturer's name** — the panel already prints it
-directly above — so marques whose only mark is their own name set as type ship
+**A badge never spells the manufacturer's name** -- the panel already prints it
+directly above -- so marques whose only mark is their own name set as type ship
 no badge and render the plain plate. Drop a better one in
 `tools/logos_local/<KEY>.png` to override.
 
@@ -282,13 +277,13 @@ no badge and render the plain plate. Drop a better one in
 | `Config.Skills` | The eight skills, their curves and what each one feeds into |
 | `Config.PoliceLights` | Mode, brightness, flash, lamp shape, detection range |
 | `Config.Exhaustion` · `Config.Stamina` | The fatigue model |
-| `Config.HiddenHudComponents` | Which native components to suppress — only the ones actually replaced |
+| `Config.HiddenHudComponents` | Which native components to suppress -- only the ones actually replaced |
 
 ---
 
 ## Documentation
 
-**[`docs/INTERNALS.md`](docs/INTERNALS.md)** — the long version. Why the minimap
+**[`docs/INTERNALS.md`](docs/INTERNALS.md)** -- the long version. Why the minimap
 is built the way it is, why the player blip drifts when you resize the map, how
 the honor push works, what the exhaustion model actually models, and the traps
 that already bit once. Read it before changing the minimap code.
@@ -302,21 +297,21 @@ Helvetica Neue → Helvetica → **Arial** → Liberation Sans; Arial is metrica
 compatible with Helvetica, so line lengths and the shrink-to-fit measurements
 hold either way. The one visible difference is the *Thin* cut, which Arial has
 no equivalent for and which therefore renders as regular on machines without
-Helvetica Neue — that affects the nav bar and the wanted box, both tuned to
+Helvetica Neue -- that affects the nav bar and the wanted box, both tuned to
 thin in the shipped layout. If you hold a licence, drop the `.otf` files into
 `html/fonts/` and restore the `url()` sources in `style.css`; `fxmanifest`
 already globs `html/fonts/*.otf`.
 
-**Rockstar-derived assets** — the GTA Art Deco and Pricedown faces, and the 51
+**Rockstar-derived assets** -- the GTA Art Deco and Pricedown faces, and the 51
 manufacturer marks (via the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manufacturers))
-— ship as-is, as is normal for FiveM resources. They remain Rockstar's
+-- ship as-is, as is normal for FiveM resources. They remain Rockstar's
 property; this project claims no rights over them and the licence below covers
 only the code.
 
 ## Licence
 
 [GPL-3.0](LICENSE). You may use, modify and redistribute this, including on a
-paid server — but if you distribute a modified version, that version has to
+paid server -- but if you distribute a modified version, that version has to
 stay open source under the same licence.
 
 > [!NOTE]

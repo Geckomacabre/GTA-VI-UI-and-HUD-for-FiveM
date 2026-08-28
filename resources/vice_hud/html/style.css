@@ -102,6 +102,39 @@
     font-display: block;
 }
 
+/* Belle Sans Extra Condensed Bold. Not the reference's real face -- nobody has
+   identified what GTA6 actually sets its scrollable item-select lists (the
+   fridge, presumably others) in -- but the closest condensed-grotesque match
+   found so far, standing in until a better one turns up. Used with a black
+   outline (see .item-select-outline below), because that is what the
+   reference actually draws: white fill, a hard black stroke round it, no
+   drop shadow doing the separation instead.
+
+   NOT BUNDLED -- resolved from the player's own machine, same reasoning as
+   Helvetica Neue above: it's a commercial face and redistributing the .otf
+   in a public repository is not ours to do. Falls straight through to the
+   Helvetica Neue / sans-serif chain below on a machine that doesn't have it
+   installed locally. Bundle the .otf again in html/fonts/ (and restore the
+   url() source here) if you own a licence for it and want the exact cut. */
+@font-face {
+    font-family: 'BelleSansCondensed';
+    src: local('Belle Sans Extra Condensed Bold'), local('BelleSansCondensed-ExtraBold');
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* The black-outline text treatment itself, kept separate from the @font-face
+   so any element can opt in once the fridge-style list this was measured
+   against exists. paint-order swaps stroke-then-fill, or the 2px stroke would
+   sit on TOP of the fill and eat into the glyph instead of ringing it. */
+.item-select-outline {
+    font-family: 'BelleSansCondensed', 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif;
+    font-weight: 700;
+    color: #f2f2ef;
+    -webkit-text-stroke: 0.045em #0a0a0a;
+    paint-order: stroke fill;
+}
+
 /* Design tokens. The reference footage is low-bitrate, so exact radii and
    shadow values cannot be read off it — these are chosen to be consistent and
    clean rather than to replicate compression artefacts. Proportions and colour
@@ -1354,6 +1387,120 @@ html, body {
 .glyph.pad-y { background: #e8c95a; color: #2a2208; }
 
 /* -----------------------------------------------------------------------------
+   Aim crosshair
+   -----------------------------------------------------------------------------
+   True screen centre. Deliberately NOT a /movehud element -- unlike every
+   panel above, this has to track the camera's actual aim point, which is
+   always dead centre regardless of any offset the player has tuned into the
+   rest of the HUD. Moving it would just make it wrong.
+   -------------------------------------------------------------------------- */
+#crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+#crosshair.hidden { display: none !important; }
+
+#cross-circle, #cross-tips { display: none; }
+#crosshair[data-mode="vehicle"] #cross-circle { display: block; }
+#crosshair[data-mode="foot"] #cross-tips { display: block; }
+
+/* Vehicle: a plain ring with a centre dot. Static -- the reference shows no
+   spread on this one, only on the foot reticle. */
+#cross-circle { position: relative; width: 0; height: 0; }
+.cc-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(1.1 * var(--w));
+    height: calc(1.1 * var(--w));
+    transform: translate(-50%, -50%);
+    border: 1.5px solid rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    box-shadow: 0 0 0.2cqh rgba(0, 0, 0, 0.6);
+}
+.cc-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(0.16 * var(--w));
+    height: calc(0.16 * var(--w));
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0.15cqh rgba(0, 0, 0, 0.7);
+}
+
+/* Foot: three ticks -- left, right, bottom. No top tick, on purpose: that's
+   both what the reference shows and the shape of GTA's own vanilla reticle.
+   `--spread` is a plain length, pushed by app.js's onCrossFire() on every
+   shot and left to fall back to 0; each tick's own `transition` on transform
+   is what turns that discrete change into the widen-then-settle motion, so
+   nothing here has to animate the custom property directly. */
+#cross-tips {
+    position: relative;
+    width: 0;
+    height: 0;
+    --spread: 0px;
+}
+.ct {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: #f2f2ef;
+    box-shadow: 0 0 0.15cqh rgba(0, 0, 0, 0.8);
+    transition: transform 160ms ease-out;
+}
+.ct-left, .ct-right {
+    width: calc(0.6 * var(--w));
+    height: 1.5px;
+    margin-top: -0.75px;
+}
+.ct-bottom {
+    width: 1.5px;
+    height: calc(0.6 * var(--w));
+    margin-left: -0.75px;
+}
+.ct-left   { transform: translateX(calc(-100% - (0.55 * var(--w) + var(--spread)))); }
+.ct-right  { transform: translateX(calc(0.55 * var(--w) + var(--spread))); }
+.ct-bottom { transform: translateY(calc(0.55 * var(--w) + var(--spread))); }
+
+/* The kill mark. Independent of [data-mode] -- it has to be able to flash
+   over either reticle -- so it stays in normal flow with opacity 0 rather
+   than being display:none by default. Coloured by onKillMark() in app.js,
+   which just adds one of the three classes; nothing here decides what a
+   clean kill is, see the classifier in client.lua. */
+#cross-kill {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(2.2 * var(--w));
+    height: calc(2.2 * var(--w));
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+    stroke-width: 9;
+    stroke-linecap: round;
+    fill: none;
+    transition: opacity 320ms ease, transform 320ms cubic-bezier(0.2, 0.8, 0.3, 1.3);
+}
+#cross-kill.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#cross-kill.kill-red {
+    stroke: #e5484d;
+    filter: drop-shadow(0 0 0.3cqh rgba(229, 72, 77, 0.7));
+}
+#cross-kill.kill-yellow {
+    stroke: #e8c56a;
+    filter: drop-shadow(0 0 0.3cqh rgba(232, 197, 106, 0.7));
+}
+#cross-kill.kill-white {
+    stroke: #f2f2ef;
+    filter: drop-shadow(0 0 0.3cqh rgba(242, 242, 239, 0.6));
+}
+
+/* -----------------------------------------------------------------------------
    Directional police glow
    -----------------------------------------------------------------------------
    Every layer is FULL VIEWPORT. The previous version used sized boxes
@@ -1552,6 +1699,31 @@ html, body {
         inset 0 0 0.5cqh rgba(0, 0, 0, 0.22),
         inset 0 0.09cqh 0 rgba(255, 255, 255, 0.055);
     pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Map badge
+   -----------------------------------------------------------------------------
+   A flat glyph in the map's own top-left corner. Anchored off the same
+   --map-* rect #map-frame uses: left matches the frame's left edge, and the
+   top edge is derived the same way --map-bottom-edge is (bottom-edge +
+   height = the map's top), since nothing publishes a top offset directly. */
+#map-badge {
+    position: absolute;
+    left: calc(var(--map-left, 1.75cqw) + 0.4cqw);
+    bottom: calc(var(--map-bottom-edge, 2.6cqh) + var(--map-height, 15.4cqh) - 0.4cqh - 2.1cqw);
+    width: 2.1cqw;
+    height: 2.1cqw;
+    object-fit: contain;
+    pointer-events: none;
+    z-index: 3;
+}
+#map-badge {
+    transform: translate(var(--off-mapbadge-x,0cqw), var(--off-mapbadge-y,0cqh)) scale(var(--sc-mapbadge-x,1), var(--sc-mapbadge-y,1));
+    transform-origin: top left;
+    /* Base 0.62 is the "slightly transparent" look asked for; the editor's
+       op row multiplies on top of that, same convention as vehlogo's 0.42. */
+    opacity: calc(0.62 * var(--op-mapbadge, 1));
 }
 
 /* -----------------------------------------------------------------------------
@@ -2939,6 +3111,307 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     border-radius: 999px;
 }
 #skills-list::-webkit-scrollbar-track { background: transparent; }
+
+/* -----------------------------------------------------------------------------
+   Race lap / checkpoint HUD
+   -----------------------------------------------------------------------------
+   Fed by exports.vice_hud:SetLapTimer -- sk_streetkings is the one resource
+   calling it today, but this has no idea that resource exists. First pass:
+   placement is a reasonable guess (roughly where the reference frames show
+   it, lower-left-of-centre), not pixel-measured the way the minimap was --
+   worth an eyeball pass in a real race with /hudlaptimer once this exists
+   in game.
+   -------------------------------------------------------------------------- */
+#lap-hud {
+    position: absolute;
+    left: 30cqw;
+    bottom: 11cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.7cqh;
+    pointer-events: none;
+    color: #f2f2ef;
+}
+#lap-hud.hidden { display: none !important; }
+
+#lap-badge {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: calc(0.85 * var(--w));
+    letter-spacing: 0.03em;
+    text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.9);
+}
+#lap-badge span { font-variant-numeric: tabular-nums; }
+
+#lap-cp-plate {
+    background: rgba(20, 20, 22, 0.55);
+    border-radius: calc(0.3 * var(--w));
+    padding: 0.55cqh calc(0.7 * var(--w));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4cqh;
+    min-width: calc(6.5 * var(--w));
+}
+#lap-cp-row {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: calc(0.8 * var(--w));
+    font-variant-numeric: tabular-nums;
+}
+
+/* One pip per checkpoint in the current lap. A discrete stand-in for the
+   reference's checkered progress bar -- see the section comment above for
+   why that texture wasn't attempted pixel-for-pixel. Rebuilt only when the
+   pip COUNT changes (see renderLapPips in app.js); the ON/OFF state is a
+   cheap class toggle on every push. */
+#lap-cp-track {
+    width: 100%;
+    display: flex;
+    gap: 2px;
+}
+.lap-cp-pip {
+    flex: 1 1 0;
+    height: calc(0.32 * var(--w));
+    min-width: 2px;
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.16);
+}
+.lap-cp-pip.on {
+    background: linear-gradient(90deg, #e8467a, #ff7fac);
+    box-shadow: 0 0 0.2cqh rgba(232, 70, 122, 0.7);
+}
+
+#lap-timer {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: calc(1.7 * var(--w));
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.9);
+}
+
+/* -----------------------------------------------------------------------------
+   Interact menu  (Phase 1 of the ox_target-replacement project)
+   -----------------------------------------------------------------------------
+   Just a list. No targeting geometry, no raycast highlight -- that engine is
+   a separate, later project (see the comment on #interact in index.html).
+   First pass: placement/sizing is a reasonable guess against the reference,
+   not pixel-measured.
+   -------------------------------------------------------------------------- */
+#interact {
+    position: absolute;
+    left: 6cqw;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #f2f2ef;
+}
+#interact.hidden { display: none !important; }
+
+#interact-list {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(4.6 * var(--w));
+    overflow: hidden;
+    /* The outer #interact is pointer-events:none (a HUD element that
+       shouldn't eat clicks meant for the game world at rest); this is what
+       lets the list itself still be clickable while it's open. */
+    pointer-events: auto;
+    /* Fades the last visible row toward transparent, reading as "more below"
+       rather than a hard clip -- the reference's own list trails off the
+       same way rather than ending on a clean edge. */
+    -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 78%, transparent 100%);
+}
+
+.interact-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: calc(0.55 * var(--w));
+    padding: calc(0.45 * var(--w)) 0;
+    opacity: 0.55;
+    cursor: pointer;
+}
+/* The current/top row reads brightest; everything under it dims toward the
+   fade at the bottom of the list, same reading the reference gives -- one
+   clear default option, the rest a fading list of alternatives. */
+.interact-row.selected { opacity: 1; }
+
+.interact-marker {
+    position: relative;
+    flex: 0 0 auto;
+    width: calc(1.1 * var(--w));
+    height: calc(1.1 * var(--w));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* The rail: a line from THIS marker's centre down to the next row's, so it
+   reads as one continuous connector rather than floating dots. Skipped on
+   the last row -- nothing below it to connect to. */
+.interact-row:not(:last-child) .interact-marker::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.5px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateX(-50%);
+}
+.interact-marker svg { width: 100%; height: 100%; position: relative; z-index: 1; }
+.interact-marker-dot circle { fill: none; stroke: #f2f2ef; stroke-width: 7; }
+.interact-marker-x circle { fill: none; stroke: #f2f2ef; stroke-width: 6; }
+.interact-marker-x path { stroke: #f2f2ef; stroke-width: 8; stroke-linecap: round; }
+
+.interact-label {
+    font-size: calc(0.85 * var(--w));
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.interact-badges {
+    display: flex;
+    gap: calc(0.2 * var(--w));
+}
+.interact-badge {
+    width: calc(0.85 * var(--w));
+    height: calc(0.85 * var(--w));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 20, 22, 0.6);
+}
+.interact-badge svg { width: 62%; height: 62%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.interact-badge svg circle { fill: currentColor; stroke: none; }
+/* Same two concepts vice_hud's own stamina/focus status rows already use --
+   reused here rather than invented fresh, so an item that boosts one reads
+   consistently everywhere it shows up. */
+.interact-badge.stamina { color: #5fd8c8; }
+.interact-badge.focus   { color: #b98bd6; }
+
+/* -----------------------------------------------------------------------------
+   World action prompt
+   -----------------------------------------------------------------------------
+   Fixed screen position, not truly world-anchored — see the comment on
+   #world-actions in index.html for why. First pass, not pixel-measured.
+   -------------------------------------------------------------------------- */
+#world-actions {
+    position: absolute;
+    left: 46cqw;
+    top: 54cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9cqh;
+    pointer-events: none;
+}
+#world-actions.hidden { display: none !important; }
+
+.wa-row {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--w));
+    color: #f2f2ef;
+    text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.85);
+}
+.wa-btn {
+    flex: 0 0 auto;
+    width: calc(1.6 * var(--w));
+    height: calc(1.6 * var(--w));
+    border-radius: 50%;
+    border: 2px solid #f2f2ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+}
+.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.wa-label {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: calc(0.95 * var(--w));
+    letter-spacing: 0.02em;
+}
+
+/* -----------------------------------------------------------------------------
+   Lockpick check — the "hold, release inside the zone" ring
+   -----------------------------------------------------------------------------
+   Same pathLength="100" ring technique as the vehicle fuel/engine pips
+   (.pip-ring et al, above) — a fixed track, plus here a SECOND arc (the
+   target zone) alongside the growing fill, since this ring has to show a
+   goal as well as progress. First pass, not pixel-measured.
+   -------------------------------------------------------------------------- */
+#lockpick {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(5 * var(--w));
+    height: calc(5 * var(--w));
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+#lockpick.hidden { display: none !important; }
+
+#lp-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    /* From twelve o'clock, clockwise — same reasoning as .pip-ring: an SVG
+       circle starts at three o'clock and nobody reads a gauge that way. */
+    transform: rotate(-90deg);
+}
+.lp-arc { stroke-linecap: round; }
+#lp-track {
+    stroke: rgba(255, 255, 255, 0.18);
+    stroke-width: 5;
+}
+/* The target zone: a fixed short arc, positioned by rotating it AWAY from
+   the ring's own -90deg base rather than by dash-offsetting it — simpler to
+   reason about for a segment that doesn't start at zero. --lp-zone-start/
+   --lp-zone-len are plain 0-100 numbers (percent of the ring), written once
+   per check by onLockpick() in app.js; 3.6deg per point is 360/100. */
+#lp-zone {
+    stroke: #ff6fa0;
+    stroke-width: 5;
+    /* Bare numbers, same as .pip-fill's stroke-dasharray: 100 — pathLength
+       makes the path's own length exactly 100 units, so no px/percent
+       conversion is needed at all. */
+    stroke-dasharray: var(--lp-zone-len, 10) 100;
+    transform: rotate(calc(var(--lp-zone-start, 0) * 3.6deg));
+    transform-box: fill-box;
+    transform-origin: center;
+    filter: drop-shadow(0 0 0.3cqh rgba(255, 111, 160, 0.8));
+}
+/* The growing fill, exactly like .pip-fill — 0 at rest, --lp-pct written on
+   every onLockpickProgress() push while the button is held. */
+#lp-fill {
+    stroke: #e8467a;
+    stroke-width: 5;
+    stroke-dasharray: 100;
+    stroke-dashoffset: calc(100 - var(--lp-pct, 0));
+    transition: stroke-dashoffset 80ms linear;
+}
+#lockpick.lp-win #lp-fill  { stroke: #6ec06e; transition: stroke 150ms ease; }
+#lockpick.lp-fail #lp-fill { stroke: #d9585c; transition: stroke 150ms ease; }
+
+#lp-glyph {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(1.6 * var(--w));
+    height: calc(1.6 * var(--w));
+    border-radius: 50%;
+    background: rgba(20, 20, 22, 0.75);
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: calc(0.85 * var(--w));
+    color: #f2f2ef;
+}
 
 /* -----------------------------------------------------------------------------
    Police light editor  (/hudpolice edit)

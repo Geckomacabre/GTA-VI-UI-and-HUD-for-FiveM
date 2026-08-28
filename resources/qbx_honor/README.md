@@ -19,7 +19,7 @@ anti-farm ceiling (`sessionCap`) all live in `config.lua`, so rebalancing never 
 editing Lua in an unrelated resource. Unknown hook names print a warning and do nothing.
 
 `cooldownMs` and `sessionCap` are per-player *and* per-hook, held in memory, and cleared
-on disconnect. A hook with neither fires every time it is called — which is why the
+on disconnect. A hook with neither fires every time it is called -- which is why the
 per-passenger and per-pickpocket hooks below have them and the once-per-heist ones don't.
 
 ### Where each hook fires
@@ -58,11 +58,11 @@ and animals around you, with no dependency on any other resource. Tuned under
 `Config.ConductWatcher`.
 
 - **Killing bystanders and harmless animals costs honor.** `civilianPedTypes` decides who
-  counts — civilians, emergency services, the homeless — and deliberately excludes gang
+  counts -- civilians, emergency services, the homeless -- and deliberately excludes gang
   and criminal ped types, which are free.
 - **Self-defence is free.** Any ped that damaged you within `selfDefenceGraceMs` (25s) is
   an aggressor, and killing it costs nothing. Peds that die holding a weapon are also
-  treated as fair game (`armedPedsAreFairGame`) — a heuristic, since a dead ped drops its
+  treated as fair game (`armedPedsAreFairGame`) -- a heuristic, since a dead ped drops its
   weapon quickly; the grace window is the reliable half of the check.
 - **Greet / Antagonize** are `ox_target` options on any ped (target it, pick the option).
   Greet waves and ticks honor up (`Config.Hooks.greet_npc`); Antagonize intimidates and
@@ -70,18 +70,18 @@ and animals around you, with no dependency on any other resource. Tuned under
   `qbx_reputation` standing if that resource is running, so a well-known criminal gets
   flinched away from on a Greet and bolted from harder on an Antagonize.
 - **`penaliseAiming`** (off by default) docks honor for pointing a gun at a civilian. It
-  fires on a very common action and gets noisy — turn it on for a stricter server.
+  fires on a very common action and gets noisy -- turn it on for a stricter server.
 
 The client never decides amounts or timing. It names what happened
 (`qbx_honor:server:reportConduct`) and the server decides whether that hook may fire,
 against an allowlist plus the usual cooldowns and caps. Ambient peds are client-owned and
-gone by the time the server hears about a kill, so there is no way to re-validate one —
+gone by the time the server hears about a kill, so there is no way to re-validate one --
 the allowlist and throttles are the defence.
 
 ## Catch and release
 
 `fusion_fishing` gained a Keep / Put it back prompt on every landed fish. Keeping it is
-the old behaviour exactly — item, full XP, **no honor change either way**. Releasing gives
+the old behaviour exactly -- item, full XP, **no honor change either way**. Releasing gives
 up the fish and the sale for `Config.release.xpMultiplier` of the XP plus the
 `fish_release` hook. The prompt is asked *before* the inventory check, so a full cooler is
 never a reason you cannot put a fish back. Any dismissed or interrupted dialog keeps the
@@ -143,7 +143,7 @@ things** from one push, and they are not the same thing:
 - **The corner panel.** Mugshot, the badge face for the current tier, and (with
   `Config.Honor.showValue`) the numeric value and the reason. Shown when honor moves,
   hidden again after `Config.Honor.holdMs` (6s). This is where you read your level.
-- **The centre-screen +/− indicator — the change.** ~2.2s. Drawn only when vice_hud
+- **The centre-screen +/− indicator -- the change.** ~2.2s. Drawn only when vice_hud
   computes a non-zero delta against the last value it saw, with the face for the
   *direction* honor moved.
 
@@ -158,13 +158,13 @@ exports.vice_hud:ShowHonorToast(mugshot, honor, emoji, reason)
 qbx_honor passes **`nil` for `emoji` on purpose**. vice_hud picks the standing face from
 its own `Config.Honor` thresholds (mirroring this resource's) and the direction face for
 the indicator separately. This resource used to pass the direction face, which forced the
-standing badge to show it too — so the corner panel disagreed with the player's actual
+standing badge to show it too -- so the corner panel disagreed with the player's actual
 tier on every single change. Do not put it back.
 
 `reason` is the `label` from the hook that fired (`Config.Hooks.<name>.label`), e.g.
 "Killed a bystander". It shows under the value for as long as the panel is up.
 
-On spawn — and whenever vice_hud restarts — this resource calls
+On spawn -- and whenever vice_hud restarts -- this resource calls
 `exports.vice_hud:SetHonorStanding(honor)` instead, which **seeds the value without
 drawing anything**. vice_hud measures the delta that fires the +/− indicator against the
 last value it saw, so it needs the spawn value; but a player who has not done anything yet
@@ -172,7 +172,7 @@ should not get a panel popped at them for it. Use `ShowHonorToast` for events,
 `SetHonorStanding` for state.
 
 `Config.AngelThreshold` / `Config.DevilThreshold` define the tiers and are mirrored in
-`vice_hud/config.lua` as `Config.Honor.angelAt` / `devilAt`. **Keep the two in sync** —
+`vice_hud/config.lua` as `Config.Honor.angelAt` / `devilAt`. **Keep the two in sync** --
 nothing enforces it, and they will silently disagree.
 
 ## Not hooked (see task report for full reasoning)
@@ -180,7 +180,7 @@ nothing enforces it, and they will silently disagree.
 `wasabi_ambulance` / `envi-medic` player revives were NOT hooked: their core logic ships
 as pre-compiled/obfuscated FXAP bytecode in this repo, so there is no readable server-side
 event carrying both the reviver's and the patient's source id to hook cleanly. Same for
-`um_rob_atm`, `loaf_storerobbery`, `loaf_bankrobbery` and `rcore_prison` — all escrowed.
+`um_rob_atm`, `loaf_storerobbery`, `loaf_bankrobbery` and `rcore_prison` -- all escrowed.
 Wiring any of them would require guessing at or patching compiled bytecode, which this
 resource deliberately avoids.
 

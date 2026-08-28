@@ -60,6 +60,10 @@ files {
     -- dropped the file in.
     'html/fonts/*.otf',
     'html/fonts/*.ttf',
+    -- The map badge's source art (#map-badge, a plain <img>). PNG rather than
+    -- webp -- webp was the first thing tried and did not render in the
+    -- game's own NUI browser.
+    'html/icons/*.png',
 }
 
 -- The radar masks in stream/ are picked up AUTOMATICALLY — FiveM streams

@@ -86,6 +86,16 @@
          the mask feathers. -->
     <div id="map-frame" class="hidden" aria-hidden="true"></div>
 
+    <!-- Map badge -------------------------------------------------------
+         A single flat glyph pinned to the map's own top-left corner, same
+         --map-* rect #map-frame reads. Static image (never changes), so the
+         src is hardcoded here rather than set from app.js the way #veh-logo
+         is -- same file-loading pattern as every other image in the HUD, a
+         plain <img>, rather than a CSS mask-image (which was tried first and
+         did not render in the game's own NUI browser). Hidden on the nav
+         distance figure by onNav() in app.js. -->
+    <img id="map-badge" src="icons/map-badge.png" alt="" aria-hidden="true">
+
     <!-- Crosshair on the exact centre of the minimap's published rect. A
          measuring tool, not decoration: the player blip should sit dead on it.
          Whatever gap you see is the number to report. /hudcross -->
@@ -350,6 +360,56 @@
         </div>
     </div>
 
+    <!-- Aim crosshair -------------------------------------------------------
+         True screen centre, not tied to any panel offset -- GTA's own camera
+         puts the aim point there regardless of how the rest of the HUD is
+         laid out. Two variants, one shown at a time via [data-mode]: a plain
+         ring+dot while driving (drive-by shooting), and a three-tick reticle
+         on foot -- left, right, bottom, deliberately NO top tick, matching
+         both the reference and vanilla GTA's own reticle shape -- that kicks
+         outward on every shot and eases back (see onCrossFire in app.js).
+
+         #cross-kill is independent of the mode switch: a coloured X that
+         flashes over whichever reticle is showing the instant a shot kills,
+         coloured by how clean the kill was. See the classifier next to the
+         gameEventTriggered hook in client.lua for what "clean" means. -->
+    <div id="crosshair" class="hidden" aria-hidden="true">
+        <div id="cross-circle">
+            <span class="cc-ring"></span>
+            <span class="cc-dot"></span>
+        </div>
+        <div id="cross-tips">
+            <span class="ct ct-left"></span>
+            <span class="ct ct-right"></span>
+            <span class="ct ct-bottom"></span>
+        </div>
+        <svg id="cross-kill" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M22 22 L78 78 M78 22 L22 78"/>
+        </svg>
+    </div>
+
+    <!-- Race lap / checkpoint HUD --------------------------------------------
+         Fed entirely by whatever race resource is running -- sk_streetkings
+         today, via exports.vice_hud:SetLapTimer -- the same "this resource
+         draws it, doesn't know who's feeding it" pattern as the weapon/equip
+         wheels. Not a /movehud element yet; fixed placement, first pass, not
+         pixel-measured against the reference the way the minimap was.
+
+         "LAP 1/2" is plain outlined text, no box, matching the reference.
+         The checkpoint count sits in its own small plate with a row of pips
+         underneath -- a simplified stand-in for the reference's checkered
+         progress bar, which is too blurry in the source frames to reproduce
+         exactly (see the CSS). The timer sits below the plate, outside it,
+         large and unboxed, same as the reference. -->
+    <div id="lap-hud" class="hidden" aria-hidden="true">
+        <div id="lap-badge">LAP <span id="lap-cur">1</span>/<span id="lap-total">1</span></div>
+        <div id="lap-cp-plate">
+            <div id="lap-cp-row"><span id="lap-cp-cur">0</span> / <span id="lap-cp-total">0</span></div>
+            <div id="lap-cp-track"></div>
+        </div>
+        <div id="lap-timer">00:00.00</div>
+    </div>
+
     <!-- Action prompts ---------------------------------------------------- -->
     <div id="prompts"></div>
 
@@ -370,6 +430,65 @@
         <div id="skills-foot">Each level is written straight into your character&rsquo;s
             stats, so it changes how the game plays &mdash; not just what this panel says.</div>
     </div>
+</div>
+
+<!-- Interact menu -------------------------------------------------------------
+     PHASE 1 of the interact system meant to eventually replace ox_target
+     (see the project notes) -- this is ONLY the menu: a plain data-driven
+     option list, styled off the reference's scrollable item-select screen
+     (the fridge frame). It has no targeting engine behind it, does not
+     touch ox_target, and is not wired to anything by default -- any
+     resource can open it via exports.vice_hud:OpenInteractMenu. The actual
+     raycast/zone targeting engine and a real ox_target migration are a
+     separate, later project; building that blind against 166 dependent
+     files with no live game to test on was explicitly ruled out.
+
+     Visual language: a vertical rail connects each row's marker dot, the
+     current/default option gets an X-in-circle marker (matching the
+     reference's "this is what you'd take" glyph) and every other option a
+     hollow dot, labels are set in the outlined display face registered for
+     exactly this screen (.item-select-outline / Belle Sans Extra Condensed
+     Bold), and the list fades out at the bottom to read as scrollable. -->
+<div id="interact" class="hidden">
+    <div id="interact-list"></div>
+</div>
+
+<!-- World action prompt --------------------------------------------------
+     A short list of button-glyph + label options (e.g. Slim Jim / Smash
+     Window on a car door) — NOT the scrollable rail-list #interact is.
+     Different enough in shape and purpose to warrant its own component
+     rather than forcing this through that one: this is 1-3 big, immediate
+     choices at a glance, not a list to browse.
+
+     Simplification worth flagging: this sits at a FIXED screen position
+     rather than being projected onto the world point it's about (the door
+     you're actually looking at). True world-anchoring needs
+     GetScreenCoordFromWorldCoord recomputed every frame as the camera
+     moves, which isn't something that can be verified without a live game
+     to check the projection math against — see the project notes. Fed by
+     exports.vice_hud:ShowWorldActions / HideWorldActions. -->
+<div id="world-actions" class="hidden" aria-hidden="true"></div>
+
+<!-- Lockpick check ----------------------------------------------------------
+     The "hold R, release inside the highlighted zone" ring — vice_hud's own
+     replacement for a plain ox_lib progress circle where a single skill
+     check (not just a wait) matters, e.g. slim-jimming a car door. Reuses
+     the exact pathLength="100" ring technique the vehicle fuel/engine pips
+     already use (see style.css), just with a second, fixed arc (the target
+     zone) added alongside the growing fill.
+
+     Fed entirely by whoever starts the check (exports.vice_hud:
+     StartLockpickCheck) via discrete pushes — onLockpickProgress only
+     updates while the button is actually held, not every frame regardless,
+     same "Lua pushes events, CSS/JS animates between them" reasoning as the
+     crosshair spread and the lap timer. -->
+<div id="lockpick" class="hidden" aria-hidden="true">
+    <svg id="lp-ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle id="lp-track" class="lp-arc" cx="50" cy="50" r="42" pathLength="100"/>
+        <circle id="lp-zone" class="lp-arc" cx="50" cy="50" r="42" pathLength="100"/>
+        <circle id="lp-fill" class="lp-arc" cx="50" cy="50" r="42" pathLength="100"/>
+    </svg>
+    <span id="lp-glyph">R</span>
 </div>
 
 <!-- Police light editor -----------------------------------------------------

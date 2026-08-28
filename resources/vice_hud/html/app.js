@@ -143,19 +143,43 @@
 
     var STAR_PATH = 'M50 5 L61 38 L96 38 L68 59 L79 92 L50 71 L21 92 L32 59 L4 38 L39 38 Z';
     /* The "tells" are red ROUNDED SQUARES with white line-art, measured off the
-       reference at ~0.88% of width by ~1.94% of height — not emoji in circles.
-       Drawn as inline SVG so they stay crisp and match the reference weight. */
+       original reference at ~0.88% of width by ~1.94% of height — not emoji in
+       circles. Drawn as inline SVG so they stay crisp and match the reference
+       weight.
+
+       A LATER reference frame showed five of these instead of the original
+       three, and different ones: camera, a medical cross, a hanger, a person
+       silhouette, and a flag — not the outfit/voice/vehicle set this row
+       shipped with first. Renamed here to match; see getWantedTells() in
+       client.lua for what each one is actually driven by, since none of them
+       carry the same meaning as before:
+         hanger  — was 'outfit', same glyph, same fenix-police signal
+         person  — was 'voice'; fenix-police has no separate "physical
+                   description" concept, so this reuses that signal under the
+                   new icon rather than inventing a second one
+         medical — new: vice_hud's own reading of the player's health, not
+                   from fenix-police at all
+         camera, flag — new, no detection wired yet; see
+                   exports.vice_hud:SetWantedTellOverride
+       The old 'vehicle' tell has no icon in the five-icon set and is simply
+       not drawn any more — the underlying fenix-police signal is untouched. */
     var TELL_SVG = {
-        outfit:
+        hanger:
             '<svg viewBox="0 0 24 24"><path d="M12 3.2a1.9 1.9 0 1 0 1.35 3.24c.2.5.06.9-.4 1.2' +
             'L3.4 14.1a1.35 1.35 0 0 0 .78 2.45h15.64a1.35 1.35 0 0 0 .78-2.45l-8.2-5.3"/></svg>',
-        voice:
-            '<svg viewBox="0 0 24 24"><rect x="9.1" y="2.6" width="5.8" height="10.6" rx="2.9"/>' +
-            '<path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0M12 17.8v3.6"/></svg>',
-        vehicle:
-            '<svg viewBox="0 0 24 24"><path d="M3.6 15.4v-3.1l1.9-4.2a2 2 0 0 1 1.8-1.2h9.4a2 2 0 0 1 1.8 1.2' +
-            'l1.9 4.2v3.1"/><path d="M3.6 12.3h16.8"/><circle cx="7.4" cy="15.6" r="1.5"/>' +
-            '<circle cx="16.6" cy="15.6" r="1.5"/></svg>'
+        person:
+            '<svg viewBox="0 0 24 24"><circle cx="12" cy="7.2" r="3.3"/>' +
+            '<path d="M4.7 20.4c0-4.3 3.3-6.9 7.3-6.9s7.3 2.6 7.3 6.9"/></svg>',
+        medical:
+            '<svg viewBox="0 0 24 24"><path d="M10 3.6h4v6.4h6.4v4H14v6.4h-4v-6.4H3.6v-4H10z" ' +
+            'fill="#fff" stroke="none"/></svg>',
+        camera:
+            '<svg viewBox="0 0 24 24"><path d="M3.6 8.2a1.6 1.6 0 0 1 1.6-1.6h2l1.1-1.7a1.6 1.6 0 0 1 1.35-.7h4.7' +
+            'a1.6 1.6 0 0 1 1.35.7l1.1 1.7h2a1.6 1.6 0 0 1 1.6 1.6v9a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6z"/>' +
+            '<circle cx="12" cy="13" r="3"/></svg>',
+        flag:
+            '<svg viewBox="0 0 24 24"><path d="M5.4 21V3.4"/>' +
+            '<path d="M5.4 4.2h12.4l-3 3.6 3 3.6H5.4" fill="#fff" stroke="none"/></svg>'
     };
 
     /* Star states, matching how GTA signals a wanted level:
@@ -275,6 +299,320 @@
             if (c) c.textContent = d.clip;
             if (r) r.textContent = d.reserve;
         }
+    }
+
+    /* --- aim crosshair ---------------------------------------------------
+       Three small, mostly-independent pieces:
+         onCrosshair  — show/hide + which variant (vehicle ring vs foot ticks)
+         onCrossFire  — a discrete "a shot just fired" ping; the widen/settle
+                        motion itself is a CSS transition on --spread (see
+                        style.css), not anything animated from here
+         onKillMark   — a discrete "a kill just happened, here's how clean"
+                        ping, coloured by client.lua's classifier */
+    function onCrosshair(d) {
+        var box = $('crosshair');
+        if (!box) return;
+        if (!d || !d.active) { show(box, false); return; }
+        box.dataset.mode = d.mode === 'vehicle' ? 'vehicle' : 'foot';
+        show(box, true);
+    }
+
+    var crossFireTimer = null;
+    function onCrossFire() {
+        var tips = $('cross-tips');
+        if (!tips) return;
+        tips.style.setProperty('--spread', 'calc(0.35 * var(--w))');
+        // Rapid fire keeps re-arming this rather than letting it settle
+        // between shots, so sustained fire holds the wide reticle and only
+        // eases back once the shooting actually stops.
+        clearTimeout(crossFireTimer);
+        crossFireTimer = setTimeout(function () {
+            tips.style.setProperty('--spread', '0px');
+        }, 220);
+    }
+
+    var KILL_CLASSES = ['kill-red', 'kill-yellow', 'kill-white'];
+    var KILL_CLASS_FOR = { headshot: 'kill-red', sloppy: 'kill-yellow', clean: 'kill-white' };
+    var killMarkTimer = null;
+    function onKillMark(d) {
+        var x = $('cross-kill');
+        if (!x || !d || !d.quality) return;
+        var cls = KILL_CLASS_FOR[d.quality] || 'kill-white';
+        // A kill can land in the instant the crosshair itself is about to be
+        // told it's inactive (the shot that killed is usually the last one
+        // fired) -- force it visible for the flash rather than let a
+        // same-tick "active: false" hide the thing that's supposed to flash.
+        show($('crosshair'), true);
+        x.classList.remove.apply(x.classList, KILL_CLASSES.concat('show'));
+        void x.offsetWidth; // restart the transition even on back-to-back kills
+        x.classList.add(cls, 'show');
+        clearTimeout(killMarkTimer);
+        killMarkTimer = setTimeout(function () { x.classList.remove('show'); }, 550);
+    }
+
+    /* --- race lap / checkpoint HUD -----------------------------------------
+       Lua pushes only on discrete events (run start, each checkpoint hit,
+       finish/abort) rather than streaming elapsedMs every frame -- see
+       client.lua's exports.vice_hud:SetLapTimer. The visible ticking is
+       entirely local: every push re-bases (lapTimerBasisMs, performance.now())
+       and a requestAnimationFrame loop interpolates from there, so the
+       number stays smooth without SendNUIMessage being called anywhere near
+       that often. Self-correcting: the next real push re-bases again, so
+       small drift between pushes never accumulates. */
+    var raf = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : function (cb) { return setTimeout(cb, 16); };
+    var caf = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
+
+    var lapTimerRAF = null;
+    var lapTimerBasisMs = 0;
+    var lapTimerBasisPerf = 0;
+    var lapTimerRunning = false;
+
+    function formatLapTime(ms) {
+        ms = Math.max(0, ms || 0);
+        var totalSeconds = ms / 1000;
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds - minutes * 60;
+        var m = (minutes < 10 ? '0' : '') + minutes;
+        var s = seconds.toFixed(2);
+        if (seconds < 10) s = '0' + s;
+        return m + ':' + s;
+    }
+
+    function lapTimerTick() {
+        if (!lapTimerRunning) return;
+        var el = $('lap-timer');
+        if (el) el.textContent = formatLapTime(lapTimerBasisMs + (performance.now() - lapTimerBasisPerf));
+        lapTimerRAF = raf(lapTimerTick);
+    }
+
+    function renderLapPips(cur, total) {
+        var track = $('lap-cp-track');
+        if (!track) return;
+        // Checkpoints-per-lap never changes mid-run, so the element count
+        // only needs rebuilding when it actually differs from last time.
+        if (track.childElementCount !== total) {
+            track.innerHTML = '';
+            for (var i = 0; i < total; i++) {
+                var pip = document.createElement('span');
+                pip.className = 'lap-cp-pip';
+                track.appendChild(pip);
+            }
+        }
+        var pips = track.children;
+        for (var j = 0; j < pips.length; j++) {
+            pips[j].classList.toggle('on', j < cur);
+        }
+    }
+
+    function onLapHud(d) {
+        var box = $('lap-hud');
+        if (!box) return;
+        if (!d || !d.show) {
+            show(box, false);
+            lapTimerRunning = false;
+            if (lapTimerRAF) caf(lapTimerRAF);
+            return;
+        }
+
+        var cur = $('lap-cur'), tot = $('lap-total');
+        if (cur) cur.textContent = d.lap != null ? d.lap : 1;
+        if (tot) tot.textContent = d.laps != null ? d.laps : 1;
+
+        var cpCur = $('lap-cp-cur'), cpTot = $('lap-cp-total');
+        if (cpCur) cpCur.textContent = d.cp != null ? d.cp : 0;
+        if (cpTot) cpTot.textContent = d.cpTotal != null ? d.cpTotal : 0;
+        renderLapPips(d.cp || 0, d.cpTotal || 0);
+
+        if (d.elapsedMs != null) {
+            lapTimerBasisMs = d.elapsedMs;
+            lapTimerBasisPerf = performance.now();
+        }
+        if (d.running) {
+            if (!lapTimerRunning) {
+                lapTimerRunning = true;
+                lapTimerTick();
+            }
+        } else {
+            lapTimerRunning = false;
+            if (lapTimerRAF) caf(lapTimerRAF);
+            var t = $('lap-timer');
+            if (t) t.textContent = formatLapTime(lapTimerBasisMs);
+        }
+
+        show(box, true);
+    }
+
+    /* --- interact menu (Phase 1 of the ox_target-replacement project) -----
+       A plain data-driven option list -- no targeting geometry, no raycast
+       highlight, see the comment on #interact in index.html for why that
+       engine is a separate, later project. Options: array of
+       { label, badges: ['stamina'|'focus', ...], selected } (selected marks
+       the ONE row that gets the X-in-circle marker; every other row gets a
+       hollow dot). Keyboard-navigable: arrows move, Enter confirms, Escape
+       cancels -- posted back to Lua as interactSelect / interactClose. */
+    var INTERACT_MARKER_DOT = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>';
+    var INTERACT_MARKER_X = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/>' +
+        '<path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>';
+    var INTERACT_BADGE_SVG = {
+        stamina: '<svg viewBox="0 0 24 24"><path d="M13 2 4.5 14h6L10 22l9.5-13h-6z"/></svg>',
+        focus: '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
+            '<circle cx="12" cy="12" r="3"/></svg>'
+    };
+
+    var interactOptions = [];
+    var interactSel = 0;
+
+    function renderInteract() {
+        var list = $('interact-list');
+        if (!list) return;
+        list.innerHTML = '';
+        interactOptions.forEach(function (opt, i) {
+            var row = document.createElement('div');
+            row.className = 'interact-row' + (i === interactSel ? ' selected' : '');
+            row.dataset.index = i;
+
+            var marker = document.createElement('span');
+            marker.className = 'interact-marker ' + (i === interactSel ? 'interact-marker-x' : 'interact-marker-dot');
+            marker.innerHTML = i === interactSel ? INTERACT_MARKER_X : INTERACT_MARKER_DOT;
+            row.appendChild(marker);
+
+            var label = document.createElement('span');
+            label.className = 'interact-label item-select-outline';
+            label.textContent = opt.label || '';
+            row.appendChild(label);
+
+            if (opt.badges && opt.badges.length) {
+                var badges = document.createElement('span');
+                badges.className = 'interact-badges';
+                opt.badges.forEach(function (b) {
+                    var chip = document.createElement('span');
+                    chip.className = 'interact-badge ' + b;
+                    chip.innerHTML = INTERACT_BADGE_SVG[b] || '';
+                    badges.appendChild(chip);
+                });
+                row.appendChild(badges);
+            }
+
+            list.appendChild(row);
+        });
+    }
+
+    function onInteract(d) {
+        var box = $('interact');
+        if (!box) return;
+        if (!d || !d.show) { show(box, false); return; }
+
+        interactOptions = d.options || [];
+        // `selected` on the data wins if given; otherwise the row already
+        // flagged selected: true in the option list itself, otherwise 0.
+        interactSel = d.selected != null ? d.selected
+            : Math.max(0, interactOptions.findIndex(function (o) { return o.selected; }));
+        if (interactSel < 0) interactSel = 0;
+
+        renderInteract();
+        show(box, true);
+    }
+
+    function moveInteractSel(delta) {
+        if (!interactOptions.length) return;
+        interactSel = (interactSel + delta + interactOptions.length) % interactOptions.length;
+        renderInteract();
+        // Lua also drives this menu directly for controller input (see
+        // client.lua) and keeps its own selected-index cache so a
+        // controller Accept press knows what to confirm. Without this, a
+        // keyboard nudge here would leave that cache pointing at whatever
+        // was highlighted before — telling it every move is what keeps the
+        // two input paths agreeing regardless of which one the player
+        // actually used last.
+        post('interactMove', { index: interactSel });
+    }
+
+    function confirmInteract() {
+        if (!interactOptions.length) return;
+        post('interactSelect', { index: interactSel });
+    }
+
+    function closeInteract() {
+        show($('interact'), false);
+        post('interactClose', {});
+    }
+
+    /* --- world action prompt ------------------------------------------------
+       A short list of button-glyph + label options, e.g. Slim Jim / Smash
+       Window. Not the scrollable #interact list — see the comment on
+       #world-actions in index.html for why this is its own component. */
+    var WA_BTN_SVG = {
+        triangle: '<svg viewBox="0 0 24 24"><path d="M12 4 L20.5 19.5 L3.5 19.5 Z"/></svg>',
+        circle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none"/></svg>',
+        square: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" fill="none"/></svg>',
+        cross: '<svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>'
+    };
+
+    function onWorldActions(d) {
+        var box = $('world-actions');
+        if (!box) return;
+        if (!d || !d.show) { show(box, false); return; }
+
+        box.innerHTML = '';
+        (d.options || []).forEach(function (opt) {
+            var row = document.createElement('div');
+            row.className = 'wa-row';
+
+            var btn = document.createElement('span');
+            btn.className = 'wa-btn';
+            btn.innerHTML = WA_BTN_SVG[opt.button] || '';
+            row.appendChild(btn);
+
+            var label = document.createElement('span');
+            label.className = 'wa-label';
+            label.textContent = opt.label || '';
+            row.appendChild(label);
+
+            box.appendChild(row);
+        });
+        show(box, true);
+    }
+
+    /* --- lockpick check -------------------------------------------------
+       "Hold, release inside the zone." Lua owns the timing and the
+       win/lose decision entirely (see exports.vice_hud:StartLockpickCheck
+       in client.lua) — this only ever draws whatever it's told: the zone's
+       position/width once per check, the fill level while the button is
+       held, and a brief win/lose flash at the end. */
+    var lockpickResultTimer = null;
+
+    function onLockpick(d) {
+        var box = $('lockpick');
+        if (!box) return;
+        if (!d || !d.show) { show(box, false); return; }
+
+        box.classList.remove('lp-win', 'lp-fail');
+        var fill = $('lp-fill');
+        if (fill) fill.style.setProperty('--lp-pct', 0);
+        var zone = $('lp-zone');
+        if (zone) {
+            zone.style.setProperty('--lp-zone-start', d.zoneStart != null ? d.zoneStart : 0);
+            zone.style.setProperty('--lp-zone-len', d.zoneLen != null ? d.zoneLen : 10);
+        }
+        var glyph = $('lp-glyph');
+        if (glyph) glyph.textContent = d.glyph || 'R';
+
+        show(box, true);
+    }
+
+    function onLockpickProgress(d) {
+        var fill = $('lp-fill');
+        if (fill && d && d.pct != null) fill.style.setProperty('--lp-pct', Math.max(0, Math.min(100, d.pct)));
+    }
+
+    function onLockpickResult(d) {
+        var box = $('lockpick');
+        if (!box) return;
+        box.classList.add(d && d.success ? 'lp-win' : 'lp-fail');
+        clearTimeout(lockpickResultTimer);
+        lockpickResultTimer = setTimeout(function () { show(box, false); }, 450);
     }
 
     /* --- minimap slot geometry ------------------------------------------- */
@@ -699,10 +1037,15 @@
     function onNav(d) {
         var el = $('nav-popup');
         var compass = $('nav-compass');
+        // The compass figure sits up in the map's corner, same neighbourhood
+        // as the badge -- so the badge steps aside rather than fighting it
+        // for the same real estate.
+        var badge = $('map-badge');
         if (!el) return;
         if (!d || !d.active || !d.near) {
             slotVanish(el);
             slotVanish(compass);
+            show(badge, true);
             return;
         }
         var turnText = $('nav-turn-text');
@@ -718,6 +1061,7 @@
         fitAll();
         slotAppear(el);
         slotAppear(compass);
+        show(badge, false);
     }
 
     /* --- vehicle panel --------------------------------------------------- */
@@ -1447,7 +1791,7 @@
     var EDITOR_ELEMENTS = [
         ['status',   'Status bars',    '#status',    'health / stamina, top-left',      'HUD'],
         ['topright', 'Wanted + ammo',  '#topright',  'stars, ammo, weapon',             'HUD'],
-        ['tells',    'Wanted tells',   '#tells',     'the three round tell icons',      'HUD'],
+        ['tells',    'Wanted tells',   '#tells',     'the five round tell icons',       'HUD'],
         ['money',    'Money',          '#money',     'cash and bank',                   'HUD'],
         ['slots',    'Map panels',     '#slots',     'both panels together',            'HUD'],
         /* The two panels are separate elements as well as being movable
@@ -1484,6 +1828,9 @@
         // forwarded to Lua, which re-applies SetMinimapComponentPosition and
         // rebuilds the scaleform. The frame is ours, but it belongs beside them.
         ['mapframe',    'Minimap frame',    '#map-frame', 'outline around the map',            'Minimap'],
+        // Purely decorative -- no game state toggles it -- so unlike every
+        // other row here it has nothing driving it besides the editor.
+        ['mapbadge',    'Map badge',        '#map-badge', 'glyph in the map\'s top-left corner', 'Minimap'],
         // Own row rather than riding on mapframe: it is a text bar, not an
         // outline, and only ever shows while a waypoint is set — Reset/Save
         // still has to reach it even when nobody happens to have one right now.
@@ -1856,6 +2203,7 @@
        how strongly it shows. */
     var NO_ROWS = {
         vehlogo: { ff: 1, fw: 1, sm: 1, ls: 1, al: 1, fs: 1, ic: 1, rad: 1, sp: 1 },
+        mapbadge: { ff: 1, fw: 1, sm: 1, ls: 1, al: 1, fs: 1, ic: 1, rad: 1, sp: 1 },
         // A full-screen effect has no box: nothing here has a font, a
         // position, or a width/height to speak of. Only the three fx* rows
         // this element actually owns are left standing.
@@ -2560,7 +2908,7 @@
         if (on) {
             onStatus({ health: 62, focus: 45, stamina: 54 });
             onWanted({ active: true, stars: 3, maxStars: 6,
-                       tells: ['outfit', 'voice', 'vehicle'] });
+                       tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
             onWeapon({ armed: true, clip: 12, reserve: 84 });
             onCash({ cash: 28163, bank: 154200, show: true });
             onDuffle({ value: 4820 });
@@ -2588,6 +2936,11 @@
             var fr = $('map-frame'); if (fr) show(fr, true);
             onNav({ active: true, near: true, street: 'Bayside', remaining: '0.69 mi',
                     instruction: 'Turn Left', dir: 'left', distance: '130 ft' });
+            // onNav just hid the badge the way it does whenever nav is active
+            // -- correct in normal play, wrong here: editor preview wants
+            // every piece on screen at once, badge included, so it can be
+            // selected and positioned like everything else.
+            show($('map-badge'), true);
             // Forced ON for the duration of editing, same reasoning as the
             // rest of this function: an effect that only shows for a few
             // seconds mid-fight is unpositionable/untunable otherwise.
@@ -2832,6 +3185,18 @@
         ev.preventDefault();
     }, true);
 
+    document.addEventListener('keydown', function (ev) {
+        var box = $('interact');
+        if (!box || box.classList.contains('hidden')) return;
+        if (ev.key === 'ArrowUp')        { moveInteractSel(-1); }
+        else if (ev.key === 'ArrowDown') { moveInteractSel(1); }
+        else if (ev.key === 'Enter')     { confirmInteract(); }
+        else if (ev.key === 'Escape')    { closeInteract(); }
+        else return;
+        ev.stopPropagation();
+        ev.preventDefault();
+    }, true);
+
     document.addEventListener('keyup', function (ev) {
         if (ev.target && ev.target.tagName === 'INPUT') return;
         if (ev.key === ' ' || ev.key === 'Spacebar') setPeek(false);
@@ -2928,6 +3293,13 @@
             show($('skills'), false);
             post('closeSkills', {});
         });
+        var interactList = $('interact-list');
+        if (interactList) interactList.addEventListener('click', function (ev) {
+            var row = ev.target.closest('.interact-row');
+            if (!row) return;
+            interactSel = Number(row.dataset.index);
+            confirmInteract();
+        });
         initPanelDrag();
         initPanelResize();
         if ((b = $('ed-resetall'))) b.addEventListener('click', function () {
@@ -2946,6 +3318,15 @@
         cash: onCash,
         duffle: onDuffle,
         weapon: onWeapon,
+        crosshair: onCrosshair,
+        crossFire: onCrossFire,
+        crossKill: onKillMark,
+        lapHud: onLapHud,
+        interact: onInteract,
+        worldActions: onWorldActions,
+        lockpick: onLockpick,
+        lockpickProgress: onLockpickProgress,
+        lockpickResult: onLockpickResult,
         mapRect: onMapRect,
         mapDebug: onMapDebug,
         zone: onZone,
@@ -3015,7 +3396,7 @@
         onStatus({ health: 66, focus: 40, stamina: 58 });
         onCash({ cash: 28163, bank: 154200, show: true });
         onDuffle({ value: 4820 });
-        onWanted({ active: true, stars: 2, maxStars: 6, tells: ['outfit', 'voice', 'vehicle'] });
+        onWanted({ active: true, stars: 2, maxStars: 6, tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
         onWeapon({ armed: true, clip: 20, reserve: 80 });
         // Keep these in step with Config.Minimap in config.lua.
         onMapRect({ left: 1.75, width: 15.8, bottom: 17.9, height: 15.4 });
@@ -3031,6 +3412,26 @@
         // resources to call. Shown here only so the slot can be eyeballed.
         onPrompt({ id: 'demo', label: 'Interact', glyph: 'E', device: 'kbm', show: true });
         onPolice({ active: true, edges: { top: 0, right: 0.45, bottom: 0, left: 0 } });
+        onCrosshair({ active: true, mode: 'foot' });
+        onLapHud({ show: true, lap: 1, laps: 2, cp: 10, cpTotal: 16, elapsedMs: 19950, running: true });
+        onInteract({
+            show: true, selected: 0,
+            options: [
+                { label: 'Logger Beer' },
+                { label: 'Lavazas Beer' },
+                { label: 'Blitz Berry Smoothie', badges: ['stamina', 'focus'] },
+                { label: 'Blitz Green Smoothie', badges: ['stamina'] }
+            ]
+        });
+        onWorldActions({
+            show: true,
+            options: [
+                { label: 'Slim Jim', button: 'triangle' },
+                { label: 'Smash Window', button: 'circle' }
+            ]
+        });
+        onLockpick({ show: true, zoneStart: 62, zoneLen: 12, glyph: 'R' });
+        onLockpickProgress({ pct: 48 });
 
     }
 })();

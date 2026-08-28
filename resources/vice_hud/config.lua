@@ -32,6 +32,12 @@ Config.HiddenHudComponents = { 1, 6, 7, 8, 9, 20 }
 -- responsive without being wasteful; nothing here is per-frame.
 Config.Tick = 250
 
+-- Extra console logging for things that can't be checked any other way —
+-- currently just the kill-mark classifier (Config.Crosshair below), which
+-- prints the raw hit count and damage bone it saw for every kill so a
+-- misclassified headshot can be diagnosed instead of guessed at again.
+Config.Debug = false
+
 -- Default for "show the minimap while on foot" — ON. Each player can override
 -- it with /hudminimap; their choice persists in KVP and beats this value.
 Config.MinimapOnFootDefault = true
@@ -340,11 +346,13 @@ Config.MinimapScale = 0.663
 Config.Minimap = {
     -- Measured frame-by-frame off the GTA6 reference (2282x1286 capture):
     --   left 1.75%   width 15.8%   top 82.1%  (=> bottom 17.9%)   height 15.4%
-    -- The frame is an NUI outline drawn over the native map. Aligning the two
-    -- reliably needs in-game trial and error, and a frame that misses its map
-    -- looks worse than none — so it is OFF by default. Turn it on once
-    -- /hudslot has it seated, or leave it off and the map simply has no border.
-    showFrame = false,
+    -- The frame is an NUI outline drawn over the native map. It re-derives its
+    -- rect from the same watchdog that repositions the minimap itself (see
+    -- publishMapRect below), so it already tracks the map through any /movehud
+    -- edit, safe-zone change, or resolution switch -- this flag only controls
+    -- whether it is drawn at all. The numbers above are the seated GTA6
+    -- reference rect (same ones style.css falls back to), so it is safe on.
+    showFrame = true,
 
     left   = 1.75,
     width  = 15.8,
@@ -508,12 +516,50 @@ Config.Nav = {
     -- and SET_BLIP_ROUTE_COLOUR both only accept the game's own named
     -- colours, there is no custom-RGB passthrough for either despite
     -- community claims otherwise (confirmed wrong in-game: the route line
-    -- ignored a custom RGB entirely and stayed default purple). 24 is
-    -- HUD_COLOUR_PINK, verified against FiveM's own HudColor enum
-    -- (github.com/d0p3t/fivem-js, src/enums/HudColor.ts) rather than guessed.
-    -- Other options nearby in that same enum: 21 purple, 22 purple (light),
-    -- 23 purple (dark), 126 pink (light).
-    waypointColour = 24,
+    -- ignored a custom RGB entirely and stayed default purple).
+    --
+    -- This used to point straight at 24 (HUD_COLOUR_PINK), the closest
+    -- STOCK shade available. It now points at 224 (HUD_COLOUR_PLACEHOLDER_01)
+    -- instead -- one of ten indices (224-233) Rockstar's own hudcolor.dat
+    -- ships as plain white and named exactly "placeholder", i.e. reserved
+    -- for this. waypointColourRGB below is what REPLACE_HUD_COLOUR_WITH_RGBA
+    -- redefines that index to, at resource start (see client.lua) -- so the
+    -- route gets the EXACT colour instead of "closest available", without
+    -- touching HUD_COLOUR_PINK itself for anything else on the server that
+    -- reads it. Full palette + the two indices this replaced verified
+    -- against docs.fivem.net/docs/game-references/hud-colors/ (Rockstar's
+    -- own common:/data/ui/hudcolor.dat), not the community fivem-js enum
+    -- this config previously cited.
+    --
+    -- The RGB itself is the same pink this HUD already uses as its one
+    -- accent colour elsewhere (the wheel selection wash, the lap timer's
+    -- checkpoint pips, the lockpick ring) -- #e8467a -- rather than a fresh
+    -- guess at the trailer's own waypoint shade, which was never pixel-
+    -- measured. Chosen for consistency across the HUD over a second guess.
+    waypointColour = 224,
+    waypointColourRGB = { 232, 70, 122 },
+}
+
+Config.Crosshair = {
+    enable = true,
+
+    -- GTA's own reticle, hidden only while ours is up so anything this
+    -- feature doesn't cover (thrown weapons, aiming unarmed, whatever else)
+    -- still gets the game's own reticle instead of none at all. 14 is the
+    -- commonly published id for HUD_RETICLE in the community's HUD-component
+    -- list (Rockstar ships no public source for it) -- NOT independently
+    -- re-verified against this build the way the minimap geometry below was.
+    -- If the vanilla reticle still shows alongside vice_hud's, this is the
+    -- number to recheck first.
+    reticleComponent = 14,
+
+    -- CEventNetworkEntityDamage's own headshot flag is exactly the kind of
+    -- payload-by-position guess client_skills.lua already warns is not safe
+    -- across builds -- so this asks GET_PED_LAST_DAMAGE_BONE instead and
+    -- compares it to SKEL_Head, which is the documented, build-stable way to
+    -- ask "where did the last hit land". If real headshot kills stop
+    -- classifying as red, turn Config.Debug on: the classifier prints the
+    -- raw hit count and bone value it saw for every kill.
 }
 
 -- =============================================================================

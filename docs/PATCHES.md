@@ -185,10 +185,12 @@ runtime, always after this one):
 
 This one is a separate, unrelated visual — a GTA VI-inspired reskin of both
 the F2 inventory screen and the in-world hotbar, not part of the vice_hud
-glass/theme system above. It's presentation-only: no drag/drop, slot, or
-networking logic is touched — `WeaponWheel.tsx` wraps the same
-`InventorySlot` components, so dnd, right-click, ctrl+click drop, and
-alt+click use all keep working.
+glass/theme system above. The visual layer is presentation-only: no
+drag/drop, slot, or networking logic is touched there — `WeaponWheel.tsx`
+and `ItemWheel.tsx` both wrap the same `InventorySlot` components, so dnd,
+right-click, ctrl+click drop, and alt+click use all keep working. The one
+genuinely functional piece is the pocket cap module described below, which
+does change server-side slot/weight limits.
 
 The hotbar is a curved wheel (`WeaponWheel.tsx`) of 8 cells mapped onto
 inventory slots 1-7, not an evenly-spaced circle. Fixed layout: top (12
@@ -231,6 +233,34 @@ by a fixed path, not a content-hashed filename like the JS/CSS, so a client
 that already loaded the page once may be showing stale cached bytes even
 after the file on disk changes; a full reconnect clears it.
 
+The ITEMS tab (`InventoryTabs.tsx`) is a second wheel now, `ItemWheel.tsx`,
+not the plain square grid it used to fall back to. It reuses `WeaponWheel.tsx`'s
+exact eight measured cell positions and the same `gta6-wheel-slot` chrome, but
+every cell is a plain `free` role — no fist button, no weapon/melee/handheld
+restriction, since this tab holds ordinary carried items rather than guns. It
+claims its own slot range (8-15), immediately after the weapon wheel's 1-7, so
+the two wheels never fight over the same inventory slot. `LeftInventory.tsx`
+now renders one wheel or the other depending on the active tab and never the
+square grid — a player's own inventory is meant to be nothing but these two
+wheels.
+
+That's backed by a slot/weight cap: without a bag equipped (four items from
+[`wasabi_backpack`](https://github.com/wasabirobby/wasabi_backpack) —
+`dufflebag`, `backpack`, `rucksack`, `cayoduffel`), a player's own inventory
+is hard-capped to 15 slots (the two wheels' worth) by `modules/gta6pockets/
+server.lua`, a new self-contained module. It hooks `Inventory.SetSlot` — the
+one low-level function every add/remove path (buy, craft, give, drop, swap)
+funnels through — so picking up or dropping a bag lifts or reapplies the cap
+on the same tick, with a slower poll as a fallback for anything that changes
+`inv.items` outside that path. `SetSlotCount`/`SetMaxWeight` only ever change
+the ceiling number, never touch existing items, so lowering the cap on an
+unbagged player can't delete or hide anything already in slots 1-15. Ship
+`wasabi_backpack` separately if you want the cap to ever lift — without it
+every player stays capped at 15 slots permanently. The bag item list and the
+15-slot/8000-weight cap are both overridable via convars
+(`inventory:pocketbags`, `inventory:pocketslots`, `inventory:pocketweight`)
+rather than editing the module.
+
 There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`.
 **This is wired up in `ox_inventory/client.lua` itself**, not in
 `qbx_honor` — FiveM only lets a resource `SendNUIMessage` its own page, so
@@ -251,12 +281,28 @@ patches/ox_inventory/web/src/index.scss
 patches/ox_inventory/web/src/components/inventory/InventoryTabs.tsx
 patches/ox_inventory/web/src/components/inventory/LeftInventory.tsx
 patches/ox_inventory/web/src/components/inventory/WeaponWheel.tsx
+patches/ox_inventory/web/src/components/inventory/ItemWheel.tsx
 patches/ox_inventory/web/src/components/inventory/InventorySlot.tsx
 patches/ox_inventory/web/src/components/inventory/PromptGlyph.tsx
 patches/ox_inventory/web/src/components/inventory/PlayerStatusBars.tsx
 patches/ox_inventory/web/src/dnd/onDisarm.ts
 patches/ox_inventory/web/src/store/honor.ts
 patches/ox_inventory/web/src/store/wheelCategories.ts
+```
+
+The pocket cap is a whole new module, shipped in full since it adds no stock
+files of its own to edit:
+
+```
+patches/ox_inventory/modules/gta6pockets/server.lua
+```
+
+Copy it into `modules/gta6pockets/server.lua` in your install, then add one
+line to `server.lua` (the entry point, not the module itself), right after
+the `local Inventory = require 'modules.inventory.server'` line near the top:
+
+```lua
+require 'modules.gta6pockets.server'
 ```
 
 New image asset the fist cell needs (already covered by ox_inventory's own
@@ -322,8 +368,8 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-6ad2a2f4.js
-patches/ox_inventory/web/build/assets/index-613ba0e8.css
+patches/ox_inventory/web/build/assets/index-cfce4429.js
+patches/ox_inventory/web/build/assets/index-cb09b7b3.css
 patches/ox_inventory/web/build/index.html
 ```
 

@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import InventoryGrid from './InventoryGrid';
 import InventorySlot from './InventorySlot';
 import InventoryTabs from './InventoryTabs';
 import WeaponWheel, { WHEEL_SLOTS } from './WeaponWheel';
+import ItemWheel, { ITEM_WHEEL_SLOTS } from './ItemWheel';
 import { useActiveTab, setActiveTab } from '../../store/activeTab';
 import PlayerStatusBars from './PlayerStatusBars';
 import PromptGlyph from './PromptGlyph';
@@ -27,21 +27,22 @@ const LeftInventory: React.FC = () => {
   const onWeapons = activeTab === 'weapons';
 
   /*
-   * The two tabs are two different presentations, never both at once:
-   *   WEAPONS -> the wheel, nothing else
-   *   ITEMS   -> the ordinary grid
+   * The two tabs are two different wheels, never both at once, and never the
+   * plain square grid:
+   *   WEAPONS -> WeaponWheel (slots 1-7, fist cell not slot-backed)
+   *   ITEMS   -> ItemWheel (slots 8-15)
    *
-   * The grid deliberately shows the WHOLE inventory now, weapons included. It
-   * used to hide them, which made it impossible to put a gun on the wheel:
-   * the wheel is inventory slots 1-6, and the only way to fill those is to
-   * drag something into them from the grid. Hiding weapons there meant the one
-   * thing the wheel is for was the one thing you could not drag onto it.
+   * These two wheels are meant to be all a player can carry on their person
+   * — the full square inventory only exists for a backpack's own stash
+   * (wasabi_backpack opens that as a separate inventory; see
+   * modules/gta6pockets/server.lua for the slot-count/weight cap this
+   * enforces server-side). LeftInventory therefore never renders
+   * InventoryGrid at all any more.
    */
 
-  // The wheel owns slots 1-6 (see WHEEL_SLOTS in WeaponWheel.tsx — the fist
-  // cell isn't backed by a slot at all), so the quick-use slots have to live
-  // past them or the two would fight over the same items.
-  const wheelSlotIds = useMemo(() => new Set(WHEEL_SLOTS), []);
+  // Both wheels' slots are excluded from the quick-use strip so the two never
+  // fight over the same items.
+  const wheelSlotIds = useMemo(() => new Set([...WHEEL_SLOTS, ...ITEM_WHEEL_SLOTS]), []);
 
   // Medical-only quick-slots (bottom-left) — see wheelCategories.ts for the
   // curated item list this is restricted to. It used to accept any `usable`
@@ -84,13 +85,7 @@ const LeftInventory: React.FC = () => {
 
       <InventoryTabs active={activeTab} onChange={setActiveTab} />
 
-      {onWeapons ? (
-        <WeaponWheel inventory={leftInventory} />
-      ) : (
-        <div className="gta6-items-grid">
-          <InventoryGrid inventory={leftInventory} />
-        </div>
-      )}
+      {onWeapons ? <WeaponWheel inventory={leftInventory} /> : <ItemWheel inventory={leftInventory} />}
 
       <div className="gta6-quickslots">
         {quickItems.map((item) => (
