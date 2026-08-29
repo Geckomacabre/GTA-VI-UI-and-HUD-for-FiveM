@@ -233,9 +233,18 @@ $gta6-ref-aspect: 1.77936; // 2000 / 1124
     height: 100%;
   }
 
+  // durability-bar/weight-bar (WeightBar.tsx) is a plain sibling of the
+  // header-wrapper, not inside it, so hiding the header alone missed it --
+  // any item with metadata.durability (bandages, medkits, anything with an
+  // expiry) drew a red/orange/green fill strip across the top of the cell,
+  // which is not part of this wheel's design at all: ammo/qty readouts here
+  // are the wheel's own gta6-ammo-mag/gta6-ammo-reserve/gta6-wheel-qty
+  // elements, built from real data, not this stock bar.
   .item-slot-header-wrapper,
   .item-hotslot-header-wrapper,
-  .inventory-slot-label-box {
+  .inventory-slot-label-box,
+  .durability-bar,
+  .weight-bar {
     display: none !important;
   }
 }

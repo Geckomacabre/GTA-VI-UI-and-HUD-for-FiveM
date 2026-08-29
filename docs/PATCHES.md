@@ -233,6 +233,15 @@ by a fixed path, not a content-hashed filename like the JS/CSS, so a client
 that already loaded the page once may be showing stale cached bytes even
 after the file on disk changes; a full reconnect clears it.
 
+Stock `InventorySlot` also draws its own durability bar (`WeightBar.tsx`,
+a red/orange/green fill strip) for any item carrying `metadata.durability`
+— bandages and medkits included. It's a sibling of the header wrapper the
+theme already hides, not a child of it, so hiding the header alone missed
+it: it drew right across the top of the cell, which isn't part of this
+wheel's design at all (ammo/qty readouts here come from the wheel's own
+elements, built off real data). `gta6-theme.scss`'s shared slot-shell mixin
+now hides `.durability-bar`/`.weight-bar` too.
+
 The ITEMS tab (`InventoryTabs.tsx`) is a second wheel now, `ItemWheel.tsx`,
 not the plain square grid it used to fall back to. It reuses `WeaponWheel.tsx`'s
 exact eight measured cell positions and the same `gta6-wheel-slot` chrome, but
@@ -244,14 +253,22 @@ now renders one wheel or the other depending on the active tab and never the
 square grid — a player's own inventory is meant to be nothing but these two
 wheels.
 
+The two bottom-left medical quickslots (also `LeftInventory.tsx`) are a
+read-only auto-populated readout, not a drop target: whatever medical items
+(see `wheelCategories.isMedicalItem`) are already carried outside the two
+wheels just show up there on their own, up to two, with no drag-and-drop and
+no empty-slot padding — matching the reference, which never draws an empty
+holster for a consumable you don't have.
+
 That's backed by a slot/weight cap: without a bag equipped (four items from
 [`wasabi_backpack`](https://github.com/wasabirobby/wasabi_backpack) —
 `dufflebag`, `backpack`, `rucksack`, `cayoduffel`), a player's own inventory
-is hard-capped to 17 slots (the two wheels' 15, plus 2 spare for
-`LeftInventory.tsx`'s medical quickslots — their own "drag onto an empty
-slot" search excludes every wheel slot and needs somewhere past them to
-land, so capping at exactly 15 left it nowhere to bind at all) by
-`modules/gta6pockets/server.lua`, a new self-contained module. It hooks
+is hard-capped to 17 slots (the two wheels' 15, plus 2 spare so a newly
+picked-up medical item has somewhere to land outside the wheels and actually
+reach the quickslot readout — `Inventory.AddItem` fills the first empty slot
+it finds, so with the wheels' 15 already full of other things, a fresh
+pickup naturally lands in 16 or 17) by `modules/gta6pockets/server.lua`, a
+new self-contained module. It hooks
 `Inventory.SetSlot` — the one low-level function every add/remove path
 (buy, craft, give, drop, swap) funnels through — so picking up or dropping
 a bag lifts or reapplies the cap on the same tick, with a slower poll as a
@@ -372,8 +389,8 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-cfce4429.js
-patches/ox_inventory/web/build/assets/index-cb09b7b3.css
+patches/ox_inventory/web/build/assets/index-95575c2f.js
+patches/ox_inventory/web/build/assets/index-93b7c2d3.css
 patches/ox_inventory/web/build/index.html
 ```
 

@@ -50,26 +50,24 @@ const LeftInventory: React.FC = () => {
   // bump a bandage out of the strip; medical is the one category this corner
   // is for.
   /*
-   * The quick-use slots ALWAYS render, filled or not — the reference shows two
-   * slots with the empty one reading "0" rather than disappearing. Medical
-   * items fill them first; any remaining slots are padded with real EMPTY
-   * inventory slots so they stay valid drop targets.
+   * Read-only, auto-populated readout, matching the reference: these are NOT
+   * drop targets you drag a bandage onto to "assign" it. Whatever medical
+   * items are already in the inventory just show up here on their own, up to
+   * MAX_QUICKSLOTS, in whatever slot order they're found. No empty-slot
+   * padding either — with nothing to show, the strip just shows fewer cells,
+   * same as the reference doesn't draw an empty holster for a gun you don't
+   * have. InventorySlot itself is still the real slot underneath (so
+   * hovering/alt-click-use/dragging it back OUT still all work), it just no
+   * longer accepts drops.
    */
-  const quickItems = useMemo(() => {
-    const usable = leftInventory.items
-      .filter((item): item is SlotWithItem => isSlotWithItem(item) && isMedicalItem(item.name))
-      .filter((item) => !wheelSlotIds.has(item.slot))
-      .slice(0, MAX_QUICKSLOTS);
-
-    if (usable.length >= MAX_QUICKSLOTS) return usable;
-
-    const taken = new Set(usable.map((i) => i.slot));
-    const empties = leftInventory.items.filter(
-      (item) => !isSlotWithItem(item) && !wheelSlotIds.has(item.slot) && !taken.has(item.slot)
-    );
-
-    return [...usable, ...empties].slice(0, MAX_QUICKSLOTS);
-  }, [leftInventory.items, wheelSlotIds]);
+  const quickItems = useMemo(
+    () =>
+      leftInventory.items
+        .filter((item): item is SlotWithItem => isSlotWithItem(item) && isMedicalItem(item.name))
+        .filter((item) => !wheelSlotIds.has(item.slot))
+        .slice(0, MAX_QUICKSLOTS),
+    [leftInventory.items, wheelSlotIds]
+  );
 
   return (
     // Full-viewport overlay, not a floating card: everything inside is
@@ -95,10 +93,9 @@ const LeftInventory: React.FC = () => {
               inventoryId={leftInventory.id}
               inventoryType={leftInventory.type}
               inventoryGroups={leftInventory.groups}
-              accepts={isMedicalItem}
             />
             <div className="gta6-quickslot-footer">
-              <span className="gta6-quickslot-count">{isSlotWithItem(item) ? item.count : 0}</span>
+              <span className="gta6-quickslot-count">{item.count}</span>
               <span className="gta6-quickslot-pip" />
             </div>
           </div>
