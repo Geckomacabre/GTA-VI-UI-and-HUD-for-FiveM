@@ -108,19 +108,13 @@
    found so far, standing in until a better one turns up. Used with a black
    outline (see .item-select-outline below), because that is what the
    reference actually draws: white fill, a hard black stroke round it, no
-   drop shadow doing the separation instead.
-
-   NOT BUNDLED -- resolved from the player's own machine, same reasoning as
-   Helvetica Neue above: it's a commercial face and redistributing the .otf
-   in a public repository is not ours to do. Falls straight through to the
-   Helvetica Neue / sans-serif chain below on a machine that doesn't have it
-   installed locally. Bundle the .otf again in html/fonts/ (and restore the
-   url() source here) if you own a licence for it and want the exact cut. */
+   drop shadow doing the separation instead. */
 @font-face {
     font-family: 'BelleSansCondensed';
-    src: local('Belle Sans Extra Condensed Bold'), local('BelleSansCondensed-ExtraBold');
+    src: url('fonts/BelleSansExtraCondensedBold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
+    font-display: block;
 }
 
 /* The black-outline text treatment itself, kept separate from the @font-face
