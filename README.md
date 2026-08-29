@@ -1,17 +1,17 @@
 # GTA VI Resources
 
 A bundle of FiveM/Qbox resources built around a GTA VI (Vice City / Leonida)
-visual identity -- a shared HUD, a matching popup/menu theme spread across a
+visual identity: a shared HUD, a matching popup/menu theme spread across a
 few community resources, a gig-economy phone app pair, and a reskinned
-inventory screen -- organized as a standalone, installable package.
+inventory screen, organized as a standalone, installable package.
 
-Visual direction throughout this set -- the HUD layout, the neon/Art Deco
-color language, the general "leaked GTA VI trailer" feel -- was inspired by
+Visual direction throughout this set (the HUD layout, the neon/Art Deco
+color language, the general "leaked GTA VI trailer" feel) was inspired by
 CyberLeek's videos and GTA VI Extended Look.
 
 > [!NOTE]
 > **Work in progress.** This is built and tuned against one live server, not
-> a general-purpose release -- some things may not work correctly on a
+> a general-purpose release, so some things may not work correctly on a
 > different setup, and configs/paths may assume pieces of that server that
 > aren't documented here yet. If something's broken or missing for you,
 > please [open an issue](../../issues) or send a
@@ -26,9 +26,9 @@ CyberLeek's videos and GTA VI Extended Look.
 | ![vice_hud day drive panel](docs/screenshots/vice_hud-day-drive-panel.png) | ![vice_hud night drive panel](docs/screenshots/vice_hud-night-drive-panel.png) |
 | Vehicle panel, minimap, speed limit sign (day) | Vehicle panel + turn-by-turn (night) |
 | ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
-| `um_gigs` -- Ryde Me driver profile | Driver profile, close up |
+| `um_gigs`, Ryde Me driver profile | Driver profile, close up |
 | ![ox_inventory weapon wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | |
-| `ox_inventory` -- GTA6 weapon wheel hotbar | |
+| `ox_inventory`: GTA6 weapon wheel hotbar | |
 | ![vice_hud money close-up](docs/screenshots/vice_hud-money-closeup.png) | ![vice_hud minimap with frame and logo](docs/screenshots/vice_hud-minimap-frame-logo.png) |
 | Cash / bank / duffle bag value | Minimap with the outline frame and map badge on |
 | ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | |
@@ -52,29 +52,29 @@ GTA VI Resources/
 
 Everything under `resources/` is a complete, ready-to-run resource on its
 own. Everything under `patches/` is deliberately **not** a full copy of the
-resource it touches -- those are large, independently-useful community
+resource it touches. Those are large, independently-useful community
 resources that aren't "GTA VI resources" in themselves. Only the handful of
 files that were changed or added to connect each one to vice_hud are
 included here.
 
 ### `resources/`
 
-- **`vice_hud`** -- The core HUD: minimap, vehicle panel, zone bar, skills,
+- **`vice_hud`**: The core HUD: minimap, vehicle panel, zone bar, skills,
   stamina/oxygen, notifications, a full in-game HUD editor (`/hudedit`), and
   the theme engine (`/hudtheme`, `/themepublish`) that the `patches/` folder
-  plugs into. Has its own `README.md` and `docs/INTERNALS.md` inside --
+  plugs into. Has its own `README.md` and `docs/INTERNALS.md` inside, so
   start there for anything HUD-specific. Depends on `ox_lib`.
 
-- **`um_gigs`** -- "Snarf" and "Ryde Me": two
+- **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the
   same Art Deco / Vice aesthetic as the rest of this set. Depends on
   `ox_lib`, `ox_target`, `qbx_core`, `lb-phone`.
 
-- **`qbx_honor`** -- An RDR2-style persistent honor stat, purpose-built to
+- **`qbx_honor`**: An RDR2-style persistent honor stat, purpose-built to
   draw its devil/angel toast and centre-screen indicator on vice_hud's NUI
   (see its own `README.md`'s "vice_hud" section). Hitting the honor floor
   permanently latches an unrepairable flag (see its README's "Unrepairable
-  floor" section) -- the devil badge renders grey and cracked from then on,
+  floor" section), so the devil badge renders grey and cracked from then on,
   independent of whatever the honor number does afterward. Small and
   self-contained enough to ship whole rather than as a patch. Depends on `qbx_core`,
   `ox_target`.
@@ -83,25 +83,25 @@ included here.
 
 Overlays for resources you install separately:
 
-- **`ox_lib`** -- the popup/notification glass theme (`lib.notify`, context
+- **`ox_lib`**: the popup/notification glass theme (`lib.notify`, context
   menus, dialogs, progress bars).
-- **`ox_target`**, **`qb-menu`**, **`qb-input`** -- each has its own
+- **`ox_target`**, **`qb-menu`**, **`qb-input`**: each has its own
   `ui_page`, so each needed its own small copy of the same theme hook.
-- **`ox_inventory`** -- a separate, unrelated GTA6-inspired reskin of the F2
+- **`ox_inventory`**: a separate, unrelated GTA6-inspired reskin of the F2
   inventory screen and the in-world hotbar: an 8-cell role-based weapon wheel
   (free/melee/handheld/fist) plus a matching items wheel, medical-only
   quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
-  installed) a hard 15-slot pocket cap that lifts while a bag is carried,
-  [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png) -- not part of
-  the vice_hud glass system above.
-- **`speedlimits`**, **`zseatbelt`** -- positioning hooks, so vice_hud's
+  installed) a hard 15-slot pocket cap that lifts while a bag is carried.
+  See the [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png). Not
+  part of the vice_hud glass system above.
+- **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
-- **`um_smallresources`** -- not theming: a functional fix for a stamina
+- **`um_smallresources`**: not theming, a functional fix for a stamina
   script in this pack that conflicts with vice_hud's stamina bar.
 
-**Read [`docs/PATCHES.md`](docs/PATCHES.md) before touching any of these** --
-each one needs a couple of files copied into an existing install plus, for
+**Read [`docs/PATCHES.md`](docs/PATCHES.md) before touching any of these.**
+Each one needs a couple of files copied into an existing install plus, for
 most, a one- or two-line manifest/HTML edit. None of it is drag-and-drop on
 its own.
 
@@ -124,45 +124,45 @@ its own.
    server console.
 
 `vice_hud` ships its own `README.md` with the full command list
-(`/hudedit`, `/hudreset`, `/hudtheme`, `/themepublish`, etc.) -- read that
+(`/hudedit`, `/hudreset`, `/hudtheme`, `/themepublish`, etc.), so read that
 once it's installed.
 
 ## Installing (theme patches)
 
-These are not resources -- do not `ensure` a `patches/` folder. Follow
+These are not resources, so do not `ensure` a `patches/` folder. Follow
 [`docs/PATCHES.md`](docs/PATCHES.md), which walks through each of `ox_lib`,
 `ox_target`, `ox_inventory`, `qb-menu`, `qb-input`, `speedlimits`,
 `zseatbelt`, and `um_smallresources` individually: which files to copy in,
 and the exact manifest/HTML edits (where one is needed).
 
-An update to any of those patched resources will silently wipe its patch --
-that's expected, and `PATCHES.md` says so per-resource. Re-apply after
+An update to any of those patched resources will silently wipe its patch.
+That's expected, and `PATCHES.md` says so per-resource. Re-apply after
 updating.
 
 ## Recommended pairings
 
-Not bundled here -- separate projects you install yourself:
+Not bundled here, these are separate projects you install yourself:
 
-- **[fenix-police](https://github.com/Geckomacabre/fenix-police)** (GPL-3.0)
-  -- an AI police dispatch/pursuit resource. Not bundled because it's a
+- **[fenix-police](https://github.com/Geckomacabre/fenix-police)** (GPL-3.0):
+  an AI police dispatch/pursuit resource. Not bundled because it's a
   standalone gameplay system, not part of this repo's UI/HUD scope, but
   `vice_hud` integrates with it directly when both are running: it feeds the
   wanted-search minimap overlay and the real outfit/voice/vehicle tells (see
   `resources/vice_hud/README.md`'s Requirements table). Without it vice_hud
   falls back to a plain wanted-star row.
 - **[FlyBanditMods-iOS_LS_Map-Lite](https://github.com/TheFlyBandit/FlyBanditMods-iOS_LS_Map-Lite)**
-  by TheFlyBandit -- an iOS/Google-Maps-styled minimap texture replacement. No
+  by TheFlyBandit: an iOS/Google-Maps-styled minimap texture replacement. No
   license published upstream covering redistribution, so it's linked rather
   than copied in here. Drag-and-drop per its own README; `vice_hud`'s rounded
   minimap mask and wanted-search overlay sit on top of whatever map style is
   loaded, so the two work together with no extra configuration.
 - **[wasabi_backpack](https://github.com/wasabirobby/wasabi_backpack)** by
-  wasabirobby -- an ox_inventory bag item with its own per-bag stash. Same
-  licensing reasoning as LS Map Lite above -- linked, not embedded.
+  wasabirobby: an ox_inventory bag item with its own per-bag stash. Same
+  licensing reasoning as LS Map Lite above, linked, not embedded.
   `vice_hud`'s Duffle Bag Value row (`Config.Duffle`) reads whatever's inside
   it, priced against what a fence/pawn shop would actually pay. Rename its
   item to `dufflebag` (or change `Config.Duffle.item` to match whatever you
-  call it) -- this repo's own server renamed it from the stock `backpack` to
+  call it). This repo's own server renamed it from the stock `backpack` to
   fit a duffle bag re-skin, and the two names need to agree.
 
 ## The arista-pro font
@@ -170,8 +170,8 @@ Not bundled here -- separate projects you install yourself:
 `resources/um_gigs/ui/fonts/arista-pro.pro-trial-regular.ttf` is bundled and
 registered via `@font-face` in `ui/app.css` under the family name
 `'Arista Pro'`, and listed in `fxmanifest.lua`'s `files{}` so FiveM actually
-ships it to clients. Neither app currently points `--font-body` at it --
-Ryde Me still uses GTAArtDeco, Snarf still uses the system font stack -- the
+ships it to clients. Neither app currently points `--font-body` at it.
+Ryde Me still uses GTAArtDeco, Snarf still uses the system font stack, so the
 font is just present and ready to use if you want to switch either app's
 `--font-body` to `'Arista Pro'`.
 
@@ -180,10 +180,10 @@ font is just present and ready to use if you want to switch either app's
 This repository is licensed under the [GNU General Public License v3.0](LICENSE),
 matching `vice_hud`, its core resource.
 
-`resources/vice_hud` carries its own `LICENSE` file (also GPL-3.0) -- that
+`resources/vice_hud` carries its own `LICENSE` file (also GPL-3.0), and that
 governs that folder specifically. Nothing else under `resources/` or
 `patches/` ships its own `LICENSE` here, since `patches/` is only a handful
-of individual files extracted from each project, not a full copy -- but the
+of individual files extracted from each project, not a full copy, but the
 original projects remain under their own upstream license:
 
 | Project | License |
@@ -203,7 +203,7 @@ redistributing patched files from this bundle outside your own server.
 If you edit any part of this source, please make your fork available on
 GitHub so we can all work together on it. Since this is still a work in
 progress (see the note up top), bug reports and pull requests are both
-welcome -- [open an issue](../../issues) if something doesn't work, or
+welcome. [Open an issue](../../issues) if something doesn't work, or
 [send a PR](../../pulls) if you've already fixed it.
 
 ## Notes
@@ -212,5 +212,5 @@ welcome -- [open an issue](../../issues) if something doesn't work, or
   and tested against.
 - `resources/vice_hud` carries its own `.gitignore` (excludes
   `node_modules/`, its Python asset-prep tooling's `__pycache__/`, and raw
-  pre-conversion texture originals) -- respect it if you resync it from your
+  pre-conversion texture originals). Respect it if you resync it from your
   own server later rather than flattening everything in.

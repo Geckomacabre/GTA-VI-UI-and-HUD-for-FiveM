@@ -192,19 +192,99 @@ RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show
 -- and just tell this what to show. Simplification: fixed screen position,
 -- not truly world-anchored — see the comment on #world-actions in
 -- index.html for why.
+--
+-- FIXED 2026-08-28: this used to take a hand-picked `button` STRING
+-- ('triangle'/'circle') with nothing tying it to what the caller's keybind
+-- was actually bound to. That let the two drift apart -- and they had:
+-- qbx_vehiclekeys showed a triangle for Slim Jim while the working pad
+-- button underneath it was Circle, and Smash Window's real button (Circle)
+-- had no controller binding at all. Pressing the icon the player was
+-- LOOKING AT did nothing, because that icon was never connected to any
+-- input in the first place. See qbx_vehiclekeys/client/slimjim.lua for the
+-- other half of this fix.
+--
+-- Now `key` (a control ID, or an ox_lib keybind's own `.hash`) is what the
+-- caller passes, and the glyph shown is RESOLVED from it, live, the exact
+-- same way the Action Prompts system above does for its own prompts
+-- (resolveKey/usingPad, duplicated here rather than reached for across the
+-- client.lua/client_overlays.lua split -- see the `ui()` helper at the top
+-- of this file for the established precedent). The icon can no longer
+-- disagree with the binding: it IS the binding, resolved.
 
---- options: array of { label, button: 'triangle'|'circle'|'square'|'cross' }
+-- GetControlInstructionalButton returns GTA button-font ligatures for a pad,
+-- which do not exist in the NUI's fonts -- see the identical helper and
+-- comment in client.lua's Action Prompts section, which this mirrors.
+local function waSafeLabel(str)
+    if not str or str == '' then return nil end
+    for i = 1, #str do
+        local b = str:byte(i)
+        if b < 0x20 or b > 0x7E then return '•' end
+    end
+    return str
+end
+
+local function waResolveKey(key)
+    if type(key) == 'string' then return key end
+    if type(key) ~= 'number' then return nil end
+    local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
+    if not ok or not raw then return nil end
+    return waSafeLabel(raw:sub(3))
+end
+
+local function waUsingPad() return not IsInputDisabled(2) end
+
+local waOptions = nil     -- the last { label, key } list shown, for the refresh thread
+local waDevice = nil
+
+local function waResolveAll()
+    local device = waUsingPad() and 'pad' or 'kbm'
+    local resolved = {}
+    if waOptions then
+        for i, opt in ipairs(waOptions) do
+            resolved[i] = { label = opt.label, glyph = waResolveKey(opt.key), device = device }
+        end
+    end
+    return resolved, device
+end
+
+--- options: array of { label, key } -- key is a native GTA control ID
+--- (see PAD::IS_CONTROL_PRESSED's `action` param) or an ox_lib keybind's
+--- own `.hash` field, exactly as ShowActionPrompt's `key` already works.
 exports('ShowWorldActions', function(options)
-    ui('worldActions', { show = true, options = options or {} })
+    waOptions = options or {}
+    local resolved, device = waResolveAll()
+    waDevice = device
+    ui('worldActions', { show = true, options = resolved })
 end)
 exports('HideWorldActions', function()
+    waOptions = nil
     ui('worldActions', { show = false })
 end)
 
+-- Re-resolve when the input device changes, same pattern as the Action
+-- Prompts refresh thread -- so a mid-prompt controller/keyboard swap updates
+-- the icon instead of leaving it wrong until the caller happens to re-push.
+CreateThread(function()
+    while true do
+        Wait(400)
+        if waOptions then
+            local device = waUsingPad() and 'pad' or 'kbm'
+            if device ~= waDevice then
+                waDevice = device
+                local resolved = waResolveAll()
+                ui('worldActions', { show = true, options = resolved })
+            end
+        end
+    end
+end)
+
 RegisterCommand('hudworldactions', function()
+    -- 51 = INPUT_CONTEXT ('E' on keyboard), 47 = INPUT_DETONATE ('Y'/Triangle
+    -- on pad) -- real GTA control IDs, purely so this demo resolves to
+    -- something real on both devices without needing a live ox_lib keybind.
     exports.vice_hud:ShowWorldActions({
-        { label = 'Slim Jim', button = 'triangle' },
-        { label = 'Smash Window', button = 'circle' },
+        { label = 'Slim Jim', key = 47 },
+        { label = 'Smash Window', key = 51 },
     })
     print('^3[vice_hud]^7 /hudworldactions — sample data. /hudworldactionsoff to clear.')
 end, false)

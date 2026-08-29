@@ -80,6 +80,20 @@
         if (ic.textContent !== want) ic.textContent = want;
     }
 
+    /* Health used to show continuously whenever it was below 100 -- which in
+       practice meant almost always, since a scratch of chip damage sits there
+       for minutes with nothing else to clear it, unlike stamina/focus which
+       mostly return to full within a second or two of letting off the key.
+       So this now reveals on an actual CHANGE (a hit or a heal) and holds for
+       HEALTH_FLASH_MS, the same "a STATE is not a LEVEL" fix already applied
+       to the vehicle lock pip -- see vice-hud-nav-popup memory. `null` on the
+       first payload so a fresh page load does not treat "no history yet" as
+       a change. */
+    var HEALTH_FLASH_MS = 3000;
+    var lastHealthVal = null;
+    var healthFlashTimer = null;
+    var healthRecentlyChanged = false;
+
     function onStatus(d) {
         var health = d.health == null ? 100 : d.health;
         var focus = d.focus == null ? 100 : d.focus;
@@ -89,8 +103,33 @@
         var submerged = oxygen !== null;
         var staminaRow = $('s-stamina');
         var focusRow = $('s-focus');
+        var wheelOpen = !!d.wheel;
 
         var cap = d.cap == null ? null : d.cap;
+        // Two different things share `cap`/`capCause`: a hunger/thirst warning
+        // ("you're hungry enough that a future heal would be capped, even
+        // though you're at full health right now") and the separate flat
+        // regen ceiling (Config.Needs.regenCeilingPct -- "you're just still
+        // hurt, below the point passive regen tops out at"). Only the FIRST
+        // is worth force-showing unconditionally: it is the one case that can
+        // fire at 100% health, where nothing else would reveal the row. The
+        // ceiling case can only ever be active while health is already below
+        // it, so ordinary damage there is exactly what healthRecentlyChanged
+        // already reveals -- force-showing it too meant the row stayed up
+        // continuously any time health sat under 62%, full belly or not,
+        // which is the same "always visible" bug being fixed here, just
+        // reached through the cap instead of the raw health value.
+        var needsWarning = cap != null && (d.capCause === 'hunger' || d.capCause === 'thirst');
+
+        if (lastHealthVal !== null && health !== lastHealthVal) {
+            healthRecentlyChanged = true;
+            if (healthFlashTimer) clearTimeout(healthFlashTimer);
+            healthFlashTimer = setTimeout(function () {
+                healthFlashTimer = null;
+                healthRecentlyChanged = false;
+            }, HEALTH_FLASH_MS);
+        }
+        lastHealthVal = health;
 
         setFill('s-health', health);
         setFill('s-focus', focus);
@@ -104,9 +143,16 @@
         setFill('s-stamina', submerged ? oxygen : stamina);
 
         // Nominal state is an empty top-left corner, matching the reference.
-        // A cap shows the row on its own: full health you cannot heal back into
-        // is worth knowing before something takes a bite out of it.
-        setVisible('health', $('s-health'), health < 100 || cap != null);
+        // Shown on a recent change (a hit or a heal), while the weapon/item
+        // wheel is open (Tab -- client.lua reads the control directly, so
+        // this works regardless of which inventory owns the wheel), or while
+        // a hunger/thirst cap is in effect: full health you cannot heal back
+        // into is worth knowing before something takes a bite out of it, and
+        // that one is a standing condition rather than a one-off event, so it
+        // is not gated on "recently changed". The flat regen-ceiling cap
+        // (capCause 'health') is deliberately NOT in this condition -- see
+        // needsWarning above for why.
+        setVisible('health', $('s-health'), healthRecentlyChanged || wheelOpen || needsWarning);
         // Focus is nominal at FULL (the opposite of armour's nominal-at-zero),
         // so it shows whenever it's spent at all, or actively draining.
         setVisible('focus', focusRow, focusActive || focus < 100);
@@ -521,13 +567,30 @@
     /* --- world action prompt ------------------------------------------------
        A short list of button-glyph + label options, e.g. Slim Jim / Smash
        Window. Not the scrollable #interact list — see the comment on
-       #world-actions in index.html for why this is its own component. */
+       #world-actions in index.html for why this is its own component.
+
+       Each option now arrives as { label, glyph, device } -- glyph is the
+       LIVE resolved key (client_overlays.lua's waResolveKey), the same way
+       the Action Prompts row above gets its `glyph`/`device`. This used to
+       take a hand-picked `button: 'triangle'|'circle'` string with nothing
+       connecting it to what was actually bound, which is exactly how it went
+       stale: the shown icon and the working button drifted apart (see the
+       fix note in vice_hud/client_overlays.lua and
+       qbx_vehiclekeys/client/slimjim.lua). Deriving the icon FROM the
+       resolved glyph, below, is what makes that drift impossible now. */
     var WA_BTN_SVG = {
         triangle: '<svg viewBox="0 0 24 24"><path d="M12 4 L20.5 19.5 L3.5 19.5 Z"/></svg>',
         circle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none"/></svg>',
         square: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" fill="none"/></svg>',
         cross: '<svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>'
     };
+    // GTA's own instructional-button text names pad face buttons with their
+    // Xbox letter (Y/B/X/A) regardless of the player's actual controller
+    // brand -- the same convention PAD_TONE (action prompts, above) keys off.
+    // Mapped to the matching PlayStation shape so a pad player still sees the
+    // outlined icon this component was designed around, derived from the
+    // resolved glyph rather than a separately hand-picked shape.
+    var WA_PAD_SHAPE = { Y: 'triangle', B: 'circle', X: 'square', A: 'cross' };
 
     function onWorldActions(d) {
         var box = $('world-actions');
@@ -541,7 +604,23 @@
 
             var btn = document.createElement('span');
             btn.className = 'wa-btn';
-            btn.innerHTML = WA_BTN_SVG[opt.button] || '';
+            var glyph = opt.glyph == null ? '' : String(opt.glyph);
+            var shape = opt.device === 'pad' ? WA_PAD_SHAPE[glyph] : null;
+            if (shape) {
+                // Recognised pad face button: the outlined shape this
+                // component was designed around.
+                // innerHTML alone -- setting .textContent afterward would wipe
+                // the SVG right back out, since it replaces all children.
+                btn.innerHTML = WA_BTN_SVG[shape];
+                btn.classList.remove('wa-btn-text');
+            } else {
+                // Keyboard, or a pad button with no shape mapping (shoulders,
+                // triggers, D-pad) -- show the resolved key/label as plain
+                // text inside the same circle rather than guessing a shape.
+                btn.innerHTML = '';
+                btn.textContent = glyph;
+                btn.classList.toggle('wa-btn-text', glyph.length > 0);
+            }
             row.appendChild(btn);
 
             var label = document.createElement('span');
@@ -3385,6 +3464,26 @@
         try { fn(d); }
         catch (err) { console.error('[vice_hud] handler "' + d.action + '" failed:', err); }
     });
+
+    /* --- tell the client the page is listening ---------------------------- */
+    /* The NUI page takes appreciably longer to come up than client.lua does, so
+       anything the client pushes during those first moments lands nowhere --
+       there is no listener yet and NUI messages are not queued. That is a
+       silent failure: the state is correct on the Lua side and simply never
+       reached the page.
+
+       It bit the minimap. A player whose saved preference is "no map on foot"
+       got the map hidden correctly, but the one `visible: false` that hides the
+       frame and the corner badge with it was sent before this file existed, and
+       setRadar only reports CHANGES -- so after every restart the frame and
+       logo sat on screen outlining an empty box until the player got into a car
+       and out again.
+
+       This ping is the fix: the client invalidates its "already sent that"
+       caches when it arrives, and the next poll tick re-asserts everything
+       against a page that is now listening. Inert outside FiveM -- post()
+       returns immediately when GetParentResourceName is undefined. */
+    post('uiReady', {});
 
     /* --- browser demo mode ----------------------------------------------- */
     /* When opened outside FiveM (no GetParentResourceName) populate the HUD with

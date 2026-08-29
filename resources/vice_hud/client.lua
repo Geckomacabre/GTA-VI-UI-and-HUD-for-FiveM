@@ -916,6 +916,33 @@ local function loadMinimapPref()
     elseif saved == 'hidden' then minimapOnFoot = false end
 end
 
+-- Called HERE, synchronously, in the main chunk -- not inside a CreateThread,
+-- which is where it used to live (further down, alongside loadMapState). A
+-- CreateThread body is scheduled, not run inline, and there was no ordering
+-- guarantee between that thread and the poll loop's own CreateThread below --
+-- both are just threads the scheduler picks among. If the poll loop's first
+-- tick ran before this one got around to it, that tick read the DEFAULT
+-- (Config.MinimapOnFootDefault, "always visible") instead of the saved
+-- preference and showed the map for at least one 250ms tick before the
+-- correct value took over -- a real, if brief, "it's on, then it turns off"
+-- flash on every load. GetResourceKvpString is a synchronous read with
+-- nothing to wait on, so there was never a reason for this to be threaded at
+-- all. Calling it here means minimapOnFoot is already correct before any
+-- thread -- including the poll loop -- has had a chance to run.
+--
+-- pcall'd because this now runs at the TOP LEVEL of the main chunk, not
+-- inside a thread: an uncaught error here would abort the rest of this
+-- file's synchronous execution and leave everything defined below it --
+-- every export, every RegisterNUICallback, the main loop itself -- never
+-- registered at all. Inside a CreateThread the same error would only have
+-- killed that one thread. GetResourceKvpString has no known way to throw,
+-- but "no known way" is not the same guarantee as a resource-start path
+-- literally cannot fail, and the cost of the pcall is one line.
+local ok, err = pcall(loadMinimapPref)
+if not ok then
+    print('^1[vice_hud]^7 loadMinimapPref failed: ' .. tostring(err))
+end
+
 -- The frame and the corner badge are NUI elements drawn over WHERE the map is;
 -- the map itself is the engine's radar. Toggling one without the other left an
 -- empty outlined box with a logo in the corner and nothing inside it. So every
@@ -923,8 +950,11 @@ end
 -- the change -- once per actual transition, not once per poll tick, since two
 -- of the four callers sit inside the 250ms loop.
 local radarShown = nil
+local radarWanted = nil     -- the last thing we ASKED for, which is not the same
+                            -- thing as what the engine is currently doing
 local function setRadar(on)
     on = on and true or false
+    radarWanted = on
     DisplayRadar(on)
     if on ~= radarShown then
         radarShown = on
@@ -932,12 +962,75 @@ local function setRadar(on)
     end
 end
 
+-- DISPLAY_RADAR is a single global flag with no owner: the LAST script to call
+-- it wins, and any resource may call it on any frame. This resource asks for
+-- what it wants four times a second (the poll loop's tick), so a resource that
+-- asks every frame simply overrules it -- the map stays up and "hide on foot"
+-- looks broken, with nothing in either console to say why.
+--
+-- HUD::IS_RADAR_HIDDEN reads the flag back, so we do not have to guess. This
+-- re-asserts a HIDE every frame while a hide is what was asked for, which is
+-- what makes the preference actually stick; and the first time it catches the
+-- engine disagreeing with us it says so once, by name, because "something else
+-- is turning your minimap back on" is a five-second fix if you know it and an
+-- afternoon if you don't.
+--
+-- Only the HIDE is enforced. Re-asserting a SHOW every frame would make this
+-- resource the very thing described above, and stop anything else -- a cutscene,
+-- a phone, an interior -- from legitimately hiding the map.
+CreateThread(function()
+    local warned = false
+    while true do
+        Wait(0)
+        if radarWanted == false then
+            if not IsRadarHidden() then
+                if not warned then
+                    warned = true
+                    print('^3[vice_hud]^7 something else is switching the minimap back on '
+                        .. '(DISPLAY_RADAR is global and last-call-wins). vice_hud is now '
+                        .. 're-asserting the hide every frame. If the map flickers, find the '
+                        .. 'other resource -- likely another HUD -- rather than leaving both '
+                        .. 'fighting over it.')
+                end
+                DisplayRadar(false)
+            end
+        else
+            warned = false
+        end
+    end
+end)
+
+-- The page posts this once it is listening. Everything pushed before that point
+-- was dropped -- NUI messages are not queued for a page that has not loaded --
+-- and because the pushes above are all "only on change", nothing would ever say
+-- it again. So forget what we think the page knows and let the next poll tick
+-- re-assert it.
+--
+-- This is what made a saved "no minimap on foot" preference look broken after a
+-- restart: the map was hidden correctly, but the one message that takes the
+-- frame and the corner badge down with it went out before the page existed.
+RegisterNUICallback('uiReady', function(_, cb)
+    radarShown = nil        -- next setRadar() re-sends, whatever it decides
+    lastRectKey = nil       -- and applyMinimap re-publishes the rect + showFrame
+    if resetPushCaches then resetPushCaches() end
+    cb({ ok = true })
+end)
+
 RegisterCommand('hudminimap', function()
     minimapOnFoot = not minimapOnFoot
     SetResourceKvp(KVP_MINIMAP, minimapOnFoot and 'always' or 'hidden')
     if not IsPedInAnyVehicle(cache.ped or PlayerPedId(), false) then
         setRadar(minimapOnFoot or editorOpen)
     end
+    -- Print the live state as well as notifying. When someone says "I set it to
+    -- hide and it doesn't", this is the line that separates "the preference did
+    -- not take" from "the preference took and something else is overriding it".
+    print(('^2[vice_hud]^7 minimap on foot: %s (stored "%s") | in vehicle: %s | editor: %s | radar hidden right now: %s')
+        :format(tostring(minimapOnFoot),
+                tostring(GetResourceKvpString(KVP_MINIMAP)),
+                tostring(IsPedInAnyVehicle(cache.ped or PlayerPedId(), false)),
+                tostring(editorOpen),
+                tostring(IsRadarHidden())))
     lib.notify({
         title = 'HUD',
         description = minimapOnFoot and 'Minimap always visible' or 'Minimap hidden while on foot',
@@ -2040,8 +2133,30 @@ CreateThread(function()
     end
 end)
 
+-- FIXED 2026-08-28 (round 2): this used to also OR in
+-- IsDisabledControlPressed(0, 37), on the reasoning that ox_inventory's own
+-- hotkey system disables control 37 while it owns it (see the identical note
+-- on this same control in client_overlays.lua). That reasoning was flagged
+-- as UNVERIFIED at the time (no running game to check against) and it was
+-- wrong: this server's ox_inventory config disables control 37 on almost
+-- EVERY frame the inventory is closed (`not EnableWeaponWheel`, which is the
+-- default), so IsDisabledControlPressed reported true essentially all the
+-- time regardless of whether Tab was actually held -- the health row never
+-- went nominal again, which is exactly the "stays on screen even when full"
+-- the user reported.
+--
+-- IsControlPressed alone is the correct, standard read: it reports the RAW
+-- physical input for a normal digital button (Tab/INPUT_SELECT_WEAPON is
+-- one) regardless of whether DisableControlAction has been called on it that
+-- frame -- disabling only suppresses the GAME's own reaction, not what this
+-- native reports back. No fallback needed.
+local function wheelHeld()
+    return IsControlPressed(0, 37)
+end
+
 CreateThread(function()
-    loadMinimapPref()
+    -- loadMinimapPref() used to be called here; moved to run synchronously
+    -- right after its own definition, above -- see the comment there.
     loadMapState()
     local savedOffset = tonumber(GetResourceKvpString(KVP_OFFSET) or '')
     Wait(500)
@@ -2074,6 +2189,22 @@ CreateThread(function()
         -- must not kill this thread forever — without the pcall it did, and
         -- the whole status/wanted/cash/vehicle stack went dark until a manual
         -- resource restart, with nothing on screen to say why.
+        -- The MAP'S VISIBILITY IS DECIDED HERE, OUTSIDE THE pcall, and must
+        -- stay here. It used to be decided at the bottom of the pcall'd body,
+        -- in the vehicle/on-foot branch -- which meant any error earlier in the
+        -- body (a nil entity, a module that failed to load, a stray arithmetic
+        -- slip) aborted the tick before the radar was ever touched. The radar
+        -- then kept whatever state it was last put in, and since a player whose
+        -- preference is "no map on foot" was last put in `hidden`, the map
+        -- could never come back -- not on foot, not in a car, not after a
+        -- restart. One unrelated error permanently removed the minimap.
+        --
+        -- It is one cheap native call and it depends on nothing but two
+        -- booleans, so it does not belong behind the same failure as the status
+        -- readouts. `or editorOpen`: /movehud has to be able to see the map it
+        -- is positioning.
+        setRadar(cache.vehicle ~= nil or minimapOnFoot or editorOpen)
+
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()
         local playerId = PlayerId()
@@ -2090,6 +2221,10 @@ CreateThread(function()
         -- what the clamp settled on rather than trailing it by a tick.
         local cap, capCause = ViceVitals.readNeeds()
         ViceVitals.enforceCap(ped, cap, maxHp)
+        -- (ViceVitals comes from client_vitals.lua. If that file ever fails to
+        -- load, every line from here down is skipped -- which is survivable now
+        -- that the radar is decided above, but the tick error print below is
+        -- the only thing that will say so.)
 
         local raw = GetEntityHealth(ped)
         local health = raw > 100 and ((raw - 100) / (maxHp - 100)) * 100 or 0
@@ -2115,6 +2250,9 @@ CreateThread(function()
             -- warning and no separate flag can contradict it.
             cap      = cap and math.floor(cap) or nil,
             capCause = cap and capCause or nil,
+            -- Lets the health row show while the player is checking the
+            -- weapon/item wheel, on top of its own recent-change reveal.
+            wheel    = wheelHeld(),
         })
 
         -- ---- wanted -------------------------------------------------------
@@ -2188,7 +2326,6 @@ CreateThread(function()
         -- it re-triggers on every new vehicle.
         local vehicle = cache.vehicle
         if vehicle then
-            setRadar(true)
             veh.fuel = fuelLevel(vehicle)
             veh.engine = GetIsVehicleEngineRunning(vehicle)
             veh.lock = lockState(vehicle)
@@ -2223,10 +2360,6 @@ CreateThread(function()
             })
             vehShown = true
         else
-            -- `or editorOpen`: the editor's Minimap rows move and resize the
-            -- native map, which is impossible to do by eye if the map is not
-            -- drawn. Hidden again the moment the editor closes.
-            setRadar(minimapOnFoot or editorOpen)
             panelUntil = 0
             if vehShown then
                 vehShown = false

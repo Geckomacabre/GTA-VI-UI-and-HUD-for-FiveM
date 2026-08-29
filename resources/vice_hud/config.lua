@@ -230,10 +230,21 @@ Config.Needs = {
 
     -- A second, FLAT cap that applies regardless of hunger/thirst: passive
     -- regen never climbs health past this percentage on its own, full belly
-    -- or not. Getting past it takes a deliberate heal -- Zombix, food, or any
-    -- other health_items consumable, which already bypasses this cap the same
-    -- way it bypasses the hunger/thirst one (see healingItemActive/healJumpPct
-    -- above; nothing extra was needed for that).
+    -- or not. Getting past it takes a deliberate heal -- one of the three
+    -- health_items consumables (Zombix, Painkiller, Medikit -- see that
+    -- resource's config.lua), which bypasses this cap the same way it
+    -- bypasses the hunger/thirst one (healingItemActive/healJumpPct above).
+    --
+    -- CORRECTED 2026-08-28: this comment used to say "Zombix, food, or any
+    -- other health_items consumable" bypasses the cap. That was wrong --
+    -- checked health_items/config.lua directly and it registers exactly
+    -- those three items, nothing named or behaving like ordinary food.
+    -- Grepped this entire server for anything that restores health from a
+    -- food item and found nothing: eating food here only ever restores
+    -- hunger/thirst (qbx_core's normal item system), never health. So
+    -- "food doesn't restore health" isn't this cap misbehaving -- nothing
+    -- was ever built to make food restore health in the first place, and
+    -- this comment had been documenting a feature that doesn't exist.
     --
     -- Whichever of this and the hunger/thirst cap is LOWER wins, so a starving
     -- player at 40% is still capped at 40%, not pulled back up to this. nil or

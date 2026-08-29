@@ -108,13 +108,19 @@
    found so far, standing in until a better one turns up. Used with a black
    outline (see .item-select-outline below), because that is what the
    reference actually draws: white fill, a hard black stroke round it, no
-   drop shadow doing the separation instead. */
+   drop shadow doing the separation instead.
+
+   NOT BUNDLED -- resolved from the player's own machine, same reasoning as
+   Helvetica Neue above: it's a commercial face and redistributing the .otf
+   in a public repository is not ours to do. Falls straight through to the
+   Helvetica Neue / sans-serif chain below on a machine that doesn't have it
+   installed locally. Bundle the .otf again in html/fonts/ (and restore the
+   url() source here) if you own a licence for it and want the exact cut. */
 @font-face {
     font-family: 'BelleSansCondensed';
-    src: url('fonts/BelleSansExtraCondensedBold.otf') format('opentype');
+    src: local('Belle Sans Extra Condensed Bold'), local('BelleSansCondensed-ExtraBold');
     font-weight: 700;
     font-style: normal;
-    font-display: block;
 }
 
 /* The black-outline text treatment itself, kept separate from the @font-face
@@ -3355,6 +3361,16 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     background: rgba(0, 0, 0, 0.35);
 }
 .wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* Keyboard (or an unmapped pad button, e.g. a shoulder/trigger/D-pad bind):
+   the resolved key text sits plainly in the same circle rather than a
+   guessed shape -- see WA_PAD_SHAPE in app.js for which pad letters get a
+   shape instead of landing here. */
+.wa-btn-text {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-size: calc(0.8 * var(--w));
+    line-height: 1;
+}
 .wa-label {
     font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
     font-size: calc(0.95 * var(--w));
