@@ -91,7 +91,7 @@ Overlays for resources you install separately:
   inventory screen and the in-world hotbar: an 8-cell role-based weapon wheel
   (free/melee/handheld/fist) plus a matching items wheel, medical-only
   quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
-  installed) a hard 15-slot pocket cap that lifts while a bag is carried.
+  installed) a hard 17-slot pocket cap that lifts while a bag is carried.
   See the [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png). Not
   part of the vice_hud glass system above.
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's

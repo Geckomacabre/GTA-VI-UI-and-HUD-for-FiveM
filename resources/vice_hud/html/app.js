@@ -3037,9 +3037,18 @@
             var ffxOff = $('focus-fx'); if (ffxOff) ffxOff.classList.remove('active');
             var frowOff = $('s-focus'); if (frowOff) frowOff.classList.remove('active');
             ['zone', 'vehicle', 'honor', 'wanted', 'honor-pop',
-             'reputation', 'reputation-pop', 'skillup', 'nav-popup', 'nav-compass'].forEach(function (id) {
+             'reputation', 'reputation-pop', 'skillup'].forEach(function (id) {
                 show($(id), false);
             });
+            // Not just a show(el, false) like the ids above: onNav's own
+            // "inactive" branch is what clears mapBadgeWanted back to true.
+            // editorPreview(true) called onNav({active:true, near:true, ...})
+            // to preview the nav bar, which sets mapBadgeWanted = false (the
+            // badge steps aside for the compass) -- hiding nav-popup/
+            // nav-compass by id here without going back through onNav left
+            // that flag stuck at false, so the badge stayed hidden after
+            // every close from then on, not just during the preview.
+            onNav({ active: false });
             // The frame and badge were forced on for the preview; put the whole
             // map chrome back to whatever the config and the live radar state
             // actually ask for.

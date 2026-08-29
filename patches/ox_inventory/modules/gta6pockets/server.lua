@@ -9,17 +9,25 @@
  grid, never this module raising the player's own inventory past the wheels.
 
  So this only ever toggles the PLAYER inventory's own ceiling between the
- 15-slot pocket cap and the server's normal capacity, driven by whether they
- are currently carrying one of wasabi_backpack's bag items. SetSlotCount/
+ pocket cap and the server's normal capacity, driven by whether they are
+ currently carrying one of wasabi_backpack's bag items. SetSlotCount/
  SetMaxWeight only change the ceiling number -- they never touch inv.items --
  confirmed by reading modules/inventory/server.lua (SetSlotCount, GetEmptySlot
  loops `for i = 1, inventory.slots`), so lowering the cap on an unbagged
  player can never delete or hide anything already in slots 1-15.
+
+ 17, not 15: LeftInventory.tsx's two medical quickslots (MAX_QUICKSLOTS) need
+ their own real, numbered slots to drag an item onto when nothing already
+ sits in one -- their "empty" fallback search excludes every wheel slot
+ (WHEEL_SLOTS ∪ ITEM_WHEEL_SLOTS, 1-15) and looks past them for a spare slot
+ number. Capping at exactly 15 left literally none: inv.slots was 15, so
+ slots 16-17 didn't exist, the quickslots had nothing to bind to, and a
+ bandage could not be dragged onto them at all.
 ]]
 
 local Inventory = require 'modules.inventory.server'
 
-local POCKET_SLOTS = GetConvarInt('inventory:pocketslots', 15)
+local POCKET_SLOTS = GetConvarInt('inventory:pocketslots', 17)
 local POCKET_WEIGHT = GetConvarInt('inventory:pocketweight', 8000)
 
 -- wasabi_backpack/config.lua's Config.Bags keys -- that resource has no

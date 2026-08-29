@@ -2133,25 +2133,30 @@ CreateThread(function()
     end
 end)
 
--- FIXED 2026-08-28 (round 2): this used to also OR in
--- IsDisabledControlPressed(0, 37), on the reasoning that ox_inventory's own
--- hotkey system disables control 37 while it owns it (see the identical note
--- on this same control in client_overlays.lua). That reasoning was flagged
--- as UNVERIFIED at the time (no running game to check against) and it was
--- wrong: this server's ox_inventory config disables control 37 on almost
+-- This used to also OR in IsDisabledControlPressed(0, 37), on the reasoning
+-- that ox_inventory's own hotkey system disables control 37 while it owns it
+-- (see the identical note on this same control in client_overlays.lua). That
+-- was wrong: this server's ox_inventory config disables control 37 on almost
 -- EVERY frame the inventory is closed (`not EnableWeaponWheel`, which is the
 -- default), so IsDisabledControlPressed reported true essentially all the
 -- time regardless of whether Tab was actually held -- the health row never
--- went nominal again, which is exactly the "stays on screen even when full"
--- the user reported.
+-- went nominal again, staying on screen even at full health.
 --
 -- IsControlPressed alone is the correct, standard read: it reports the RAW
 -- physical input for a normal digital button (Tab/INPUT_SELECT_WEAPON is
 -- one) regardless of whether DisableControlAction has been called on it that
 -- frame -- disabling only suppresses the GAME's own reaction, not what this
 -- native reports back. No fallback needed.
+--
+-- Also true for the whole time the full F2 inventory screen is open, not
+-- just while Tab is physically held for the wheel: LocalPlayer.state.invOpen
+-- is ox_inventory's own state bag flag (global, readable by any resource),
+-- set true on open and false on close. Without it, checking a full backpack
+-- of medical items left the health row auto-hidden at full health, the same
+-- "row disappears while the player is actively looking at their own stats"
+-- complaint the Tab-wheel case above already exists to fix.
 local function wheelHeld()
-    return IsControlPressed(0, 37)
+    return IsControlPressed(0, 37) or LocalPlayer.state.invOpen == true
 end
 
 CreateThread(function()
@@ -2203,7 +2208,17 @@ CreateThread(function()
         -- booleans, so it does not belong behind the same failure as the status
         -- readouts. `or editorOpen`: /movehud has to be able to see the map it
         -- is positioning.
-        setRadar(cache.vehicle ~= nil or minimapOnFoot or editorOpen)
+        --
+        -- `and not LocalPlayer.state.invOpen`: ox_inventory sets this state bag
+        -- flag itself (LocalPlayer.state is global, readable by any resource)
+        -- on open/close. Without this check, opening the inventory hid the
+        -- ENGINE's radar (ox_inventory calls DisplayRadar(false) itself) but
+        -- left #map-frame/#map-badge on screen — those two are pure NUI
+        -- elements that only ever react to vice_hud's OWN belief about radar
+        -- state, and from vice_hud's side nothing had changed, so it never
+        -- re-sent the mapRect hide. The frame and badge floated over the
+        -- inventory screen with nothing behind them.
+        setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen) and not LocalPlayer.state.invOpen)
 
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()

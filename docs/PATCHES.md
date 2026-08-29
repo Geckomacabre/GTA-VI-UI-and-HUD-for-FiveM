@@ -247,17 +247,21 @@ wheels.
 That's backed by a slot/weight cap: without a bag equipped (four items from
 [`wasabi_backpack`](https://github.com/wasabirobby/wasabi_backpack) —
 `dufflebag`, `backpack`, `rucksack`, `cayoduffel`), a player's own inventory
-is hard-capped to 15 slots (the two wheels' worth) by `modules/gta6pockets/
-server.lua`, a new self-contained module. It hooks `Inventory.SetSlot` — the
-one low-level function every add/remove path (buy, craft, give, drop, swap)
-funnels through — so picking up or dropping a bag lifts or reapplies the cap
-on the same tick, with a slower poll as a fallback for anything that changes
-`inv.items` outside that path. `SetSlotCount`/`SetMaxWeight` only ever change
-the ceiling number, never touch existing items, so lowering the cap on an
-unbagged player can't delete or hide anything already in slots 1-15. Ship
-`wasabi_backpack` separately if you want the cap to ever lift — without it
-every player stays capped at 15 slots permanently. The bag item list and the
-15-slot/8000-weight cap are both overridable via convars
+is hard-capped to 17 slots (the two wheels' 15, plus 2 spare for
+`LeftInventory.tsx`'s medical quickslots — their own "drag onto an empty
+slot" search excludes every wheel slot and needs somewhere past them to
+land, so capping at exactly 15 left it nowhere to bind at all) by
+`modules/gta6pockets/server.lua`, a new self-contained module. It hooks
+`Inventory.SetSlot` — the one low-level function every add/remove path
+(buy, craft, give, drop, swap) funnels through — so picking up or dropping
+a bag lifts or reapplies the cap on the same tick, with a slower poll as a
+fallback for anything that changes `inv.items` outside that path.
+`SetSlotCount`/`SetMaxWeight` only ever change the ceiling number, never
+touch existing items, so lowering the cap on an unbagged player can't
+delete or hide anything already in slots 1-17. Ship `wasabi_backpack`
+separately if you want the cap to ever lift — without it every player
+stays capped at 17 slots permanently. The bag item list and the
+17-slot/8000-weight cap are both overridable via convars
 (`inventory:pocketbags`, `inventory:pocketslots`, `inventory:pocketweight`)
 rather than editing the module.
 
