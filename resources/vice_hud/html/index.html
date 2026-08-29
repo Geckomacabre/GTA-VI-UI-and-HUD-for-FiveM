@@ -136,11 +136,21 @@
                 <!-- Two paths, one shown at a time via [data-dir] in CSS: a
                      plain up-arrow for "straight", and a hooked turn glyph
                      for left/right/u-turn -- mirrored/rotated with a single
-                     transform rather than authored three times. -->
+                     transform rather than authored three times.
+
+                     arrow-straight's own ink bounding box (x: 6.5-17.5) is
+                     already symmetric around the viewBox's x-centre (12), so
+                     the tile's flex centring lands it dead centre. arrow-turn
+                     was not: its hook originally spanned x: 2-12, entirely
+                     the left half of the box, which is what made the turn
+                     glyph read as off-centre in the tile while straight
+                     looked fine. Shifted +5x/+1.25y (a pure translate, same
+                     curve/angles) so its own bounding box (x: 7-17, y:
+                     2.75-21.25) centres on (12, 12) the same way. -->
                 <div id="nav-turn-arrow">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path class="arrow-straight" d="M12 20 L12 5 M12 5 L6.5 10.5 M12 5 L17.5 10.5"/>
-                        <path class="arrow-turn" d="M12 20 L12 12 Q12 5 5 5 L2 5 M2 5 L5.5 1.5 M2 5 L5.5 8.5"/>
+                        <path class="arrow-turn" d="M17 21.25 L17 13.25 Q17 6.25 10 6.25 L7 6.25 M7 6.25 L10.5 2.75 M7 6.25 L10.5 9.75"/>
                     </svg>
                 </div>
             </div>
