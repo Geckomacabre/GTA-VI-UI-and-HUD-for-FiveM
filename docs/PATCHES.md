@@ -255,9 +255,10 @@ wheels.
 
 The two bottom-left medical quickslots (also `LeftInventory.tsx`) are a
 read-only auto-populated readout, not a drop target: whatever medical items
-(see `wheelCategories.isMedicalItem`) are already carried outside the two
-wheels just show up there on their own, up to two, with no drag-and-drop and
-no empty-slot padding — matching the reference, which never draws an empty
+(see `wheelCategories.isMedicalItem`) are already carried — wheel slots
+included, searched across the whole inventory — just show up there on their
+own, up to two, with no drag-and-drop and no empty-slot padding — matching
+the reference, which never draws an empty
 holster for a consumable you don't have.
 
 That's backed by a slot/weight cap: without a bag equipped (four items from
@@ -389,7 +390,7 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-95575c2f.js
+patches/ox_inventory/web/build/assets/index-2555cb6f.js
 patches/ox_inventory/web/build/assets/index-93b7c2d3.css
 patches/ox_inventory/web/build/index.html
 ```

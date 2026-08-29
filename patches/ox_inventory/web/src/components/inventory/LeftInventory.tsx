@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import InventorySlot from './InventorySlot';
 import InventoryTabs from './InventoryTabs';
-import WeaponWheel, { WHEEL_SLOTS } from './WeaponWheel';
-import ItemWheel, { ITEM_WHEEL_SLOTS } from './ItemWheel';
+import WeaponWheel from './WeaponWheel';
+import ItemWheel from './ItemWheel';
 import { useActiveTab, setActiveTab } from '../../store/activeTab';
 import PlayerStatusBars from './PlayerStatusBars';
 import PromptGlyph from './PromptGlyph';
@@ -40,10 +40,6 @@ const LeftInventory: React.FC = () => {
    * InventoryGrid at all any more.
    */
 
-  // Both wheels' slots are excluded from the quick-use strip so the two never
-  // fight over the same items.
-  const wheelSlotIds = useMemo(() => new Set([...WHEEL_SLOTS, ...ITEM_WHEEL_SLOTS]), []);
-
   // Medical-only quick-slots (bottom-left) — see wheelCategories.ts for the
   // curated item list this is restricted to. It used to accept any `usable`
   // item (food, drinks, drugs, bandages alike), which meant a burger could
@@ -52,21 +48,28 @@ const LeftInventory: React.FC = () => {
   /*
    * Read-only, auto-populated readout, matching the reference: these are NOT
    * drop targets you drag a bandage onto to "assign" it. Whatever medical
-   * items are already in the inventory just show up here on their own, up to
-   * MAX_QUICKSLOTS, in whatever slot order they're found. No empty-slot
-   * padding either — with nothing to show, the strip just shows fewer cells,
-   * same as the reference doesn't draw an empty holster for a gun you don't
-   * have. InventorySlot itself is still the real slot underneath (so
-   * hovering/alt-click-use/dragging it back OUT still all work), it just no
-   * longer accepts drops.
+   * items are already carried just show up here on their own, up to
+   * MAX_QUICKSLOTS, in whatever slot order they're found -- searched across
+   * the WHOLE inventory, wheel slots included. The old version excluded the
+   * wheels' own slots 1-15 (a leftover from when this WAS a drop target and
+   * the two could otherwise fight over the same item), but that meant a
+   * bandage sitting in one of the item wheel's own cells -- which, at a
+   * 17-slot pocket cap with the wheels claiming 15 of them, is where a
+   * carried item usually IS -- would never surface here at all. Being a
+   * read-only mirror now, there's nothing left to fight over: the same
+   * bandage can be one of the item wheel's 8 cells AND show up here.
+   * No empty-slot padding either — with nothing to show, the strip just
+   * shows fewer cells, same as the reference doesn't draw an empty holster
+   * for a consumable you don't have. InventorySlot itself is still the real
+   * slot underneath (so hovering/alt-click-use/dragging it back OUT still
+   * all work), it just no longer accepts drops.
    */
   const quickItems = useMemo(
     () =>
       leftInventory.items
         .filter((item): item is SlotWithItem => isSlotWithItem(item) && isMedicalItem(item.name))
-        .filter((item) => !wheelSlotIds.has(item.slot))
         .slice(0, MAX_QUICKSLOTS),
-    [leftInventory.items, wheelSlotIds]
+    [leftInventory.items]
   );
 
   return (

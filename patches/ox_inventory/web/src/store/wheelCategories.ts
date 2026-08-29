@@ -54,6 +54,10 @@ const MEDICAL_ITEMS = new Set([
   'perc5',
   'vic10',
   'vic5',
+  // health_items' own healing effects (config.lua's Config.Effects): perc30
+  // above already covers the 'painkiller' effect, zombix was the one item
+  // in that same resource missing from this list.
+  'zombix',
 ]);
 
 export const isMeleeItem = (name: string): boolean => MELEE_ITEMS.has(name);
