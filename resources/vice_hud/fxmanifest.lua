@@ -3,8 +3,8 @@ game 'gta5'
 lua54 'yes'
 
 name 'vice_hud'
-description 'GTA6-style HUD for Qbox: status bars, minimap slot (zone + vehicle), turn-by-turn navigation, wanted stars, weapon/ammo, money, honor, skills, action prompts, directional police glow and exhaustion effects. Requires ox_lib; qbx_core optional.'
-version '1.39.0'
+description 'GTA6-style HUD for Qbox: status bars, minimap slot (zone + vehicle), turn-by-turn navigation, wanted stars, weapon/ammo, money, honor, skills, action prompts, directional police glow and exhaustion effects. The interact menu renders through ScaleformUI instead of NUI. Requires ox_lib and the sibling ScaleformUI_Assets resource; qbx_core optional.'
+version '2.0.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
@@ -17,6 +17,32 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Vendored library (see vendor/ScaleformUI_Lua/VENDORED.md for source/
+    -- commit/license). Must load before client_overlays.lua, which is the
+    -- only file that references its globals (UIMenu, MenuHandler, ...).
+    -- Needs its OWN glob rather than folding into the split below because it
+    -- is third-party code, not part of this resource's own file-split.
+    --
+    -- Split into every sibling directory PLUS mainScaleform.lua listed last,
+    -- rather than one 'src/**/*.lua' glob: FXServer expands a glob in
+    -- alphabetical path order, and 'ScaleformUI/mainScaleform.lua' (capital S)
+    -- sorted before 'scaleforms/Minimap/MinimapOverlays.lua' (lowercase s).
+    -- mainScaleform.lua's top level captures globals like MinimapOverlays,
+    -- BigMessageInstance, RankbarHandler into the ScaleformUI.Scaleforms
+    -- table immediately on load -- if it runs first those globals don't
+    -- exist yet, so the table permanently gets nil (Lua doesn't retroactively
+    -- update an already-assigned field). That produced two client script
+    -- errors ("attempt to index a nil value (field 'MinimapOverlays')") and,
+    -- because that thread died before requesting the rest of its scaleforms,
+    -- contributed to unrelated scaleform-loading contention on connect.
+    'vendor/ScaleformUI_Lua/src/Elements/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/Hud/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/Menus/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/TimerBars/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/scaleforms/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/utils/**/*.lua',
+    'vendor/ScaleformUI_Lua/src/ScaleformUI/scaleform.lua',
+    'vendor/ScaleformUI_Lua/src/ScaleformUI/mainScaleform.lua',
     -- Split out of client.lua, and loaded BEFORE it so their published tables
     -- exist by the time anything can call them. Each .lua file is its own Lua
     -- chunk with its own 200-top-level-locals budget, which is the reason the
@@ -92,4 +118,9 @@ files {
 
 dependencies {
     'ox_lib',
+    -- The compiled .gfx scaleform movies -- see ../ScaleformUI_Assets/VENDORED.md.
+    -- `dependencies` only blocks this resource from starting before that one
+    -- has started; server.cfg still needs `ensure ScaleformUI_Assets` ABOVE
+    -- `ensure vice_hud` or the ordering never happens in the first place.
+    'ScaleformUI_Assets',
 }

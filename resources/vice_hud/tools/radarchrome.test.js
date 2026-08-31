@@ -3,7 +3,7 @@
  *   npm i fengari && node tools/radarchrome.test.js
  *
  * Two of its four callers sit inside the 250ms poll loop, so the thing worth
- * pinning is that it reports TRANSITIONS, not ticks, otherwise the page would
+ * pinning is that it reports TRANSITIONS, not ticks -- otherwise the page would
  * take a mapRect message four times a second forever. Runs the real setRadar
  * lifted out of client.lua.
  */

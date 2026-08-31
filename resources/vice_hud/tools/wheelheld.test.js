@@ -8,17 +8,17 @@
  * That reasoning was flagged unverified (no running game to check against),
  * and it was wrong in a specific, reproducible way: this server's
  * ox_inventory config disables control 37 on almost every frame the
- * inventory is CLOSED (`not EnableWeaponWheel`, the default), so
+ * inventory is CLOSED (`not EnableWeaponWheel`, the default) -- so
  * IsDisabledControlPressed read true nearly all the time regardless of
  * whether Tab was actually held, and the health row never went nominal again
  * ("stays on screen even when full", reported after the fix shipped).
  *
  * IsControlPressed alone is correct: it reports the raw physical input for a
  * normal digital button (Tab/INPUT_SELECT_WEAPON is one) regardless of
- * whether DisableControlAction was called on it that frame, disabling only
+ * whether DisableControlAction was called on it that frame -- disabling only
  * suppresses the GAME's own reaction, not what this native reports back.
  * This pins that wheelHeld() reflects ONLY the plain control read, and does
- * NOT reference IsDisabledControlPressed at all, so a future "fix" can't
+ * NOT reference IsDisabledControlPressed at all -- so a future "fix" can't
  * silently reintroduce the same bug.
  *
  * ROUND 3: also true whenever LocalPlayer.state.invOpen is set. ox_inventory
@@ -43,13 +43,13 @@ if (a < 0 || b < 5) throw new Error('could not locate wheelHeld() in client.lua'
 const body = src.slice(a, b);
 
 ok(!/IsDisabledControlPressed/.test(body),
-   'wheelHeld() does not reference IsDisabledControlPressed at all, ' +
+   'wheelHeld() does not reference IsDisabledControlPressed at all -- ' +
    'the specific native that caused round 1\'s "always shown" bug');
 
 const L = lauxlib.luaL_newstate();
 lualib.luaL_openlibs(L);
 let pressed = false;
-// Deliberately do NOT define IsDisabledControlPressed in this harness, if
+// Deliberately do NOT define IsDisabledControlPressed in this harness -- if
 // wheelHeld() were to call it, the load below would fail with "attempt to
 // call a nil value", which is a second, independent guard against the same
 // regression alongside the static check above.

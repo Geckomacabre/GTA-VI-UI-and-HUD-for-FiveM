@@ -1552,12 +1552,6 @@ exports('SetHudVisible', function(visible)
     ui('hudVisible', { show = visible ~= false })
 end)
 
--- Accept the event qbx_honor already fires, so no change is needed there.
-RegisterNetEvent('vice_hud:honor', function(data)
-    if type(data) ~= 'table' then return end
-    ShowHonorToast(data.mugshot, data.honor, data.emoji, data.reason, data.broken)
-end)
-
 -- =============================================================================
 -- Reputation toast
 -- =============================================================================

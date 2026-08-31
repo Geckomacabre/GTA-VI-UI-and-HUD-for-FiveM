@@ -62,8 +62,15 @@ included here.
 - **`vice_hud`**: The core HUD: minimap, vehicle panel, zone bar, skills,
   stamina/oxygen, notifications, a full in-game HUD editor (`/hudedit`), and
   the theme engine (`/hudtheme`, `/themepublish`) that the `patches/` folder
-  plugs into. Has its own `README.md` and `docs/INTERNALS.md` inside, so
-  start there for anything HUD-specific. Depends on `ox_lib`.
+  plugs into. The interact menu renders through ScaleformUI rather than NUI;
+  see `resources/vice_hud/README.md` for what that needs. Has its own
+  `README.md` and `docs/INTERNALS.md` inside, so start there for anything
+  HUD-specific. Depends on `ox_lib` and the sibling `ScaleformUI_Assets`
+  resource.
+
+- **`ScaleformUI_Assets`**: The compiled scaleform movie `vice_hud`'s
+  interact menu renders through. Not a HUD feature on its own, just a
+  runtime dependency; ensure it before `vice_hud` in server.cfg.
 
 - **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the
@@ -117,10 +124,12 @@ its own.
 
 ## Installing (drag-and-drop resources)
 
-1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/qbx_honor`,
-   and/or `resources/qbx_vehiclekeys` into your server's `resources/` folder.
+1. Copy `resources/vice_hud`, `resources/ScaleformUI_Assets`,
+   `resources/um_gigs`, `resources/qbx_honor`, and/or
+   `resources/qbx_vehiclekeys` into your server's `resources/` folder.
 2. Add them to `server.cfg`:
    ```
+   ensure ScaleformUI_Assets
    ensure vice_hud
    ensure um_gigs
    ensure qbx_honor
@@ -128,7 +137,8 @@ its own.
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
-   - `vice_hud` needs **ox_lib**.
+   - `vice_hud` needs **ox_lib** and **ScaleformUI_Assets** (bundled here,
+     just make sure it's ensured first).
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
    - `qbx_honor` needs **qbx_core**, **ox_target**.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
@@ -200,11 +210,16 @@ This repository is licensed under the [GNU General Public License v3.0](LICENSE)
 matching `vice_hud`, its core resource.
 
 `resources/vice_hud` and `resources/qbx_vehiclekeys` each carry their own
-`LICENSE` file (both GPL-3.0), and that governs those folders specifically.
-Nothing else under `resources/` or `patches/` ships its own `LICENSE` here,
-since `patches/` is only a handful of individual files extracted from each
-project, not a full copy, but the original projects remain under their own
-upstream license:
+`LICENSE` file (both GPL-3.0), and that governs those folders specifically,
+**except** `resources/vice_hud/vendor/ScaleformUI_Lua` and
+`resources/ScaleformUI_Assets`, which are
+[ScaleformUI](https://github.com/manups4e/ScaleformUI) under CC BY-NC-SA 4.0,
+non-commercial only. Those two pieces are what the interact menu renders
+through; see `resources/vice_hud/README.md`'s License section before running
+this on a paid server. Nothing else under `resources/` or `patches/` ships
+its own `LICENSE` here, since `patches/` is only a handful of individual
+files extracted from each project, not a full copy, but the original
+projects remain under their own upstream license:
 
 | Project | License |
 | --- | --- |
@@ -214,6 +229,7 @@ upstream license:
 | `qb-menu`, `qb-input` | GPL-3.0 |
 | `speedlimits`, `zseatbelt` | MIT |
 | `um_smallresources` | GPL-3.0 |
+| ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
 
 Check each project's own repository for its full license text before
 redistributing patched files from this bundle outside your own server.

@@ -325,12 +325,19 @@ const scale = (el) => {
 };
 const fill = () => scale(row.querySelector('.sfill'));
 
-// Fed and healthy: the row is nominal, so it goes away.
+// Establish a baseline, then move it -- the row now reveals on an actual
+// CHANGE (see html/healthreveal.test.js for the full behaviour), not on
+// "below full" alone, so a single reading proves nothing about visibility by
+// itself. Fill updates regardless of visibility, and is what actually proves
+// the listener ran.
+msg({ action: 'status', health: 100, armor: 0, stamina: 100 });
 msg({ action: 'status', health: 50, armor: 0, stamina: 100 });
-ok(!row.classList.contains('hidden'),
-   'app.js listener is attached (the row shows at 50 health)');
+ok(fill() === 50, 'app.js listener is attached (fill reads 50 after health drops)', fill());
+ok(!row.classList.contains('hidden'), 'and the drop itself reveals the row');
 
-// Starving at FULL health. The row has to appear on the cap alone.
+// Starving at FULL health, health UNCHANGED from the row above (50, not
+// reset) -- the cap has to appear the row on its own, independent of whether
+// health just moved.
 msg({ action: 'status', health: 100, armor: 0, stamina: 100, cap: 70, capCause: 'hunger' });
 ok(!row.classList.contains('hidden'),
    'a cap shows the health row even at 100 health, which health alone never would');
@@ -342,10 +349,13 @@ ok(fill() === 100,
 msg({ action: 'status', health: 55, armor: 0, stamina: 100, cap: 40, capCause: 'thirst' });
 ok(fill() === 55, 'the fill reads health, not the cap', fill());
 
-// Drank something, still hurt.
+// The cap clears, health itself unchanged (55 -> 55): under the new rule
+// this is NOT a health change and there is no other active trigger, so the
+// row now hides -- it no longer "stays up" just because the last known
+// health was below full. That persistence was the whole thing this fix
+// removed.
 msg({ action: 'status', health: 55, armor: 0, stamina: 100 });
-ok(!row.classList.contains('hidden'), 'the row stays for the health that is still down');
-ok(fill() === 55, 'and the fill is unchanged by the cap clearing', fill());
+ok(fill() === 55, 'the fill is unchanged by the cap clearing', fill());
 
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nall checks passed');
 process.exit(fails ? 1 : 0);

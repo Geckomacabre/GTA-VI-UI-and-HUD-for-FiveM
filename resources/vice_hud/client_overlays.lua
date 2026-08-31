@@ -397,28 +397,35 @@ end -- close the do opened above local lockpickActive
 -- lets these registers be reused once the block ends instead of staying
 -- live for the rest of the file, which is what keeps client.lua under
 -- that cap as it grows.
+-- This panel used to be an NUI page with its own keyboard/controller polling
+-- and SetNuiFocus juggling. ScaleformUI's UIMenu/MenuHandler owns all of
+-- that itself now (input polling, Up/Down/Accept/Cancel, weapon-wheel/
+-- attack/aim disabling while a menu is open) via the CreateThread loop
+-- already running in vendor/ScaleformUI_Lua/src/ScaleformUI/mainScaleform.lua,
+-- and reads controls natively rather than through NUI focus, so none of the
+-- old SetNuiFocus/DisableControlAction/polling-thread machinery is needed
+-- here any more.
 do
-local interactOpen = false
-local interactHeldFocus = false
--- Mirrors what the NUI page is actually showing, so a controller Accept/
--- Cancel press (polled natively, further down) always confirms whatever is
--- really highlighted — kept in sync by app.js's moveInteractSel() posting
--- 'interactMove' on every keyboard nudge too, so mixing keyboard and
--- controller input on the same open menu can't leave this pointing at a
--- stale row.
-local interactOptionsCache = {}
-local interactSelCache = 0
+local interactMenu = nil -- rebuilt fresh on every OpenInteractMenu call
+-- true while THIS file is the one closing the menu (a select, or an explicit
+-- CloseInteractMenu/releaseFocus) -- the old NUI version fired
+-- vice_hud:interactClose ONLY for Cancel/Back, never for those, and
+-- OnMenuClose below fires for every close path so it needs to tell them apart.
+local suppressCloseEvent = false
 
-local function closeInteractMenuInternal()
-    interactOpen = false
-    if interactHeldFocus then
-        interactHeldFocus = false
-        SetNuiFocus(false, false)
-        -- SetNuiFocusKeepInput is what lets the controller poller further
-        -- down keep reading IsControlJustPressed while this menu still has
-        -- the mouse cursor — without it, granting cursor focus above would
-        -- swallow controller input the same way it swallows mouse look.
-        SetNuiFocusKeepInput(false)
+-- ScaleformUI has no exact 'stamina'/'focus' badge -- these are the closest
+-- built-in BadgeStyle icons (see vendor/ScaleformUI_Lua/src/Elements/Badge.lua)
+-- until real custom icons are worth the runtime-texture-dict setup.
+local BADGE_MAP = {
+    stamina = BadgeStyle.HEALTH_HEART,
+    focus   = BadgeStyle.STAR,
+}
+
+local function closeInteractMenuSilently()
+    if interactMenu and interactMenu:Visible() then
+        suppressCloseEvent = true
+        interactMenu:Visible(false)
+        suppressCloseEvent = false
     end
 end
 
@@ -426,52 +433,61 @@ end
 --- selected (top-level, optional, 0-based): which row starts highlighted;
 --- defaults to whichever option has selected=true, or the first one.
 exports('OpenInteractMenu', function(options, selected)
-    interactOpen = true
-    interactHeldFocus = true
-    SetNuiFocus(true, true)
-    SetNuiFocusKeepInput(true)
-    interactOptionsCache = options or {}
-    interactSelCache = selected
-    if interactSelCache == nil then
-        interactSelCache = 0
-        for i, o in ipairs(interactOptionsCache) do
-            if o.selected then interactSelCache = i - 1 break end
+    options = options or {}
+    closeInteractMenuSilently() -- in case a caller opens over an already-open menu
+
+    local startIndex = tonumber(selected)
+    if startIndex == nil then
+        startIndex = 0
+        for i, o in ipairs(options) do
+            if o.selected then startIndex = i - 1 break end
         end
     end
-    ui('interact', { show = true, options = interactOptionsCache, selected = interactSelCache })
-end)
 
-RegisterNUICallback('interactMove', function(data, cb)
-    if data and type(data.index) == 'number' then interactSelCache = data.index end
-    cb(1)
+    -- Rebuilt on every open rather than reused: ScaleformUI menus are cheap
+    -- to throw away, and a fresh menu means a caller changing `options`
+    -- between calls can never see a stale item left over from the last one.
+    interactMenu = UIMenu.New('', '', 0, 0, false, '', '', false)
+    interactMenu:CanPlayerCloseMenu(true)
+
+    for _, opt in ipairs(options) do
+        local item = UIMenuItem.New(tostring(opt.label or ''), '')
+        for _, badge in ipairs(opt.badges or {}) do
+            local style = BADGE_MAP[badge]
+            if style then item:LeftBadge(style) end
+        end
+        interactMenu:AddItem(item)
+    end
+
+    interactMenu.OnItemSelect = function(_, _, index)
+        -- Old NUI version closed BEFORE firing the select event; keep that
+        -- order in case a caller opens a new menu from inside its handler.
+        closeInteractMenuSilently()
+        -- ScaleformUI indices are 1-based; the public event contract here
+        -- has always been 0-based (qbx_vehiclekeys already depends on it).
+        TriggerEvent('vice_hud:interactSelect', index - 1)
+    end
+    interactMenu.OnMenuClose = function()
+        -- Fires for EVERY close (Cancel/Back included) -- suppressCloseEvent
+        -- is what keeps this matching the old contract of "only a Cancel
+        -- fires interactClose".
+        if not suppressCloseEvent then
+            TriggerEvent('vice_hud:interactClose')
+        end
+    end
+
+    interactMenu:Visible(true)
+    interactMenu:CurrentSelection(startIndex + 1)
 end)
 
 exports('CloseInteractMenu', function()
-    closeInteractMenuInternal()
-    ui('interact', { show = false })
-end)
-
-RegisterNUICallback('interactSelect', function(data, cb)
-    closeInteractMenuInternal()
-    ui('interact', { show = false })
-    -- The caller is expected to be listening for this — OpenInteractMenu
-    -- hands back control here rather than taking an onSelect callback
-    -- directly, so the export stays plain data in and a plain event out.
-    TriggerEvent('vice_hud:interactSelect', data and data.index)
-    cb(1)
-end)
-
-RegisterNUICallback('interactClose', function(_, cb)
-    closeInteractMenuInternal()
-    TriggerEvent('vice_hud:interactClose')
-    cb(1)
+    closeInteractMenuSilently()
 end)
 
 -- /hudfocus already broadcasts this to clear every focus-holding panel in
 -- the resource, not just the editor — the interact menu is another one.
 AddEventHandler('vice_hud:releaseFocus', function()
-    closeInteractMenuInternal()
-    ui('interact', { show = false })
+    closeInteractMenuSilently()
 end)
 
 RegisterCommand('hudinteract', function()
@@ -484,95 +500,8 @@ RegisterCommand('hudinteract', function()
     print('^3[vice_hud]^7 /hudinteract — sample data. Arrows to move, Enter to pick, Esc to cancel.')
 end, false)
 
-AddEventHandler('onClientResourceStart', function(res)
-    if res ~= GetCurrentResourceName() then return end
-    interactOpen, interactHeldFocus = false, false
-end)
-
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
-    if interactHeldFocus then
-        SetNuiFocus(false, false)
-        SetNuiFocusKeepInput(false)
-    end
+    closeInteractMenuSilently()
 end)
-
-CreateThread(function()
-    while true do
-        Wait(500)
-        if not interactOpen and IsNuiFocused() and interactHeldFocus then
-            interactHeldFocus = false
-            SetNuiFocus(false, false)
-            SetNuiFocusKeepInput(false)
-            print('^3[vice_hud]^7 released stranded NUI focus (the interact menu was not open)')
-        end
-    end
-end)
-
--- =============================================================================
--- Controller (and keyboard-equivalent) input for the interact menu
--- =============================================================================
--- GTA's own FRONTEND_* controls carry BOTH a keyboard and a controller
--- default already (docs.fivem.net/docs/game-references/controls), and
--- Rockstar scoped them specifically so they don't fight movement/jump/
--- attack/aim during normal play. This server already leans on the same
--- 201/202 pair (ACCEPT/CANCEL) for exactly this "confirm/cancel a context
--- menu" purpose in several other resources (um_spawn, rcore_spray, and
--- others), so none of this is a fresh convention:
---
---   D-pad Up/Down / Arrows     (188 / 187)                 move the highlighted row
---   A / Enter                  (201, FRONTEND_ACCEPT)      confirm the highlighted interact row
---   B / Backspace,Esc          (202, FRONTEND_CANCEL)      back out without picking
---
--- The one REAL collision, and the reason for the disable block below:
--- INPUT_SELECT_WEAPON (control 37) is ALSO Tab/LB by default. ox_inventory's
--- own weapon/item wheel (the real one, now that vice_hud's own has been
--- retired) already disables this itself while its wheel is open, so this
--- only has to cover the interact menu, along with attack/aim, so nothing
--- double-fires off a shared button while it's up.
-
-local function anyMenuOpen() return interactOpen end
-
-CreateThread(function()
-    while true do
-        Wait(anyMenuOpen() and 0 or 200)
-        if anyMenuOpen() then
-            DisableControlAction(0, 37, true) -- INPUT_SELECT_WEAPON (Tab/LB) — see note above
-            DisableControlAction(0, 24, true) -- INPUT_ATTACK
-            DisableControlAction(0, 25, true) -- INPUT_AIM
-            DisablePlayerFiring(PlayerId(), true)
-        end
-    end
-end)
-
--- ---- interact menu: mirrors the keyboard nav already in app.js ---------
-CreateThread(function()
-    while true do
-        Wait(interactOpen and 0 or 200)
-        if interactOpen then
-            local total = #interactOptionsCache
-            if total > 0 then
-                if IsControlJustPressed(0, 187) then -- Down
-                    interactSelCache = (interactSelCache + 1) % total
-                    ui('interact', { show = true, options = interactOptionsCache, selected = interactSelCache })
-                end
-                if IsControlJustPressed(0, 188) then -- Up
-                    interactSelCache = (interactSelCache - 1 + total) % total
-                    ui('interact', { show = true, options = interactOptionsCache, selected = interactSelCache })
-                end
-            end
-            if IsControlJustPressed(0, 201) then -- Accept
-                local idx = interactSelCache
-                closeInteractMenuInternal()
-                ui('interact', { show = false })
-                TriggerEvent('vice_hud:interactSelect', idx)
-            end
-            if IsControlJustPressed(0, 202) then -- Cancel
-                closeInteractMenuInternal()
-                ui('interact', { show = false })
-                TriggerEvent('vice_hud:interactClose')
-            end
-        end
-    end
-end)
-end -- close the do opened above local interactOpen
+end -- close the do opened above

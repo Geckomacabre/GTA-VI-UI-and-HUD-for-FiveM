@@ -48,7 +48,13 @@ panelUntil = 0
 vehShown = false
 minimapOnFoot, editorOpen = false, false
 
-function tick() ${'\n'}${branch}${'\n'} end
+-- Mirrors the real poll loop: the radar is decided FIRST, before the pcall'd
+-- body, and the vehicle/on-foot branch no longer touches it at all. See
+-- tools/radarsurvives.test.js for why that ordering is load-bearing.
+function tick()
+  setRadar(cache.vehicle ~= nil or minimapOnFoot or editorOpen)
+${'\n'}${branch}${'\n'}
+end
 
 function drive(t) now = t end
 function lastPush() return pushes[#pushes] end

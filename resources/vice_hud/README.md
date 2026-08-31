@@ -2,16 +2,16 @@
 
 # vice_hud
 
-**A GTA VI-styled HUD for Qbox.**
+**A GTA VI–styled HUD for Qbox.**
 
 Status bars, wanted stars, weapon and ammo, money, zone bar, a vehicle panel
 with real manufacturer badges, honor standing, action prompts, directional
-police glow and exhaustion effects, with a full in-game layout editor.
+police glow and exhaustion effects — with a full in-game layout editor.
 
-![version](https://img.shields.io/badge/version-1.39.0-2f81f7?style=flat-square)
+![version](https://img.shields.io/badge/version-2.0.0-2f81f7?style=flat-square)
 ![framework](https://img.shields.io/badge/framework-Qbox-8957e5?style=flat-square)
 ![dependency](https://img.shields.io/badge/requires-ox__lib-3fb950?style=flat-square)
-![licence](https://img.shields.io/badge/licence-GPL--3.0-fa7970?style=flat-square)
+![licence](https://img.shields.io/badge/licence-GPL--3.0*-fa7970?style=flat-square)
 ![build](https://img.shields.io/badge/build-none-6e7681?style=flat-square)
 ![tests](https://img.shields.io/badge/tests-624%20passing-3fb950?style=flat-square)
 
@@ -19,12 +19,37 @@ police glow and exhaustion effects, with a full in-game layout editor.
 
 ---
 
+## The interact menu renders through ScaleformUI
+
+As of 2.0.0 the interact menu (used for things like vehicle slim jim/lockpick
+choices) no longer runs through NUI. It is built with
+[ScaleformUI](https://github.com/manups4e/ScaleformUI), which draws native
+vector graphics through the game engine the same way Rockstar's own menus do,
+instead of a rasterized browser texture, so it is sharper and carries no CEF
+overhead. The
+vendored Lua library lives in `vendor/ScaleformUI_Lua`; see
+`vendor/ScaleformUI_Lua/VENDORED.md` for its exact source, commit, and
+licence.
+
+This also means the resource now requires a second resource, ScaleformUI's
+compiled scaleform movie, since that ships separately from the Lua source.
+See **Requirements** and **Installation** below.
+
+`fxmanifest.lua` loads the vendored library through one glob per source
+subfolder instead of a single recursive glob, with `ScaleformUI/mainScaleform.lua`
+listed last on purpose. That file captures globals like `MinimapOverlays`
+into a shared table as soon as it loads, and a single glob expands in
+alphabetical path order, which put `mainScaleform.lua` ahead of the files
+defining those globals and left the table entries nil. Keep any future
+additions to the vendored file list in that same order unless the vendored
+source itself changes.
+
 ## Why this one
 
 **No build step.** No bundler, no framework, no `dist/`. What is on disk is what
 runs, so a stale build can never ship and any change is one restart away.
 
-**Everything is tunable in game.** `/movehud` is a real editor: pick a piece on
+**Everything is tunable in game.** `/movehud` is a real editor — pick a piece on
 the left, tune it on the right, drag the panel out of your way, save. It reaches
 elements in *other* resources too, and it can publish one layout to the whole
 server.
@@ -53,12 +78,12 @@ on entering                          for the rest of the drive
 
 - **51 real manufacturer badges**, stamped into the plate behind the names.
   Rockstar's own marks, normalised to one visual weight *and* one visual size
-  (`tools/normalize_logos.py`), keyed off the make the game reports, accents,
+  (`tools/normalize_logos.py`), keyed off the make the game reports — accents,
   truncated spawn tokens and all.
 - **Gauge rings** on engine and fuel that fill to the actual reading, so the
   strip answers *how much* rather than only *is it bad yet*.
 - **The pips earn their place.** All three show while the panel is announcing
-  the car. After it collapses only the ones with something to say stay:
+  the car. After it collapses only the ones with something to say stay —
   fuel and engine in the amber or red bands, and the lock for a few seconds
   when it actually changes. A healthy car stops drawing a panel at all.
 - **A parked car goes monochrome.** Green, amber and red on a car nothing is
@@ -70,10 +95,9 @@ on entering                          for the rest of the drive
 | --- | --- |
 | **Status bars** | Health, armour, stamina. Auto-hide at full, with an anti-flicker hold |
 | **Minimap** | Rounded corner mask with 14 baked radii, positioned and resized from the editor |
-| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route, so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise. The waypoint cross, route line and turn tile all pick teal or pink to match the character's gender |
-| **Wanted** | Four states matching the reference footage: solid for direct contact, flashing when they've lost you but are still hunting, hollow before they know who you are, and red once you've shaken them but are still in the search zone. Reads fenix-police's own pursuit model when it's installed, falls back to a simpler contact/hollow read otherwise |
-| **Ammo** | Clip and reserve next to the weapon icon, its own row in `/movehud` with its own position, scale, font and icon size, separate from the wanted stars |
-| **Money** | Cash, bank, duffle bag value, and casino chips when you're carrying any, all in GTA's own Pricedown |
+| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route — so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
+| **Wanted** | Star row, plus the "cops are searching for you" notice and its tells |
+| **Money** | Cash and bank, in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
 | **Police glow** | Directional edge lighting driven by real siren bearing and distance. Three modes, with a live editor |
 | **Exhaustion** | A vignette that breathes in as stamina empties |
@@ -87,12 +111,11 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
-| **Optional** | `ox_inventory`, for weapon icons and the actual reserve ammo count, omitted cleanly if absent |
-| **Optional** | `qbx_core`, for the money readout, the gender-matched waypoint colour, and skill XP persistence |
-| **Optional** | `qbx_honor`, for the honor system |
-| **Optional** | `fenix-police`, for the four wanted states and the search-radius overlay |
-| **Optional** | `rcore_casino`, for the casino chips row |
-| **Optional** | `speedlimits`, `zseatbelt`, positioned by the editor's *Other resources* rows |
+| **Required** | `ScaleformUI_Assets` (bundled in `resources/`), the compiled scaleform movie the interact menu renders through |
+| **Optional** | `ox_inventory` — weapon icons, omitted cleanly if absent |
+| **Optional** | `qbx_core` — the money readout and skill XP persistence |
+| **Optional** | `qbx_honor` — the honor system |
+| **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
 the HUD simply leaves that piece out.
@@ -100,14 +123,15 @@ the HUD simply leaves that piece out.
 ## Installation
 
 ```bash
-# 1. drop the folder into your resources/
-# 2. in server.cfg, after ox_lib:
+# 1. drop both folders into your resources/: vice_hud AND ScaleformUI_Assets
+# 2. in server.cfg, after ox_lib, ScaleformUI_Assets BEFORE vice_hud:
+ensure ScaleformUI_Assets
 ensure vice_hud
 ```
 
 > [!IMPORTANT]
 > Adding new files to a running server needs `refresh` **before** `ensure`. A
-> FiveM server only rescans a resource folder on `refresh`. `restart` re-runs
+> FiveM server only rescans a resource folder on `refresh` — `restart` re-runs
 > the scripts but keeps serving the file list from the last scan, so new files
 > 404 while everything else looks fine.
 
@@ -130,9 +154,9 @@ ensure vice_hud
 | <kbd>Space</kbd> | hold to see through the panel |
 | <kbd>Enter</kbd> / <kbd>Esc</kbd> | save / cancel |
 
-Click any value to type an exact number. Twenty-seven elements, each with position,
+Click any value to type an exact number. Twenty elements, each with position,
 size, opacity, font, weight, letter spacing, alignment, smoothing, corner radius
-and child spacing, every one writing a single CSS custom property, with the
+and child spacing — every one writing a single CSS custom property, with the
 shipped value as the `var()` fallback so an untouched setting renders exactly as
 designed.
 
@@ -164,11 +188,8 @@ exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, nee
 ```
 
 Prompts are cleaned up automatically when the resource that registered them
-stops, so a crashed script cannot strand one on screen. Give ids the
+stops, so a crashed script cannot strand one on screen — give ids the
 `yourresource:something` form for that to work.
-
-`vice_hud:honor` is also accepted as a net event, with the same fields as
-`ShowHonorToast`.
 
 ---
 
@@ -179,7 +200,7 @@ stops, so a crashed script cannot strand one on screen. Give ids the
 
 | | |
 | --- | --- |
-| `/movehud` | The editor, reach for this first |
+| `/movehud` | The editor — reach for this first |
 | `/hudmove <element> <dx> <dy>` | The same by hand. `/hudmove list` prints the elements |
 | `/hudreset` | Back to the shipped layout |
 | `/hudexport` · `/hudimport <json>` | Dump / restore the whole tuned HUD |
@@ -218,7 +239,7 @@ stops, so a crashed script cannot strand one on screen. Give ids the
 
 ## Development
 
-No build. Open `html/index.html` in a browser; `app.js` detects it is outside
+No build. Open `html/index.html` in a browser — `app.js` detects it is outside
 FiveM and fills itself with representative data.
 
 ```bash
@@ -262,7 +283,7 @@ python tools/make_makes.py       # writes html/makes.js from what is there
 
 The two normalisation passes fix different problems and both are needed.
 `fetch_logos.py` flattens each mark to one ink weight, then crops it to its own
-edges, which leaves fifty-one wildly different *shapes*, so a single CSS rule
+edges — which leaves fifty-one wildly different *shapes*, so a single CSS rule
 sizes a wide slab and a narrow upright completely differently (the ink area ran
 **9.9x** between the largest and smallest mark). `normalize_logos.py` scales
 each one to a constant ink area and centres it on one shared square canvas,
@@ -271,8 +292,8 @@ untouched originals in `tools/logos_raw/` and always re-reads from there, so it
 is safe to re-run and `CANVAS` can be retuned freely.
 
 Marks come from the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manufacturers).
-**A badge never spells the manufacturer's name**, since the panel already prints
-it directly above, so marques whose only mark is their own name set as type ship
+**A badge never spells the manufacturer's name** — the panel already prints it
+directly above — so marques whose only mark is their own name set as type ship
 no badge and render the plain plate. Drop a better one in
 `tools/logos_local/<KEY>.png` to override.
 
@@ -292,14 +313,13 @@ no badge and render the plain plate. Drop a better one in
 | `Config.Skills` | The eight skills, their curves and what each one feeds into |
 | `Config.PoliceLights` | Mode, brightness, flash, lamp shape, detection range |
 | `Config.Exhaustion` · `Config.Stamina` | The fatigue model |
-| `Config.HiddenHudComponents` | Which native components to suppress, only the ones actually replaced |
-| `Config.Duffle` · `Config.Chips` | The two optional money rows: what item or export to read and how often to poll for it |
+| `Config.HiddenHudComponents` | Which native components to suppress — only the ones actually replaced |
 
 ---
 
 ## Documentation
 
-**[`docs/INTERNALS.md`](docs/INTERNALS.md)**: the long version. Why the minimap
+**[`docs/INTERNALS.md`](docs/INTERNALS.md)** — the long version. Why the minimap
 is built the way it is, why the player blip drifts when you resize the map, how
 the honor push works, what the exhaustion model actually models, and the traps
 that already bit once. Read it before changing the minimap code.
@@ -313,22 +333,31 @@ Helvetica Neue → Helvetica → **Arial** → Liberation Sans; Arial is metrica
 compatible with Helvetica, so line lengths and the shrink-to-fit measurements
 hold either way. The one visible difference is the *Thin* cut, which Arial has
 no equivalent for and which therefore renders as regular on machines without
-Helvetica Neue. That affects the nav bar and the wanted box, both tuned to
+Helvetica Neue — that affects the nav bar and the wanted box, both tuned to
 thin in the shipped layout. If you hold a licence, drop the `.otf` files into
 `html/fonts/` and restore the `url()` sources in `style.css`; `fxmanifest`
 already globs `html/fonts/*.otf`.
 
-**Rockstar-derived assets**, the GTA Art Deco and Pricedown faces, and the 51
-manufacturer marks (via the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manufacturers)),
-ship as-is, as is normal for FiveM resources. They remain Rockstar's
+**Rockstar-derived assets** — the GTA Art Deco and Pricedown faces, and the 51
+manufacturer marks (via the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manufacturers))
+— ship as-is, as is normal for FiveM resources. They remain Rockstar's
 property; this project claims no rights over them and the licence below covers
 only the code.
 
 ## Licence
 
-[GPL-3.0](LICENSE). You may use, modify and redistribute this, including on a
-paid server, but if you distribute a modified version, that version has to
-stay open source under the same licence.
+[GPL-3.0](LICENSE) for this resource's own code. You may use, modify and
+redistribute that under the same licence, including on a paid server.
+
+**With one exception:** `vendor/ScaleformUI_Lua` (vendored into this
+resource) and the sibling `ScaleformUI_Assets` resource are
+[ScaleformUI](https://github.com/manups4e/ScaleformUI), licensed
+CC BY-NC-SA 4.0, non-commercial only. That licence, not GPL-3.0, governs
+those two pieces, and it means the interact menu feature (and any server
+running it) cannot be used commercially while depending on them. If that
+matters for your server, either keep the menu on the old NUI implementation
+or replace `vendor/ScaleformUI_Lua` with something under a licence that
+allows commercial use.
 
 > [!NOTE]
 > The copyright line in `LICENSE`'s *How to Apply* section is left for you to
@@ -339,3 +368,15 @@ stay open source under the same licence.
 Built for Qbox, on top of [`ox_lib`](https://github.com/overextended/ox_lib).
 Minimap geometry follows [`qbx_hud`](https://github.com/Qbox-project/qbx_hud)'s
 square-map preset. Manufacturer marks and the GTA typefaces are Rockstar's.
+
+The interact menu's scaleform rendering is built on
+[ScaleformUI](https://github.com/manups4e/ScaleformUI) by manups4e,
+PhilippRendell and Lacol9, vendored under `vendor/ScaleformUI_Lua` (see that
+folder's `VENDORED.md`). Thanks to the Qbox Discord for pointing to it and to
+these related repositories:
+
+- [ScaleformUI](https://github.com/QuadrupleTurbo/ScaleformUI)
+- [ScaleformUI-Scaleform](https://github.com/QuadrupleTurbo/ScaleformUI-Scaleform)
+- [FxEvents](https://github.com/QuadrupleTurbo/FxEvents)
+- [natives](https://github.com/QuadrupleTurbo/natives)
+- [NativeUI-scaleform_flash](https://github.com/QuadrupleTurbo/NativeUI-scaleform_flash)

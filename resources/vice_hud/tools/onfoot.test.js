@@ -1,4 +1,4 @@
-/* "Hide the minimap on foot": the preference, the toggle, and the decision.
+/* "Hide the minimap on foot" -- the preference, the toggle, and the decision.
  *
  *   npm i fengari && node tools/onfoot.test.js
  *
@@ -166,7 +166,7 @@ lua.lua_getglobal(L, to_luastring('runCmd'));
 lua.lua_pushstring(L, to_luastring('hudminimap'));
 lua.lua_pcall(L, 1, 0, 0);                       // hidden again
 call('loadPref');
-ok(call('pref') === false, 'a reload of "hidden" restores hidden, the restart case');
+ok(call('pref') === false, 'a reload of "hidden" restores hidden -- the restart case');
 call('clearRadar'); call('tickDecision');
 ok(lastRadar() === false, 'and the first tick of that session hides the map');
 
@@ -184,7 +184,7 @@ ok(call('radarIsHidden') === false, 'and something else switches it back on');
 
 call('enforceFrame');
 ok(lastRadar() === false && call('radarIsHidden') === true,
-   'the per-frame enforcement puts the hide back, this is what makes the ' +
+   'the per-frame enforcement puts the hide back -- this is what makes the ' +
    'preference stick against another resource');
 
 // A SHOW must never be re-asserted: something else hiding the map (a cutscene,
@@ -201,16 +201,16 @@ ok(lastRadar() === null,
 
 // ---- the startup race this test exists to catch -----------------------------
 /* loadMinimapPref() used to run inside a CreateThread, alongside loadMapState,
-   with no ordering guarantee against the poll loop's OWN CreateThread, two
+   with no ordering guarantee against the poll loop's OWN CreateThread -- two
    independent threads, either could run first. If the poll loop's first tick
    won that race, it read Config.MinimapOnFootDefault (visible) instead of the
    saved preference and showed the map for at least one tick before flipping
-   back off, a real "it's on, then it turns off" flash on every load, which
+   back off -- a real "it's on, then it turns off" flash on every load, which
    is what a report of "it disappeared for a second, then came right back"
    would look like read backwards.
 
    loadMinimapPref() is called synchronously right after its own definition
-   now, in the main chunk, not inside any thread, so this is a structural
+   now, in the main chunk -- not inside any thread -- so this is a structural
    check: is the call there, unconditionally, at the top level? */
 const defStart = src.indexOf('local function loadMinimapPref');
 const defEnd = src.indexOf('\nend\n', defStart) + 1;   // the FUNCTION's own end,
@@ -221,7 +221,7 @@ const nextThread = src.indexOf('\nCreateThread(', defEnd);
 const between = src.slice(defEnd, nextThread);
 ok(/^local ok, err = pcall\(loadMinimapPref\)\s*$/m.test(between),
    'loadMinimapPref() is called synchronously (via pcall) right after its definition, ' +
-   'before the next CreateThread, not raced against one', between.trim());
+   'before the next CreateThread -- not raced against one', between.trim());
 
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nall checks passed');
 process.exit(fails ? 1 : 0);

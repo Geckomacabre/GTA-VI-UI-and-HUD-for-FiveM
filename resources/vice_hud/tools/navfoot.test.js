@@ -1,10 +1,10 @@
-/* The turn-by-turn popup is a DRIVING instrument, it must not show on foot.
+/* The turn-by-turn popup is a DRIVING instrument -- it must not show on foot.
  *
  *   npm i fengari && node tools/navfoot.test.js
  *
  * Runs the REAL updateNav out of client.lua with the natives stubbed, and
  * asserts on what it pushes to the NUI. The interesting case is not "nothing
- * happens on foot", it is that LEAVING a vehicle mid-route sends an explicit
+ * happens on foot" -- it is that LEAVING a vehicle mid-route sends an explicit
  * {active=false} teardown, because the page only fades the bar out when it is
  * told to. Without that the popup would freeze on screen with a stale
  * instruction for as long as the player stayed out of the car.
@@ -52,7 +52,7 @@ push('CalculateTravelDistanceBetweenPoints', (S) => { lua.lua_pushnumber(S, 500)
 push('DoesBlipExist', (S) => { lua.lua_pushboolean(S, true); return 1; });
 push('GetFirstBlipInfoId', (S) => { lua.lua_pushnumber(S, 7); return 1; });
 push('ReplaceHudColourWithRgba', () => 0);
-// A waypoint 40m from a LEFT turn, comfortably inside nearTurnMetres.
+// A waypoint 40m from a LEFT turn -- comfortably inside nearTurnMetres.
 push('GetBlipInfoIdCoord', (S) => {
   lua.lua_newtable(S);
   for (const k of ['x', 'y', 'z']) {

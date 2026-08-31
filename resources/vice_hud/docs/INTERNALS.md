@@ -72,9 +72,6 @@ Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen. Give prompt ids the
 `yourresource:something` form for that to work.
 
-`vice_hud:honor` is also accepted as a net event, with the same fields as
-`ShowHonorToast`.
-
 ### Honor: two panels, one push
 
 `ShowHonorToast` feeds both the corner **standing** panel and the centre-screen **change**
