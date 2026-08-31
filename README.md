@@ -79,6 +79,16 @@ included here.
   self-contained enough to ship whole rather than as a patch. Depends on `qbx_core`,
   `ox_target`.
 
+- **`qbx_vehiclekeys`**: Qbox's own vehicle keys, carjacking and hotwire
+  resource, with a Slim Jim and Smash Window addition on top. Third-eye a
+  locked car's driver door for either option: Smash Window costs time, noise
+  and honor rather than a tool, Slim Jim needs a lockpick and plays out on
+  vice_hud's own "hold, release inside the zone" ring instead of a plain
+  skill check. Both hand off into the resource's existing hotwire flow once
+  the doors are open. Falls back to a plain `ox_target` prompt with no ring
+  if vice_hud isn't running. Depends on `qbx_core`, `ox_target`,
+  `ox_inventory`.
+
 ### `patches/`
 
 Overlays for resources you install separately:
@@ -107,19 +117,22 @@ its own.
 
 ## Installing (drag-and-drop resources)
 
-1. Copy `resources/vice_hud`, `resources/um_gigs`, and/or `resources/qbx_honor`
-   into your server's `resources/` folder.
+1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/qbx_honor`,
+   and/or `resources/qbx_vehiclekeys` into your server's `resources/` folder.
 2. Add them to `server.cfg`:
    ```
    ensure vice_hud
    ensure um_gigs
    ensure qbx_honor
+   ensure qbx_vehiclekeys
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
    - `vice_hud` needs **ox_lib**.
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
    - `qbx_honor` needs **qbx_core**, **ox_target**.
+   - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
+     Its Slim Jim ring only shows up while `vice_hud` is also running.
 4. Restart the resource (or the server) and confirm it starts clean in the
    server console.
 
@@ -164,6 +177,12 @@ Not bundled here, these are separate projects you install yourself:
   item to `dufflebag` (or change `Config.Duffle.item` to match whatever you
   call it). This repo's own server renamed it from the stock `backpack` to
   fit a duffle bag re-skin, and the two names need to agree.
+- **rcore_casino**: a commercial casino resource, not linked here since it's
+  paid and closed source. If you already run it, `vice_hud`'s Casino Chips
+  row (`Config.Chips`) will pick up your chip balance on its own, it just
+  reads a small export added to the resource's own client code
+  (`GetPlayerChips` / `RefreshPlayerChips`) rather than touching anything
+  else about how it plays.
 
 ## The arista-pro font
 
@@ -180,11 +199,12 @@ font is just present and ready to use if you want to switch either app's
 This repository is licensed under the [GNU General Public License v3.0](LICENSE),
 matching `vice_hud`, its core resource.
 
-`resources/vice_hud` carries its own `LICENSE` file (also GPL-3.0), and that
-governs that folder specifically. Nothing else under `resources/` or
-`patches/` ships its own `LICENSE` here, since `patches/` is only a handful
-of individual files extracted from each project, not a full copy, but the
-original projects remain under their own upstream license:
+`resources/vice_hud` and `resources/qbx_vehiclekeys` each carry their own
+`LICENSE` file (both GPL-3.0), and that governs those folders specifically.
+Nothing else under `resources/` or `patches/` ships its own `LICENSE` here,
+since `patches/` is only a handful of individual files extracted from each
+project, not a full copy, but the original projects remain under their own
+upstream license:
 
 | Project | License |
 | --- | --- |

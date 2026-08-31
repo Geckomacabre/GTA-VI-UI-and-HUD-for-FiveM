@@ -70,9 +70,10 @@ on entering                          for the rest of the drive
 | --- | --- |
 | **Status bars** | Health, armour, stamina. Auto-hide at full, with an anti-flicker hold |
 | **Minimap** | Rounded corner mask with 14 baked radii, positioned and resized from the editor |
-| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route, so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
-| **Wanted** | Star row, plus the "cops are searching for you" notice and its tells |
-| **Money** | Cash and bank, in GTA's own Pricedown |
+| **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route, so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise. The waypoint cross, route line and turn tile all pick teal or pink to match the character's gender |
+| **Wanted** | Four states matching the reference footage: solid for direct contact, flashing when they've lost you but are still hunting, hollow before they know who you are, and red once you've shaken them but are still in the search zone. Reads fenix-police's own pursuit model when it's installed, falls back to a simpler contact/hollow read otherwise |
+| **Ammo** | Clip and reserve next to the weapon icon, its own row in `/movehud` with its own position, scale, font and icon size, separate from the wanted stars |
+| **Money** | Cash, bank, duffle bag value, and casino chips when you're carrying any, all in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
 | **Police glow** | Directional edge lighting driven by real siren bearing and distance. Three modes, with a live editor |
 | **Exhaustion** | A vignette that breathes in as stamina empties |
@@ -86,9 +87,11 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
-| **Optional** | `ox_inventory`, for weapon icons, omitted cleanly if absent |
-| **Optional** | `qbx_core`, for the money readout and skill XP persistence |
+| **Optional** | `ox_inventory`, for weapon icons and the actual reserve ammo count, omitted cleanly if absent |
+| **Optional** | `qbx_core`, for the money readout, the gender-matched waypoint colour, and skill XP persistence |
 | **Optional** | `qbx_honor`, for the honor system |
+| **Optional** | `fenix-police`, for the four wanted states and the search-radius overlay |
+| **Optional** | `rcore_casino`, for the casino chips row |
 | **Optional** | `speedlimits`, `zseatbelt`, positioned by the editor's *Other resources* rows |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
@@ -127,7 +130,7 @@ ensure vice_hud
 | <kbd>Space</kbd> | hold to see through the panel |
 | <kbd>Enter</kbd> / <kbd>Esc</kbd> | save / cancel |
 
-Click any value to type an exact number. Twenty elements, each with position,
+Click any value to type an exact number. Twenty-seven elements, each with position,
 size, opacity, font, weight, letter spacing, alignment, smoothing, corner radius
 and child spacing, every one writing a single CSS custom property, with the
 shipped value as the `var()` fallback so an untouched setting renders exactly as
@@ -290,6 +293,7 @@ no badge and render the plain plate. Drop a better one in
 | `Config.PoliceLights` | Mode, brightness, flash, lamp shape, detection range |
 | `Config.Exhaustion` · `Config.Stamina` | The fatigue model |
 | `Config.HiddenHudComponents` | Which native components to suppress, only the ones actually replaced |
+| `Config.Duffle` · `Config.Chips` | The two optional money rows: what item or export to read and how often to poll for it |
 
 ---
 
