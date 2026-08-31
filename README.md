@@ -206,20 +206,22 @@ font is just present and ready to use if you want to switch either app's
 
 ## License
 
-This repository is licensed under the [GNU General Public License v3.0](LICENSE),
-matching `vice_hud`, its core resource.
+This repository is licensed under [Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International](LICENSE) (CC
+BY-NC-SA 4.0), matching `vice_hud`, its core resource. In short: use it,
+modify it, share it, but not on a paid or commercial server, credit is
+required, and a modified version has to stay under the same license.
 
-`resources/vice_hud` and `resources/qbx_vehiclekeys` each carry their own
-`LICENSE` file (both GPL-3.0), and that governs those folders specifically,
-**except** `resources/vice_hud/vendor/ScaleformUI_Lua` and
-`resources/ScaleformUI_Assets`, which are
-[ScaleformUI](https://github.com/manups4e/ScaleformUI) under CC BY-NC-SA 4.0,
-non-commercial only. Those two pieces are what the interact menu renders
-through; see `resources/vice_hud/README.md`'s License section before running
-this on a paid server. Nothing else under `resources/` or `patches/` ships
-its own `LICENSE` here, since `patches/` is only a handful of individual
-files extracted from each project, not a full copy, but the original
-projects remain under their own upstream license:
+`resources/qbx_vehiclekeys` is the exception: it's a modified copy of
+[Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys),
+which is GPL-3.0. That's Qbox-project's own license on their own code, not
+something this repository can change, so it keeps its own `LICENSE` file
+and stays GPL-3.0 regardless of the license above.
+
+Nothing else under `resources/` or `patches/` ships its own `LICENSE` here,
+since `patches/` is only a handful of individual files extracted from each
+project, not a full copy, but the original projects remain under their own
+upstream license:
 
 | Project | License |
 | --- | --- |
@@ -229,6 +231,7 @@ projects remain under their own upstream license:
 | `qb-menu`, `qb-input` | GPL-3.0 |
 | `speedlimits`, `zseatbelt` | MIT |
 | `um_smallresources` | GPL-3.0 |
+| `qbx_vehiclekeys` | GPL-3.0 (see above) |
 | ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
 
 Check each project's own repository for its full license text before

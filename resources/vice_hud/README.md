@@ -11,7 +11,7 @@ police glow and exhaustion effects — with a full in-game layout editor.
 ![version](https://img.shields.io/badge/version-2.0.0-2f81f7?style=flat-square)
 ![framework](https://img.shields.io/badge/framework-Qbox-8957e5?style=flat-square)
 ![dependency](https://img.shields.io/badge/requires-ox__lib-3fb950?style=flat-square)
-![licence](https://img.shields.io/badge/licence-GPL--3.0*-fa7970?style=flat-square)
+![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-fa7970?style=flat-square)
 ![build](https://img.shields.io/badge/build-none-6e7681?style=flat-square)
 ![tests](https://img.shields.io/badge/tests-624%20passing-3fb950?style=flat-square)
 
@@ -346,22 +346,18 @@ only the code.
 
 ## Licence
 
-[GPL-3.0](LICENSE) for this resource's own code. You may use, modify and
-redistribute that under the same licence, including on a paid server.
-
-**With one exception:** `vendor/ScaleformUI_Lua` (vendored into this
-resource) and the sibling `ScaleformUI_Assets` resource are
-[ScaleformUI](https://github.com/manups4e/ScaleformUI), licensed
-CC BY-NC-SA 4.0, non-commercial only. That licence, not GPL-3.0, governs
-those two pieces, and it means the interact menu feature (and any server
-running it) cannot be used commercially while depending on them. If that
-matters for your server, either keep the menu on the old NUI implementation
-or replace `vendor/ScaleformUI_Lua` with something under a licence that
-allows commercial use.
+[CC BY-NC-SA 4.0](LICENSE): Attribution, NonCommercial, ShareAlike. You may
+use, modify and redistribute this, but not on a paid/commercial server, and
+credit is required. A modified version has to stay under the same licence.
+This matches `vendor/ScaleformUI_Lua`'s own licence (see that folder's
+`VENDORED.md`), which this resource depends on and could not legally be
+distributed under permissive terms anyway.
 
 > [!NOTE]
-> The copyright line in `LICENSE`'s *How to Apply* section is left for you to
-> fill in with your own name before publishing.
+> `vendor/ScaleformUI_Lua` and the sibling `ScaleformUI_Assets` resource
+> remain their own upstream project ([ScaleformUI](https://github.com/manups4e/ScaleformUI)
+> by manups4e, PhilippRendell and Lacol9) under their own copyright; this
+> licence covers vice_hud's own code, not theirs.
 
 ## Credits
 
