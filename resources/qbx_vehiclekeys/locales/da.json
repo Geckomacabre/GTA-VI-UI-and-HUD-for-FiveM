@@ -1,0 +1,54 @@
+{
+  "addcom": {
+    "addkeys": "tilføjnøgler",
+    "addkeys_help": "Tilføjer nøgler til et køretøj for nogen.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "Spiller ID",
+    "addkeys_plate": "nummerplade",
+    "addkeys_plate_help": "Nummerplade",
+    "givekeys": "givnøgler",
+    "givekeys_help": "Overdrag nøglerne til nogen. Hvis ingen ID er angivet, gives de til den nærmeste person eller alle i køretøjet.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "Spiller ID",
+    "givekeys_plate": "nummerplade",
+    "givekeys_plate_help": "Nummerplade",
+    "removekeys": "fjernernøgler",
+    "removekeys_help": "Fjern nøgler til et køretøj for nogen.",
+    "removekeys_id": "id",
+    "removekeys_id_help": "Spiller ID",
+    "removekeys_plate": "nummerplade",
+    "removekeys_plate_help": "Nummerplade"
+  },
+  "info": {
+    "engine": "Tænd/Sluk Motor",
+    "search_keys_dispatch": "[H] - Søg efter nøgler",
+    "search_keys": "Søg efter bilnøgler",
+    "toggle_locks": "Lås/Åbn Køretøj",
+    "vehicle_theft": "Køretøjstyveri i gang. Type: "
+  },
+  "notify": {
+    "carjack_failed": "Bilkapring mislykkedes!",
+    "failed_lockedpick": "Det lykkedes dig ikke at dirke låsen op.",
+    "failed_keys": "Du kan ikke finde nøglerne og bliver frustreret.",
+    "fpid": "Udfyld spiller ID og nummerplade argumenter",
+    "gave_keys": "Du overdrager nøglerne.",
+    "added_keys": "Du gav en kopi af nøglerne til køretøj %s til spiller %s!",
+    "keys_taken": "Du får nøglerne til køretøjet!",
+    "keys_removed": "Du mistede nøglerne til køretøjet!",
+    "no_keys": "Du har ikke nøgler til dette køretøj.",
+    "not_near": "Der er ingen i nærheden at give nøglerne til",
+    "vehicle_not_near": "Not close enough to vehicle",
+    "vehicle_locked": "Køretøj låst!",
+    "vehicle_lockedpick": "Det lykkedes dig at dirke dørlåsen op!",
+    "vehicle_unlocked": "Køretøj ulåst!",
+    "removed_keys": "Nøglerne til nummerplade %s for spiller %s er blevet fjernet!",
+    "removed_keys_player": "Dine nøgler til nummerplade %s er blevet fjernet!",
+    "player_offline": "Denne spiller er ikke online!",
+	"vehicle_is_unlocked": "Vehicle is already unlocked!"
+  },
+  "progress": {
+    "attempting_carjack": "Forsøger at kapre køretøjet...",
+    "searching_keys": "Leder efter bilnøgler...",
+    "takekeys": "Tager nøgler fra kroppen..."
+  }
+}

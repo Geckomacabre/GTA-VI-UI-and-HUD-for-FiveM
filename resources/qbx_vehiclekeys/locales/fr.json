@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Ajouter les clés à un véhicule pour quelqu'un.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "ID du joueur",
+    "addkeys_plate": "plaque",
+    "addkeys_plate_help": "Plaque",
+    "givekeys": "givekeys",
+    "givekeys_help": "Donner les clés à quelqu'un. Si aucun ID, donne à la personne la plus proche ou à tout le monde dans le véhicule.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "ID du joueur",
+    "givekeys_plate": "plaque",
+    "givekeys_plate_help": "Plaque",
+    "removekeys": "removekeys",
+    "removekeys_help": "Retirer les clés à un véhicule pour quelqu'un.",
+    "remove_keys_id": "id",
+    "remove_keys_id_help": "ID du joueur",
+    "remove_keys_plate": "plaque",
+    "remove_keys_plate_help": "Plaque"
+  },
+  "info": {
+    "engine": "Allumer/Eteindre le moteur",
+    "search_keys_dispatch": "[H] - Chercher les clés",
+    "toggle_locks": "Verrouiller/Déverrouiller le véhicule",
+    "vehicle_theft": "Vol de véhicule en cours. Type: "
+  },
+  "notify": {
+    "carjack_failed": "Le détournement de voiture a échoué",
+    "failed_lockedpick": "You failed to lockpick.",
+    "failed_keys": "You fail to find the keys and get frustrated.",
+    "fpid": "Remplissez les arguments ID et plaque.",
+    "gave_keys": "Vous donnez les clés.",
+    "added_keys": "You gave a copy of the keys to vehicle %s to player %s!",
+    "keys_taken": "Vous obtenez les clés du véhicule!",
+    "no_keys": "Vous n'avez pas de clés de ce véhicule.",
+    "not_near": "Il n'y a personne à proximité.",
+    "vehicle_not_near": "Not close enough to vehicle",
+    "vehicle_locked": "Véhicule verrouillé!",
+    "vehicle_lockedpick": "Vous avez réussi à ouvrir le véhicule!",
+    "vehicle_unlocked": "Véhicule déverrouillé!",
+    "removed_keys": "The keys to plate %s for player %s have been removed!",
+    "removed_keys_player": "Your keys to plate %s have been removed!",
+    "player_offline": "This player is not online!",
+	"vehicle_is_unlocked": "Vehicle is already unlocked!"
+  },
+  "progress": {
+    "attempting_carjack": "Tentative de vol de carjack..",
+    "searching_keys": "Cherche les clés du véhicule..",
+    "takekeys": "Prend les clés du corps.."
+  }
+}

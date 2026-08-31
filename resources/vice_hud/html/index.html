@@ -39,10 +39,16 @@
     <div id="topright">
         <div id="stars"></div>
         <div id="tells" class="hidden"></div>
-        <div id="ammo" class="hidden">
-            <span id="ammo-clip">0</span><span id="ammo-reserve">0</span>
+        <!-- Its own /movehud element (see EDITOR_ELEMENTS in app.js), separate
+             from #topright's own row, so the ammo readout can be nudged away
+             from the wanted stars/tells above it instead of only moving as
+             one fixed block. -->
+        <div id="ammo-wrap">
+            <div id="ammo" class="hidden">
+                <span id="ammo-clip">0</span><span id="ammo-reserve">0</span>
+            </div>
+            <img id="weapon-icon" class="hidden" alt="">
         </div>
-        <img id="weapon-icon" class="hidden" alt="">
         <div id="money">
             <div class="money-row hidden" id="cash-row">
                 <span class="money-amt" id="cash">$0</span>
@@ -72,6 +78,20 @@
                         <path d="M7 9V7a5 5 0 0 1 10 0v2" fill="none" stroke="currentColor" stroke-width="2"/>
                         <rect x="3" y="9" width="18" height="12" rx="2.4"/>
                         <rect x="3" y="13.2" width="18" height="2.2" class="stripe"/>
+                    </svg>
+                </span>
+            </div>
+            <!-- rcore_casino's own chip balance, hidden at 0. See onChips(). -->
+            <div class="money-row hidden" id="chips-row">
+                <span class="money-amt" id="chips">0</span>
+                <span class="money-ic money-ic-chips" title="Casino Chips">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="6.2" class="hole"/>
+                        <rect x="11" y="0.6" width="2" height="4" rx="1"/>
+                        <rect x="11" y="19.4" width="2" height="4" rx="1"/>
+                        <rect x="0.6" y="11" width="4" height="2" rx="1"/>
+                        <rect x="19.4" y="11" width="4" height="2" rx="1"/>
                     </svg>
                 </span>
             </div>

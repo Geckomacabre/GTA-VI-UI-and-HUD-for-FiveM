@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Fügt jemandem die Schlüssel zu einem Fahrzeug hinzu.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "Bürger-ID",
+    "addkeys_plate": "kennzeichen",
+    "addkeys_plate_help": "Kennzeichen",
+    "givekeys": "givekeys",
+    "givekeys_help": "Übergebe die Schlüssel an jemanden. Wenn keine Bürger-ID angegeben wird, gehen sie an die nächstgelegene Person oder alle Personen im Fahrzeug.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "Bürger-ID",
+    "givekeys_plate": "kennzeichen",
+    "givekeys_plate_help": "Kennzeichen",
+    "removekeys": "removekeys",
+    "removekeys_help": "Nimmt jemandem die Schlüssel eines Fahrzeugs ab.",
+    "remove_keys_id": "id",
+    "remove_keys_id_help": "Bürger-ID",
+    "remove_keys_plate": "kennzeichen",
+    "remove_keys_plate_help": "Kennzeichen"
+  },
+  "info": {
+    "engine": "Motor ein-/ausschalten",
+    "search_keys_dispatch": "[H] - Nach Schlüssel suchen",
+    "toggle_locks": "Fahrzeug auf-/zuschließen",
+    "vehicle_theft": "Fahrzeugdiebstahl im Gange. Typ: "
+  },
+  "notify": {
+    "carjack_failed": "Der Autodiebstahl ist fehlgeschlagen!",
+    "failed_lockedpick": "Das Knacken des Schlosses ist fehlgeschlagen.",
+    "failed_keys": "Du konntest die Schlüssel nicht finden und wirst frustriert.",
+    "fpid": "Gebe die Bürger-ID und das Kennzeichen an.",
+    "gave_keys": "Du hast die Schlüssel abgegeben.",
+    "added_keys": "Du hast %s dem Spieler %s eine Kopie der Fahrzeugschlüssel gegeben!",
+    "keys_taken": "Du hast die Schlüssel für das Fahrzeug erhalten!",
+    "no_keys": "Du hast keine Schlüssel für das Fahrzeug!",
+    "not_near": "Es ist niemand in der Nähe, der den Schlüssel bekommen könnte!",
+    "vehicle_not_near": "Nicht nah genug am Fahrzeug.",
+    "vehicle_locked": "Fahrzeug verriegelt!",
+    "vehicle_lockedpick": "Es ist dir gelungen, das Türschloss zu knacken!",
+    "vehicle_unlocked": "Fahrzeug entriegelt.",
+    "removed_keys": "Die Schlüssel zum Kennzeichen %s für Spieler %s wurden entfernt!",
+    "removed_keys_player": "Deine Schlüssel zum Kennzeichen %s wurden entfernt!",
+    "player_offline": "Dieser Spieler ist nicht online!",
+    "vehicle_is_unlocked": "Das Fahrzeug ist bereits entriegelt!"
+  },
+  "progress": {
+    "attempting_carjack": "Versuche, das Auto zu stehlen...",
+    "searching_keys": "Suche nach Fahrzeugschlüsseln...",
+    "takekeys": "Fahrzeugschlüssel entnehmen..."
+  }
+}

@@ -674,27 +674,38 @@ html, body {
 .money-ic-cash   { color: #4fc27b; }   /* green banknote */
 .money-ic-bank   { color: #4f8fd6; }   /* blue card      */
 .money-ic-duffle { color: #3ddbe0; }   /* cyan duffle bag */
+.money-ic-chips  { color: #c9a13b; }   /* gold chip stack */
 
-/* Ammo readout. Measured: text spans 4.3% of width, cap height ~1.76% of
-   height, clip and reserve separated by ~0.78%. Pricedown is GTA's own display
-   face and matches the blocky condensed numerals in the frames. */
+/* Ammo readout, now its own /movehud element (#ammo-wrap) rather than sharing
+   #topright's position and Font/Icon size rows with the wanted stars, so
+   --fs-ammo/--ic-ammo/--ff-ammo below, not the old --fs-topright/--ic-topright
+   the stars still use. #ammo-wrap carries the position/scale/opacity that
+   used to come from #topright alone; this rule only lays its two children out.
+   Measured: text spans 4.3% of width, cap height ~1.76% of height, clip and
+   reserve separated by ~0.78%. Pricedown is GTA's own display face and
+   matches the blocky condensed numerals in the frames. */
+#ammo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.14cqh;
+}
 #ammo {
     display: flex;
     align-items: baseline;
     gap: 0.78cqw;
-    font-family: var(--ff-topright, 'Pricedown', 'Segoe UI', Arial, sans-serif);
+    font-family: var(--ff-ammo, 'Pricedown', 'Segoe UI', Arial, sans-serif);
     line-height: 1;
     color: #d8d8d4;
     text-shadow: 0 0.15cqh 0.2cqh rgba(0, 0, 0, 0.9), 0 0 0.15cqh rgba(0, 0, 0, 0.8);
 }
-#ammo-clip { font-size: calc((2.9cqh) * var(--fs-topright, 1)); color: #f0f0ec; }
-#ammo-reserve { font-size: calc((2.9cqh) * var(--fs-topright, 1)); color: #cfcfca; }
+#ammo-clip { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #f0f0ec; }
+#ammo-reserve { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #cfcfca; }
 
 /* Measured 63x43px at 1920x1080 => 3.28% wide, 3.98% tall. */
 #weapon-icon {
-    width: calc((3.28cqw) * var(--ic-topright, 1));
+    width: calc((3.28cqw) * var(--ic-ammo, 1));
     height: auto;
-    max-height: calc((3.98cqh) * var(--ic-topright, 1));
+    max-height: calc((3.98cqh) * var(--ic-ammo, 1));
     object-fit: contain;
     filter: drop-shadow(0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.85));
 }
@@ -2043,6 +2054,7 @@ html, body {
 #status   { transform: translate(var(--off-status-x,0cqw),   var(--off-status-y,0cqh))   scale(var(--sc-status-x,1), var(--sc-status-y,1));   transform-origin: top left; opacity: var(--op-status, 1); }
 #tells    { transform: translate(var(--off-tells-x,0cqw),    var(--off-tells-y,0cqh))    scale(var(--sc-tells-x,1), var(--sc-tells-y,1));    transform-origin: top right; opacity: var(--op-tells, 1); }
 #topright { transform: translate(var(--off-topright-x,0cqw), var(--off-topright-y,0cqh)) scale(var(--sc-topright-x,1), var(--sc-topright-y,1)); transform-origin: top right; opacity: var(--op-topright, 1); }
+#ammo-wrap{ transform: translate(var(--off-ammo-x,0cqw),     var(--off-ammo-y,0cqh))     scale(var(--sc-ammo-x,1), var(--sc-ammo-y,1));       transform-origin: top right; opacity: var(--op-ammo, 1); }
 #money    { transform: translate(var(--off-money-x,0cqw),    var(--off-money-y,0cqh))    scale(var(--sc-money-x,1), var(--sc-money-y,1));    transform-origin: top right; opacity: var(--op-money, 1); }
 #slots    { transform: translate(var(--off-slots-x,0cqw),    var(--off-slots-y,0cqh))    scale(var(--sc-slots-x,1), var(--sc-slots-y,1));    transform-origin: bottom left; opacity: var(--op-slots, 1); }
 #wanted   { transform: translate(var(--off-wanted-x,0cqw),   var(--off-wanted-y,0cqh))   scale(var(--sc-wanted-x,1), var(--sc-wanted-y,1));   transform-origin: top left; opacity: var(--op-wanted, 1); }
@@ -2131,6 +2143,7 @@ html, body {
    -------------------------------------------------------------------------- */
 #status    { font-family: var(--ff-status, inherit);    -webkit-font-smoothing: var(--sm-status, antialiased); }
 #topright  { -webkit-font-smoothing: var(--sm-topright, antialiased); }
+#ammo-wrap { -webkit-font-smoothing: var(--sm-ammo, antialiased); }
 #tells     { font-family: var(--ff-tells, inherit);     -webkit-font-smoothing: var(--sm-tells, antialiased); }
 #money     { -webkit-font-smoothing: var(--sm-money, antialiased); }
 /* GTA Art Deco is the DEFAULT for the two map panels, not just an option in
@@ -2236,6 +2249,7 @@ html, body {
    -------------------------------------------------------------------------- */
 #status            { align-items: var(--ai-status, stretch); }
 #topright          { align-items: var(--ai-topright, flex-end); }
+#ammo-wrap         { align-items: var(--ai-ammo, flex-end); }
 #tells             { justify-content: var(--ai-tells, flex-start); }
 #money             { align-items: var(--ai-money, flex-end); }
 #slots             { align-items: var(--ai-slots, stretch); }

@@ -1,0 +1,54 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Birine bir araca ait anahtarları ekler.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "Oyuncu ID'si",
+    "addkeys_plate": "plate",
+    "addkeys_plate_help": "Plaka",
+    "givekeys": "givekeys",
+    "givekeys_help": "Anahtarları birine teslim et. Eğer ID verilmezse, en yakın kişiye veya araçtaki herkese verir.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "Oyuncu ID'si",
+    "givekeys_plate": "plate",
+    "givekeys_plate_help": "Plaka",
+    "removekeys": "removekeys",
+    "removekeys_help": "Birine ait aracın anahtarlarını kaldırır.",
+    "removekeys_id": "id",
+    "removekeys_id_help": "Oyuncu ID'si",
+    "removekeys_plate": "plate",
+    "removekeys_plate_help": "Plaka"
+  },
+  "info": {
+    "engine": "Motoru Aç/Kapa",
+    "search_keys_dispatch": "[H] - Anahtarları Ara",
+    "search_keys": "Araç anahtarlarını ara",
+    "toggle_locks": "Araç Kilitlerini Aç/Kapa",
+    "vehicle_theft": "Araç hırsızlığı devam ediyor. Tür: "
+  },
+  "notify": {
+    "carjack_failed": "Araç gaspı başarısız oldu!",
+    "failed_lockedpick": "Kilit açmayı başaramadın.",
+    "failed_keys": "Anahtarları bulamadın ve hayal kırıklığına uğradın.",
+    "fpid": "Oyuncu ID'si ve Plaka argümanlarını doldurun.",
+    "gave_keys": "Anahtarları teslim ettin.",
+    "added_keys": "Araç %s için anahtar kopyasını oyuncu %s'ye verdin!",
+    "keys_taken": "Aracın anahtarlarını aldın!",
+    "keys_removed": "Aracın anahtarlarını kaybettin!",
+    "no_keys": "Bu aracın anahtarlarına sahip değilsin.",
+    "not_near": "Teslim edilecek kimse yakınlarda yok.",
+    "vehicle_not_near": "Araca yeterince yakın değilsin.",
+    "vehicle_locked": "Araç kilitlendi!",
+    "vehicle_lockedpick": "Kapı kilidini açmayı başardın!",
+    "vehicle_unlocked": "Araç kilidi açıldı!",
+    "removed_keys": "Oyuncu %s için plaka %s anahtarları kaldırıldı!",
+    "removed_keys_player": "Plaka %s için anahtarların kaldırıldı!",
+    "player_offline": "Bu oyuncu çevrimiçi değil!",
+    "vehicle_is_unlocked": "Araç zaten kilitsiz!"
+  },
+  "progress": {
+    "attempting_carjack": "Araç gaspı deneniyor...",
+    "searching_keys": "Araç anahtarları aranıyor...",
+    "takekeys": "Anahtarlar bedenden alınıyor..."
+  }
+}

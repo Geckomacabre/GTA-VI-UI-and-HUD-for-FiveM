@@ -1,0 +1,40 @@
+---@enum VehicleClass
+VehicleClass = {
+    COMPACTS = 0,
+    SEDANS = 1,
+    SUVS = 2,
+    COUPES = 3,
+    MUSCLE = 4,
+    SPORTS_CLASSICS = 5,
+    SPORTS = 6,
+    SUPER = 7,
+    MOTORCYCLES = 8,
+    OFF_ROAD = 9,
+    INDUSTRIAL = 10,
+    UTILITY = 11,
+    VANS = 12,
+    CYCLES = 13,
+    BOATS = 14,
+    HELICOPTERS = 15,
+    PLANES = 16,
+    SERVICE = 17,
+    EMERGENCY = 18,
+    MILITARY = 19,
+    COMMERCIAL = 20,
+    TRAINS = 21,
+    OPEN_WHEEL = 22,
+}
+
+---@enum WeaponTypeGroup
+WeaponTypeGroup = {
+    MELEE = 2685387236,
+    HANDGUN = 416676503,
+    SMG = -957766203,
+    SHOTGUN = 860033945,
+    RIFLE = 970310034,
+    LMG = 1159398588,
+    SNIPER = 3082541095,
+    HEAVY = 2725924767,
+    THROWABLE = 1548507267,
+    MISC = 4257178988,
+}

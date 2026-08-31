@@ -1,0 +1,54 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Dodaje klucze do pojazdu dla kogoś.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "ID gracza",
+    "addkeys_plate": "rejestracja",
+    "addkeys_plate_help": "Numer rejestracyjny",
+    "givekeys": "givekeys",
+    "givekeys_help": "Przekazuje klucze komuś. Jeśli brak ID, przekazuje najbliższej osobie lub wszystkim w pojeździe.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "ID gracza",
+    "givekeys_plate": "rejestracja",
+    "givekeys_plate_help": "Numer rejestracyjny",
+    "removekeys": "removekeys",
+    "removekeys_help": "Usuwa klucze do pojazdu dla kogoś.",
+    "removekeys_id": "id",
+    "removekeys_id_help": "ID gracza",
+    "removekeys_plate": "rejestracja",
+    "removekeys_plate_help": "Numer rejestracyjny"
+  },
+  "info": {
+    "engine": "Włącz/Wyłącz silnik",
+    "search_keys_dispatch": "[H] - Szukaj kluczy",
+    "search_keys": "Szukaj kluczy do pojazdu",
+    "toggle_locks": "Zamknij/Odblokuj pojazd",
+    "vehicle_theft": "Trwa kradzież pojazdu. Typ: "
+  },
+  "notify": {
+    "carjack_failed": "Próba kradzieży pojazdu nie powiodła się!",
+    "failed_lockedpick": "Nie udało się otworzyć zamka.",
+    "failed_keys": "Nie udało się znaleźć kluczy, jesteś zirytowany.",
+    "fpid": "Wypełnij ID gracza i numer rejestracyjny",
+    "gave_keys": "Przekazujesz klucze.",
+    "added_keys": "Dano kopię kluczy do pojazdu %s graczowi %s!",
+    "keys_taken": "Otrzymano klucze do pojazdu!",
+    "keys_removed": "Stracono klucze do pojazdu!",
+    "no_keys": "Nie masz kluczy do tego pojazdu.",
+    "not_near": "W pobliżu nie ma nikogo, komu można przekazać klucze",
+    "vehicle_not_near": "Nie jesteś wystarczająco blisko pojazdu",
+    "vehicle_locked": "Pojazd zamknięty!",
+    "vehicle_lockedpick": "Udało się otworzyć zamek!",
+    "vehicle_unlocked": "Pojazd odblokowany!",
+    "removed_keys": "Klucze do pojazdu o numerze %s dla gracza %s zostały usunięte!",
+    "removed_keys_player": "Twoje klucze do pojazdu o numerze %s zostały usunięte!",
+    "player_offline": "Ten gracz nie jest online!",
+    "vehicle_is_unlocked": "Pojazd jest już odblokowany!"
+  },
+  "progress": {
+    "attempting_carjack": "Próba kradzieży pojazdu...",
+    "searching_keys": "Szukanie kluczy do pojazdu...",
+    "takekeys": "Zabieranie kluczy z ciała..."
+  }
+}

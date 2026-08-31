@@ -1,0 +1,54 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Adaugă chei la un vehicul pentru cineva.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "ID-ul jucătorului",
+    "addkeys_plate": "număr de înmatriculare",
+    "addkeys_plate_help": "Număr de înmatriculare",
+    "givekeys": "dăchei",
+    "givekeys_help": "Predă cheile cuiva. Dacă nu există ID, le dă persoanei celei mai apropiate sau tuturor din vehicul.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "ID-ul jucătorului",
+    "givekeys_plate": "număr de înmatriculare",
+    "givekeys_plate_help": "Număr de înmatriculare",
+    "removekeys": "eliminăchei",
+    "removekeys_help": "Elimină cheile unui vehicul pentru cineva.",
+    "removekeys_id": "id",
+    "removekeys_id_help": "ID-ul jucătorului",
+    "removekeys_plate": "număr de înmatriculare",
+    "removekeys_plate_help": "Număr de înmatriculare"
+  },
+  "info": {
+    "engine": "Porneste/opreste motorul",
+    "search_keys_dispatch": "[H] - Caută chei",
+    "search_keys": "Cauta cheile vehiculului",
+    "toggle_locks": "Incuie/descuie vehiculul",
+    "vehicle_theft": "Furt de vehicul în curs. Tip: "
+  },
+  "notify": {
+    "carjack_failed": "Furtul de mașină a eșuat!",
+    "failed_lockedpick": "Nu ai reușit să forțezi încuietoarea.",
+    "failed_keys": "Nu reușești să găsești cheile și te frustrezi.",
+    "fpid": "Completează argumentele ID jucător și Număr de înmatriculare",
+    "gave_keys": "Ai predat cheile.",
+    "added_keys": "Ai dat o copie a cheilor pentru vehiculul %s jucătorului %s!",
+    "keys_taken": "Ai primit cheile vehiculului!",
+    "keys_removed": "Ai pierdut cheile vehiculului!",
+    "no_keys": "Nu ai chei pentru acest vehicul.",
+    "not_near": "Nu este nimeni prin apropiere căruia să îi poți da cheile",
+    "vehicle_not_near": "Nu ești suficient de aproape de vehicul",
+    "vehicle_locked": "Vehicul încuiat!",
+    "vehicle_lockedpick": "Ai reușit să forțezi încuietoarea ușii!",
+    "vehicle_unlocked": "Vehicul descuiat!",
+    "removed_keys": "Cheile pentru numărul de înmatriculare %s al jucătorului %s au fost eliminate!",
+    "removed_keys_player": "Cheile tale pentru numărul de înmatriculare %s au fost eliminate!",
+    "player_offline": "Acest jucător nu este online!",
+    "vehicle_is_unlocked": "Vehiculul este deja descuiat!"
+  },
+  "progress": {
+    "attempting_carjack": "Ameninți șoferul...",
+    "searching_keys": "Cauți cheile vehiculului...",
+    "takekeys": "Iei cheile de la corp..."
+  }
+}

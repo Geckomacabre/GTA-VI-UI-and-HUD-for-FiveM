@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Agrega llaves a un vehículo para alguien.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "ID de jugador",
+    "addkeys_plate": "placa",
+    "addkeys_plate_help": "Placa",
+    "givekeys": "givekeys",
+    "givekeys_help": "Entregar llaves a alguien. Si no hay ID, entregar a la persona más cercana o a todos en el vehículo.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "ID de jugador",
+    "givekeys_plate": "placa",
+    "givekeys_plate_help": "Placa",
+    "removekeys": "removekeys",
+    "removekeys_help": "Quitar llaves de un vehículo a alguien.",
+    "remove_keys_id": "id",
+    "remove_keys_id_help": "ID de jugador",
+    "remove_keys_plate": "placa",
+    "remove_keys_plate_help": "Placa"
+  },
+  "info": {
+    "engine": "Encender/apagar motor",
+    "search_keys_dispatch": "[H] - Buscar llaves",
+    "toggle_locks": "Habilitar/deshabilitar seguro de carro",
+    "vehicle_theft": "Robo de vehículo en progreso. Tipo: "
+  },
+  "notify": {
+    "carjack_failed": "¡Robo de carro falló!",
+    "failed_lockedpick": "You failed to lockpick.",
+    "failed_keys": "You fail to find the keys and get frustrated.",
+    "fpid": "Llena los argumentos de ID y placa del jugador",
+    "gave_keys": "Has entregado las llaves",
+    "added_keys": "You gave a copy of the keys to vehicle %s to player %s!",
+    "keys_taken": "Has recibido las llaves del vehículo",
+    "no_keys": "No tienes las llaves de este vehículo",
+    "not_near": "No hay nadie cerca a quién darle las llaves",
+    "vehicle_not_near": "Not close enough to vehicle",
+    "vehicle_locked": "Vehículo cerrado",
+    "vehicle_lockedpick": "Lograste abrir la cerradura",
+    "vehicle_unlocked": "Vehículo abierto",
+    "removed_keys": "The keys to plate %s for player %s have been removed!",
+    "removed_keys_player": "Your keys to plate %s have been removed!",
+    "player_offline": "This player is not online!",
+	"vehicle_is_unlocked": "Vehicle is already unlocked!"
+  },
+  "progress": {
+    "attempting_carjack": "Intentando robar carro...",
+    "searching_keys": "Buscando las llaves del carro...",
+    "takekeys": "Obteniendo las llaves del cuerpo..."
+  }
+}

@@ -2265,6 +2265,37 @@ CreateThread(function()
     end
 end)
 
+-------------------------------------------------------------------------------
+-- Casino chips (fed by rcore_casino's own PLAYER_CHIPS, via its exports)
+-------------------------------------------------------------------------------
+CreateThread(function()
+    local cfgC = Config.Chips
+    if not cfgC or not cfgC.enable then return end
+
+    local lastChips = 'unset' -- distinct from nil, so the first hide still fires ui()
+
+    local function pushChips(value)
+        if value == lastChips then return end
+        lastChips = value
+        ui('chips', { value = value })
+    end
+
+    while true do
+        Wait(cfgC.pollMs or 5000)
+
+        if GetResourceState(cfgC.resource) ~= 'started' then
+            pushChips(nil)
+            goto continue
+        end
+
+        pcall(function() exports[cfgC.resource]:RefreshPlayerChips() end)
+        local ok, chips = pcall(function() return exports[cfgC.resource]:GetPlayerChips() end)
+        pushChips((ok and type(chips) == 'number' and chips > 0) and chips or nil)
+
+        ::continue::
+    end
+end)
+
 -- FIXED 2026-08-28 (round 2): this used to also OR in
 -- IsDisabledControlPressed(0, 37), on the reasoning that ox_inventory's own
 -- hotkey system disables control 37 while it owns it (see the identical note
@@ -2447,15 +2478,33 @@ CreateThread(function()
         -- ammo at all rather than off the count being non-zero.
         local _, wep = GetCurrentPedWeapon(ped, true)
         if wep and wep ~= `WEAPON_UNARMED` then
-            local total  = GetAmmoInPedWeapon(ped, wep) or 0
             local inClip = select(2, GetAmmoInClip(ped, wep)) or 0
-            local maxClip = select(2, GetMaxAmmoInClip(ped, wep, true)) or 0
+            -- GET_MAX_AMMO_IN_CLIP returns a plain int, not a bool+outparam
+            -- pair like GET_AMMO_IN_CLIP above it. select(2, ...) on a
+            -- single return is always nil, which is why maxClip was always 0
+            -- and the ammo numbers never showed, only the weapon icon.
+            local maxClip = GetMaxAmmoInClip(ped, wep, true) or 0
             -- Icon comes from ox_inventory's own art via nui://, so the HUD and
             -- the inventory show the same image. WeaponIcons is generated in
             -- weapons.lua from ox_inventory/data/weapons.lua.
             local icon = WeaponIcons and WeaponIcons[wep] or nil
             if maxClip > 0 then
-                ui('weapon', { armed = true, icon = icon, clip = inClip, reserve = math.max(0, total - inClip) })
+                -- GetAmmoInPedWeapon reads the NATIVE pool, which ox_inventory
+                -- only ever fills from the equipped weapon item's OWN
+                -- metadata.ammo (see modules/weapon/client.lua's SetPedAmmo
+                -- call). It has no idea about a separate ammo stack sitting
+                -- in the inventory, so total-inClip is not "spare rounds",
+                -- it's close to 0 whenever the whole loaded amount fits in one
+                -- clip. The actual spare-ammo figure the reference means is
+                -- the ammo ITEM's own inventory count (e.g. how many rounds
+                -- of 'ammo-9' you're carrying to reload with).
+                local reserve = 0
+                local ok, cw = pcall(function() return exports.ox_inventory:getCurrentWeapon() end)
+                if ok and cw and cw.ammo then
+                    local ok2, count = pcall(function() return exports.ox_inventory:Search('count', cw.ammo) end)
+                    if ok2 and type(count) == 'number' then reserve = count end
+                end
+                ui('weapon', { armed = true, icon = icon, clip = inClip, reserve = reserve })
             else
                 ui('weapon', { armed = true, icon = icon })
             end

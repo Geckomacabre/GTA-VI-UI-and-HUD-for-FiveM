@@ -19,14 +19,17 @@ Config.HideNativeHealthBars = true
 -- Only list things we ACTUALLY replace — hiding a component we don't draw just
 -- removes information from the player:
 --    1 wanted stars   (we draw our own, top-right)
+--    2 weapon icon    (the ammo row in #topright replaces it, see onWeapon)
+--    3 cash           (the cash row replaces it, see onCash)
+--    4 mp cash        (bank row, same replacement as cash)
 --    6 vehicle name   (the make/model panel replaces it)
 --    7 area name      (the zone bar replaces it)
 --    8 vehicle class
 --    9 street name
 --   20 weapon-wheel stats
--- Deliberately NOT hidden: 2 weapon icon, 3/4 cash, 16 radio — we don't render
--- substitutes for those, so they stay native.
-Config.HiddenHudComponents = { 1, 6, 7, 8, 9, 20 }
+-- Deliberately NOT hidden: 16 radio, we don't render a substitute for that,
+-- so it stays native.
+Config.HiddenHudComponents = { 1, 2, 3, 4, 6, 7, 8, 9, 20 }
 
 -- Poll interval for the status/wanted loop, in ms. 250 keeps the wanted stars
 -- responsive without being wasteful; nothing here is per-frame.
@@ -449,6 +452,22 @@ Config.Duffle = {
     -- the cash/bank row above (read straight off qbx_core's client cache), so
     -- it runs on its own slower thread rather than every main-loop tick.
     pollMs = 3000,
+}
+
+-- =============================================================================
+-- Casino chips
+-- =============================================================================
+-- Chip balance, shown next to cash/bank/duffle when it's above 0.
+-- rcore_casino owns the balance and its own top-right chips HUD
+-- (Config.ShowChipsHud in its own config.lua, turned off since it duplicated
+-- this row); GetPlayerChips/RefreshPlayerChips are exports added to
+-- client/main/casino.lua for exactly this.
+Config.Chips = {
+    enable = true,
+    resource = 'rcore_casino',
+
+    -- How often (ms) to refresh from the server and re-read the export.
+    pollMs = 5000,
 }
 
 -- =============================================================================

@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Přidá někomu klíče od vozidla.",
+    "addkeys_id": "ID",
+    "addkeys_id_help": "ID hráče",
+    "addkeys_plate": "SPZ",
+    "addkeys_plate_help": "SPZ",
+    "givekeys": "givekeys",
+    "givekeys_help": "Předejte někomu klíče. Pokud nemáte průkaz totožnosti, dejte je nejbližší osobě nebo všem ve vozidle.",
+    "givekeys_id": "ID",
+    "givekeys_id_help": "ID hráče",
+    "givekeys_plate": "SPZ",
+    "givekeys_plate_help": "SPZ",
+    "removekeys": "removekeys",
+    "removekeys_help": "Odebrat někomu klíče od vozidla.",
+    "remove_keys_id": "id",
+    "remove_keys_id_help": "ID hráče",
+    "remove_keys_plate": "SPZ",
+    "remove_keys_plate_help": "SPZ"
+  },
+  "info": {
+    "engine": "Zapnout motor",
+    "search_keys_dispatch": "[H] - Hledat klíče",
+    "toggle_locks": "Zámek od vozidla",
+    "vehicle_theft": "Probíhající krádež vozidla. Typ: "
+  },
+  "notify": {
+    "carjack_failed": "Krádež auta se nezdařila!",
+    "failed_lockedpick": "You failed to lockpick.",
+    "failed_keys": "You fail to find the keys and get frustrated.",
+    "fpid": "Vyplňte ID hráče a SPZ",
+    "gave_keys": "Předáš klíče.",
+    "added_keys": "You gave a copy of the keys to vehicle %s to player %s!",
+    "keys_taken": "Dostanete klíčky od vozidla!",
+    "no_keys": "Od tohoto vozidla nemáte klíče.",
+    "not_near": "V blízkosti není nikdo, komu by bylo možné předat klíče",
+    "vehicle_not_near": "Not close enough to vehicle",
+    "vehicle_locked": "Vozidlo je zamčené!",
+    "vehicle_lockedpick": "Podařilo se ti otevřít zámek dveří!",
+    "vehicle_unlocked": "Vozidlo odemčeno!",
+    "removed_keys": "The keys to plate %s for player %s have been removed!",
+    "removed_keys_player": "Your keys to plate %s have been removed!",
+    "player_offline": "This player is not online!",
+	"vehicle_is_unlocked": "Vehicle is already unlocked!"
+  },
+  "progress": {
+    "attempting_carjack": "Pokus o krádež auta...",
+    "searching_keys": "Hledání klíčů od auta...",
+    "takekeys": "Odebírání klíčů z těla..."
+  }
+}

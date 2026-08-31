@@ -314,6 +314,15 @@
         show($('duffle-row'), d.value != null);
     }
 
+    /* rcore_casino's own chip balance, comma-grouped like money but with no $
+       sign, chips aren't cash. Hidden at 0 same as vice_hud's client.lua only
+       pushes a value once it's above 0 in the first place. */
+    function onChips(d) {
+        var v = $('chips');
+        if (d.value != null && v) v.textContent = String(Math.floor(Math.abs(Number(d.value) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        show($('chips-row'), d.value != null);
+    }
+
     /* Equipped weapon: icon plus, for ranged weapons, clip/reserve counts.
        Melee shows the icon alone — the frames confirm no ammo row for a wrench. */
     function onWeapon(d) {
@@ -1889,8 +1898,12 @@
        the engine, and the last two live in other resources entirely. */
     var EDITOR_ELEMENTS = [
         ['status',   'Status bars',    '#status',    'health / stamina, top-left',      'HUD'],
-        ['topright', 'Wanted + ammo',  '#topright',  'stars, ammo, weapon',             'HUD'],
+        ['topright', 'Wanted stars',   '#topright',  'stars (also moves ammo/tells/money together)', 'HUD'],
         ['tells',    'Wanted tells',   '#tells',     'the five round tell icons',       'HUD'],
+        // Its own row, separate from the wanted stars above. It previously
+        // shared #topright's position (and its Font/Icon size rows), which
+        // meant nudging the ammo readout also nudged the stars.
+        ['ammo',     'Ammo',           '#ammo-wrap', 'clip/reserve numbers + weapon icon', 'HUD'],
         ['money',    'Money',          '#money',     'cash and bank',                   'HUD'],
         ['slots',    'Map panels',     '#slots',     'both panels together',            'HUD'],
         /* The two panels are separate elements as well as being movable
@@ -3008,9 +3021,14 @@
             onStatus({ health: 62, focus: 45, stamina: 54 });
             onWanted({ active: true, stars: 3, maxStars: 6, state: 'contact',
                        tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
-            onWeapon({ armed: true, clip: 12, reserve: 84 });
+            // A real icon, not just the clip/reserve numbers, so the ammo row
+            // has actual art to line up against instead of an empty box.
+            // weapon_pistol is ox_inventory's own art, the same nui:// path
+            // client.lua's WeaponIcons table points at in game.
+            onWeapon({ armed: true, icon: 'nui://ox_inventory/web/images/weapon_pistol.png', clip: 12, reserve: 84 });
             onCash({ cash: 28163, bank: 154200, show: true });
             onDuffle({ value: 4820 });
+            onChips({ value: 3450 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
             /* Fuel and engine are pushed into their WARNING bands, and the
                lock pip's event window is held open, so all three discs are on
@@ -3428,6 +3446,7 @@
         wanted: onWanted,
         cash: onCash,
         duffle: onDuffle,
+        chips: onChips,
         weapon: onWeapon,
         crosshair: onCrosshair,
         crossFire: onCrossFire,
@@ -3524,6 +3543,7 @@
         onStatus({ health: 66, focus: 40, stamina: 58 });
         onCash({ cash: 28163, bank: 154200, show: true });
         onDuffle({ value: 4820 });
+        onChips({ value: 3450 });
         onWanted({ active: true, stars: 2, maxStars: 6, state: 'searching', tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
         onWeapon({ armed: true, clip: 20, reserve: 80 });
         // Keep these in step with Config.Minimap in config.lua.

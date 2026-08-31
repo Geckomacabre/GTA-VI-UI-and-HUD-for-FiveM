@@ -1,0 +1,62 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Adds keys to a vehicle for someone.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "Player ID",
+    "addkeys_plate": "plate",
+    "addkeys_plate_help": "Plate",
+    "givekeys": "givekeys",
+    "givekeys_help": "Hand over the keys to someone. If no ID, gives to closest person or everyone in the vehicle.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "Player ID",
+    "givekeys_plate": "plate",
+    "givekeys_plate_help": "Plate",
+    "removekeys": "removekeys",
+    "removekeys_help": "Remove keys to a vehicle for someone.",
+    "removekeys_id": "id",
+    "removekeys_id_help": "Player ID",
+    "removekeys_plate": "plate",
+    "removekeys_plate_help": "Plate"
+  },
+  "info": {
+    "engine": "Toggle Engine",
+    "search_keys_dispatch": "[H] - Search for Keys",
+    "search_keys": "Search for vehicle keys",
+    "toggle_locks": "Toggle Vehicle Locks",
+    "vehicle_theft": "Vehicle theft in progress. Type: ",
+    "crime_smash": "Smashed window"
+  },
+  "notify": {
+    "carjack_failed": "Carjacking failed!",
+    "failed_lockedpick": "You failed to lockpick.",
+    "failed_keys": "You fail to find the keys and get frustrated.",
+    "fpid": "Fill out the player ID and Plate arguments",
+    "gave_keys": "You hand over the keys.",
+    "added_keys": "You gave a copy of the keys to vehicle %s to player %s!",
+    "keys_taken": "You get keys to the vehicle!",
+    "keys_removed": "You lost keys to the vehicle!",
+    "no_keys": "You don't have keys to this vehicle.",
+    "not_near": "There is nobody nearby to hand keys to",
+    "vehicle_not_near": "Not close enough to vehicle",
+    "vehicle_locked": "Vehicle locked!",
+    "vehicle_lockedpick": "You managed to pick the door lock open!",
+    "vehicle_unlocked": "Vehicle unlocked!",
+    "removed_keys": "The keys to plate %s for player %s have been removed!",
+    "removed_keys_player": "Your keys to plate %s have been removed!",
+    "player_offline": "This player is not online!",
+    "vehicle_is_unlocked": "Vehicle is already unlocked!",
+    "window_smashed": "You put the window through and pop the lock!",
+    "no_lockpick": "You need a lockpick to try that."
+  },
+  "progress": {
+    "attempting_carjack": "Attempting Carjacking...",
+    "searching_keys": "Searching for the car keys...",
+    "takekeys": "Taking keys from body...",
+    "smashing_window": "Smashing the window..."
+  },
+  "target": {
+    "smash_window": "Smash Window",
+    "slim_jim": "Slim Jim"
+  }
+}

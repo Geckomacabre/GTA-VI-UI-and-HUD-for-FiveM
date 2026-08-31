@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "addkeys",
+    "addkeys_help": "Adiciona chaves a um veículo para uma pessoa.",
+    "addkeys_id": "id",
+    "addkeys_id_help": "ID do Jogador",
+    "addkeys_plate": "placa",
+    "addkeys_plate_help": "Placa",
+    "givekeys": "givekeys",
+    "givekeys_help": "Entrega as chaves a alguém. Se não houver ID, dá à pessoa mais próxima ou a todos no veículo.",
+    "givekeys_id": "id",
+    "givekeys_id_help": "ID do Jogador",
+    "givekeys_plate": "placa",
+    "givekeys_plate_help": "Placa",
+    "removekeys": "removekeys",
+    "removekeys_help": "Remove chaves de um veículo para alguém.",
+    "remove_keys_id": "id",
+    "remove_keys_id_help": "ID do Jogador",
+    "remove_keys_plate": "placa",
+    "remove_keys_plate_help": "Placa"
+  },
+  "info": {
+    "engine": "Ativar/Desativar Motor",
+    "search_keys_dispatch": "[H] - Procurar por Chaves",
+    "toggle_locks": "Alternar Fechaduras do Veículo",
+    "vehicle_theft": "Roubo de veículo em andamento. Tipo: "
+  },
+  "notify": {
+    "carjack_failed": "Falha no assalto ao veículo!",
+    "failed_lockedpick": "Não conseguiste destrancar.",
+    "failed_keys": "Não conseguiste encontrar as chaves.",
+    "fpid": "Preenche os argumentos do ID do jogador e da placa",
+    "gave_keys": "Entregaste as chaves.",
+    "added_keys": "Deste a cópia das chaves para o veículo %s e para o jogador %s!",
+    "keys_taken": "Recebeste as chaves do veículo!",
+    "no_keys": "Não tens as chaves deste veículo.",
+    "not_near": "Não há ninguém por perto para entregar as chaves",
+    "vehicle_not_near": "Não estás perto do veículo",
+    "vehicle_locked": "Veículo trancado!",
+    "vehicle_lockedpick": "Conseguiste abrir a fechadura da porta!",
+    "vehicle_unlocked": "Veículo destrancado!",
+    "removed_keys": "As chaves da matrícula %s para o jogador %s foram removidas!",
+    "removed_keys_player": "As tuas chaves da matrícula %s foram removidas!",
+    "player_offline": "O jogador não está online!",
+	"vehicle_is_unlocked": "O veículo já está destrancado!"
+  },
+  "progress": {
+    "attempting_carjack": "Tentativa de assalto ao veículo...",
+    "searching_keys": "A procurar pelas chaves do carro...",
+    "takekeys": "A tirar as chaves do corpo..."
+  }
+}

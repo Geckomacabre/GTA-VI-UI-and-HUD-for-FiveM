@@ -1,0 +1,52 @@
+{
+  "addcom": {
+    "addkeys": "鍵を追加",
+    "addkeys_help": "誰かに車の鍵を追加する。",
+    "addkeys_id": "ID",
+    "addkeys_id_help": "プレイヤーID",
+    "addkeys_plate": "ナンバープレート",
+    "addkeys_plate_help": "ナンバープレート",
+    "givekeys": "鍵を渡す",
+    "givekeys_help": "誰かに鍵を渡す。IDが指定されていない場合、最も近い人または車内の全員に渡す。",
+    "givekeys_id": "ID",
+    "givekeys_id_help": "プレイヤーID",
+    "givekeys_plate": "ナンバープレート",
+    "givekeys_plate_help": "ナンバープレート",
+    "removekeys": "鍵を削除",
+    "removekeys_help": "誰かから車の鍵を削除する",
+    "removekeys_id": "ID",
+    "removekeys_id_help": "プレイヤーID",
+    "removekeys_plate": "ナンバープレート",
+    "removekeys_plate_help": "ナンバープレート"
+  },
+  "info": {
+    "engine": "エンジンの切り替え",
+    "search_keys_dispatch": "[H] - 鍵を探す",
+    "search_keys": "車の鍵を探す",
+    "toggle_locks": "車のロックを切り替える",
+    "vehicle_theft": "車両盗難が進行中です。タイプ: "
+  },
+  "notify": {
+    "carjack_failed": "カージャックに失敗しました！",
+    "failed_lockedpick": "ピッキングに失敗しました。",
+    "failed_keys": "鍵が見つからず、イライラしています。",
+    "fpid": "プレイヤーIDとナンバープレートの引数を入力してください",
+    "gave_keys": "鍵を渡しました。",
+    "added_keys": "%sの車両の合鍵を %s に渡しました！",
+    "keys_taken": "車両の鍵を手に入れました！",
+    "keys_removed": "車両の鍵を失いました！",
+    "no_keys": "この車両の鍵を持っていません。",
+    "not_near": "近くに鍵を渡せる人がいません。",
+    "vehicle_locked": "車両がロックされました！",
+    "vehicle_lockedpick": "ドアロックを開けることに成功しました！",
+    "vehicle_unlocked": "車両がアンロックされました！",
+    "removed_keys": "%sのナンバープレートの鍵が %s から削除されました！",
+    "removed_keys_player": "%sのナンバープレートのあなたの鍵が削除されました！",
+    "player_offline": "このプレイヤーはオンラインではありません！"
+  },
+  "progress": {
+    "attempting_carjack": "カージャックを試みています...",
+    "searching_keys": "車の鍵を探しています...",
+    "takekeys": "鍵を盗んでいます..."
+  }
+}
