@@ -1190,6 +1190,7 @@ RegisterCommand('hudtest', function()
 
     ui('status', { health = 55, focus = 40, stamina = 60 })
     ui('wanted', { active = true, stars = 2, maxStars = Config.MaxStars or 6,
+        state = 'searching',
         tells = { 'camera', 'medical', 'hanger', 'person', 'flag' } })
     ui('weapon', { armed = true, clip = 20, reserve = 80 })
     ui('zone', { zone = 'TEST ZONE', duration = 15000 })
@@ -1674,10 +1675,19 @@ end
 -- top-level locals (Lua's per-function register limit, enforced at parse
 -- time -- FXServer refuses to even load the file past it, which is exactly
 -- what happened here the first time this block was added as plain top-level
--- locals). Only `updateNav` is called from outside this block, so it alone
--- needs a real top-level local; everything else lives inside the `do` block
--- and goes out of scope (and off the main chunk's register count) at its `end`.
+-- locals). `updateNav` and `applyWaypointPalette` are called from outside
+-- this block (the main loop, and onResourceStop's revert-to-stock call), so
+-- those two alone need real top-level locals; everything else lives inside
+-- the `do` block and goes out of scope (and off the main chunk's register
+-- count) at its `end`.
+--
+-- applyWaypointPalette itself used to be a one-shot call made from right
+-- next to its own definition, entirely inside this block, which is why this
+-- was never caught before it started being called from the main loop
+-- instead. Once that block's `end` had already gone by, the result was
+-- "attempt to call a nil value (global 'applyWaypointPalette')".
 local updateNav
+local applyWaypointPalette
 do
 
 -- Rockstar's mapping, from trevor3.c (see the header comment above).
@@ -1712,10 +1722,8 @@ local function navFormatDist(m)
 end
 
 -- Repaints the palette slots the game's OWN waypoint route already draws
--- with, once, at resource start. Restored to stock on resource stop -- see the
--- onResourceStop handler near the end of this file. A plain top-level call
--- rather than an event handler: this file already only runs once per resource
--- start, so there's nothing an onClientResourceStart handler would add here.
+-- with. Restored to stock on resource stop, see the onResourceStop handler
+-- near the end of this file.
 --
 -- This replaced an earlier approach that called
 -- SetBlipRoute(blip, true) + SetBlipRouteColour(blip, <placeholder index>) on
@@ -1725,15 +1733,22 @@ end
 -- to a blip that already HAS one does not recolour the existing line, it
 -- stacks another one beside it -- so the only way to change the colour of the
 -- line the game draws is to change what the game draws it WITH.
-local function applyWaypointPalette(revert)
+--
+-- Not a one-shot top-level call any more: `accentKey` ('pink'|'teal') is
+-- picked per CHARACTER (see the main loop below, same characterAccentKey(),
+-- reading qbx_core's charinfo.gender, not the ped's current model), so this
+-- has to be callable again once that has actually resolved, not just once
+-- at resource start before qbx_core's player data necessarily even exists
+-- yet.
+-- Not `local function`: this assigns the pre-declared upvalue above (same
+-- reasoning as `updateNav`) so it survives past this do...end block's `end`.
+applyWaypointPalette = function(revert, accentKey)
     if not Config.Nav.waypointColour then return end
     for _, slot in ipairs(Config.Nav.waypointColour) do
-        local rgb = revert and slot.stock or slot.rgb
+        local rgb = revert and slot.stock or slot[accentKey or 'pink']
         ReplaceHudColourWithRgba(slot.index, rgb[1], rgb[2], rgb[3], 255)
     end
 end
-
-applyWaypointPalette(false)
 
 local function getWaypointCoords()
     local blip = GetFirstBlipInfoId(8) -- 8 = the player's own waypoint cross
@@ -1928,12 +1943,15 @@ end)
 -- =============================================================================
 
 local lastWanted = -1
-local lastSpotted = false
+local lastWantedState = false
 local lastTellsKey = ''
+local lastWaypointAccentKey = nil
 
 --- True when a police ped actually has line of sight to the player.
---- This is what separates "they are hunting for you" (stars flash) from
---- "they can see you" (stars go solid red).
+--- Only the fallback for when fenix-police isn't installed, see
+--- wantedState() below, which prefers that resource's own contact model
+--- (FenixPursuit.hasContact/isSearching, client/pursuit.lua) once it exists,
+--- since it already tracks exactly this without a fresh GetGamePool scan.
 local function copsCanSeeMe(ped)
     if GetPlayerWantedLevel(PlayerId()) <= 0 then return false end
     local me = GetEntityCoords(ped)
@@ -1948,6 +1966,120 @@ local function copsCanSeeMe(ped)
     end
     return false
 end
+
+--- Four states, matching the reference frames exactly:
+---   'contact'   solid fill, static, police have you in their sights right now.
+---   'searching' flashes between hollow and filled, contact was lost, they're
+---               still hunting (fenix-police's FenixPursuit.isSearching).
+---   'hollow'    outline only, static, a crime was reported but nobody has
+---               ever laid eyes on you for it yet.
+---   'red'       solid RED fill, static, contact was made and then fully
+---               lost (fenix-police stopped searching), but the wanted level
+---               hasn't dropped yet: "basically shaken them, still in the
+---               search zone" per the reference.
+--- Without fenix-police there is no search-radius/contact-history model to
+--- read at all, so this degrades to the two states copsCanSeeMe() can
+--- actually tell apart: 'contact' or 'hollow'. Never 'searching' or 'red',
+--- inventing a distinction the fallback has no data for would be worse than
+--- not drawing it.
+local everContactedThisWanted = false
+
+local function wantedState(ped, wanted)
+    if wanted <= 0 then
+        everContactedThisWanted = false
+        return nil
+    end
+
+    if GetResourceState('fenix-police') == 'started' then
+        local ok, contact = pcall(function() return exports['fenix-police']:HasContact() end)
+        if ok and contact then
+            everContactedThisWanted = true
+            return 'contact'
+        end
+
+        local okS, searching = pcall(function() return exports['fenix-police']:IsSearching() end)
+        if okS and searching then
+            everContactedThisWanted = true
+            return 'searching'
+        end
+
+        return everContactedThisWanted and 'red' or 'hollow'
+    end
+
+    if copsCanSeeMe(ped) then
+        everContactedThisWanted = true
+        return 'contact'
+    end
+
+    return 'hollow'
+end
+
+--- Pink for a female CHARACTER, teal for a male one, read from qbx_core's
+--- own charinfo.gender (0 = male, else female; the same field
+--- qbx_core/client/character.lua itself reads to print "Male"/"Female" on
+--- the character-select card), not the ped's current model. A model check
+--- was tried first and was wrong: which model a ped actually wears is a
+--- clothing/appearance question, not the same thing as which gender the
+--- player picked when they made the character, and the two don't reliably
+--- agree.
+---
+--- Resolved once and cached: a character's gender does not change without a
+--- relog or character switch, either of which restarts this script anyway,
+--- so re-querying qbx_core every tick for something that cannot change here
+--- would be wasted work. Retries every tick (never caches a guess) until
+--- qbx_core's player data actually has charinfo on it, since that is not
+--- guaranteed to exist yet on the very first tick after a resource start.
+---
+--- Falls back to teal without qbx_core installed at all, or before it has
+--- resolved, arbitrary, but a default has to point somewhere.
+---
+--- Used by applyWaypointPalette() (above, the native waypoint cross/route)
+--- and the nav-turn tile's CSS default (see the ui('navAccent', ...) push in
+--- the main loop below), NOT the wanted stars, those are literal
+--- white/red/hollow per the reference, unrelated to character gender.
+--- Returns the 'pink'/'teal' KEY directly, to index into
+--- Config.Nav.waypointColour's per-slot RGB tables.
+local genderAccentKey = nil
+
+local function characterAccentKey()
+    if genderAccentKey then return genderAccentKey end
+    if GetResourceState('qbx_core') ~= 'started' then return 'teal' end
+
+    local ok, pd = pcall(function() return exports.qbx_core:GetPlayerData() end)
+    if not ok or type(pd) ~= 'table' or type(pd.charinfo) ~= 'table' or pd.charinfo.gender == nil then
+        return 'teal' -- not loaded yet, try again next tick, do not cache a guess
+    end
+
+    genderAccentKey = pd.charinfo.gender == 0 and 'teal' or 'pink'
+    return genderAccentKey
+end
+
+-- Character switches (and fresh logins) fire this without necessarily
+-- restarting this script. QBCore:Client:OnPlayerLoaded is qbx_core's own
+-- signal that PlayerData just changed out from under everything, whether or
+-- not a resource actually reloaded. Without this, swapping to a different
+-- character kept the FIRST character's cached accent for the rest of the
+-- session, which is exactly the "changed to my female character and it's
+-- still teal" bug this fixes. Only clears the cache; the main loop's own
+-- next tick re-resolves and re-pushes both the waypoint palette and the
+-- nav-tile default the same way it already does on first resolve.
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    genderAccentKey = nil
+end)
+
+-- Hex pairs for the nav-turn tile's background/ink, see the
+-- ui('navAccent', ...) push in the main loop below. The waypoint palette
+-- above needs RGB triples for REPLACE_HUD_COLOUR_WITH_RGBA; the nav tile is
+-- plain CSS, so this is hex strings instead, kept as its own small table
+-- rather than formatting Config.Nav.waypointColour's RGB every tick.
+-- Accents match Config.Nav.waypointColour's 142 entries exactly, so the tile
+-- and the native waypoint marker read as the same colour. Ink is a
+-- near-black, same-hue "very dark" companion to each, high contrast for the
+-- glyph stroke drawn on top of it.
+local NAV_ACCENT_HEX = {
+    teal = { accent = '#47aba7', ink = '#0b1a19' },
+    pink = { accent = '#fc74a4', ink = '#280d14' },
+}
 
 --- Which of the outfit/voice/vehicle tells are still live, as an array of
 --- strings matching html/app.js's TELL_SVG keys (array membership is the
@@ -2133,14 +2265,17 @@ CreateThread(function()
     end
 end)
 
--- This used to also OR in IsDisabledControlPressed(0, 37), on the reasoning
--- that ox_inventory's own hotkey system disables control 37 while it owns it
--- (see the identical note on this same control in client_overlays.lua). That
--- was wrong: this server's ox_inventory config disables control 37 on almost
+-- FIXED 2026-08-28 (round 2): this used to also OR in
+-- IsDisabledControlPressed(0, 37), on the reasoning that ox_inventory's own
+-- hotkey system disables control 37 while it owns it (see the identical note
+-- on this same control in client_overlays.lua). That reasoning was flagged
+-- as UNVERIFIED at the time (no running game to check against) and it was
+-- wrong: this server's ox_inventory config disables control 37 on almost
 -- EVERY frame the inventory is closed (`not EnableWeaponWheel`, which is the
 -- default), so IsDisabledControlPressed reported true essentially all the
 -- time regardless of whether Tab was actually held -- the health row never
--- went nominal again, staying on screen even at full health.
+-- went nominal again, which is exactly the "stays on screen even when full"
+-- bug this fixes.
 --
 -- IsControlPressed alone is the correct, standard read: it reports the RAW
 -- physical input for a normal digital button (Tab/INPUT_SELECT_WEAPON is
@@ -2213,7 +2348,7 @@ CreateThread(function()
         -- flag itself (LocalPlayer.state is global, readable by any resource)
         -- on open/close. Without this check, opening the inventory hid the
         -- ENGINE's radar (ox_inventory calls DisplayRadar(false) itself) but
-        -- left #map-frame/#map-badge on screen — those two are pure NUI
+        -- left #map-frame/#map-badge on screen. Those two are pure NUI
         -- elements that only ever react to vice_hud's OWN belief about radar
         -- state, and from vice_hud's side nothing had changed, so it never
         -- re-sent the mapRect hide. The frame and badge floated over the
@@ -2223,6 +2358,23 @@ CreateThread(function()
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()
         local playerId = PlayerId()
+
+        -- ---- character accent (waypoint + nav tile) ------------------------
+        -- Repainted/pushed only on an actual change, not every tick.
+        -- characterAccentKey() only actually changes on resolve or a
+        -- character switch (see its own comment and the
+        -- QBCore:Client:OnPlayerLoaded handler above), and both
+        -- ReplaceHudColourWithRgba and a NUI push are work worth skipping
+        -- 4 times a second for nothing.
+        local waypointAccentKeyNow = characterAccentKey()
+        if waypointAccentKeyNow ~= lastWaypointAccentKey then
+            print(('^3[vice_hud]^7 waypoint/nav accent -> %s (was %s, gender resolved: %s)')
+                :format(waypointAccentKeyNow, tostring(lastWaypointAccentKey), tostring(genderAccentKey ~= nil)))
+            lastWaypointAccentKey = waypointAccentKeyNow
+            applyWaypointPalette(false, waypointAccentKeyNow)
+            local navHex = NAV_ACCENT_HEX[waypointAccentKeyNow]
+            if navHex then ui('navAccent', navHex) end
+        end
 
         -- ---- status -------------------------------------------------------
         -- GTA puts 100 at dead, not 0. The ceiling is 200 by default but a
@@ -2272,19 +2424,19 @@ CreateThread(function()
 
         -- ---- wanted -------------------------------------------------------
         local wanted = GetPlayerWantedLevel(playerId)
-        local spotted = wanted > 0 and copsCanSeeMe(ped) or false
-        -- Computed every tick, not just when wanted/spotted change: a tell
+        local wstate = wantedState(ped, wanted)
+        -- Computed every tick, not just when wanted/state change: a tell
         -- can clear (or reappear) mid-pursuit purely from the player changing
-        -- clothes or vehicles, with wanted level and spotted state untouched.
+        -- clothes or vehicles, with wanted level and state untouched.
         local tells = getWantedTells(wanted)
         local tellsKey = table.concat(tells, ',')
-        if wanted ~= lastWanted or spotted ~= lastSpotted or tellsKey ~= lastTellsKey then
-            lastWanted, lastSpotted, lastTellsKey = wanted, spotted, tellsKey
+        if wanted ~= lastWanted or wstate ~= lastWantedState or tellsKey ~= lastTellsKey then
+            lastWanted, lastWantedState, lastTellsKey = wanted, wstate, tellsKey
             ui('wanted', {
                 active = wanted > 0,
                 stars = wanted,
                 maxStars = Config.MaxStars or 6,
-                spotted = spotted,
+                state = wstate,
                 tells = tells,
             })
         end
@@ -3699,7 +3851,7 @@ end)
 -- needs editorOpen and is defined above this point.
 
 function resetPushCaches()
-    lastWanted, lastSpotted = -1, false
+    lastWanted, lastWantedState = -1, false
     lastCash = nil
     lastRectKey = nil
     currentZone = nil

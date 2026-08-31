@@ -207,13 +207,19 @@
             '<path d="M5.4 4.2h12.4l-3 3.6 3 3.6H5.4" fill="#fff" stroke="none"/></svg>'
     };
 
-    /* Star states, matching how GTA signals a wanted level:
-         searching — police know about you but have no eyes on you. The star
-                     pulses between a hollow cut-out and a white fill.
-         spotted   — police can actually see you. Solid red, no animation.
-       `filled` is how many stars the level has earned; `spotted` decides
-       whether those earned stars read as red or as the flashing white. */
-    function renderStars(container, filled, total, spotted) {
+    /* Four star states, matching the reference frames exactly, all literal
+       colours (client.lua's wantedState() decides which one applies, see
+       the comment there for what each actually means):
+         contact   solid white fill, static, they can see you right now.
+         searching flashes between hollow and white fill, lost you, still
+                   hunting.
+         hollow    outline only, static, brighter than an unearned star but
+                   never filled, reported, nobody's found you yet.
+         red       solid red fill, static, shaken them, still in the zone.
+       `filled` is how many stars the level has earned; `state` decides how
+       those earned stars render. None of this is the pink/teal character
+       accent, that's the waypoint/nav bar's own thing, not the stars'. */
+    function renderStars(container, filled, total, state) {
         if (!container) return;
         container.innerHTML = '';
         for (var i = 0; i < total; i++) {
@@ -223,7 +229,7 @@
             // Filled from the RIGHT: the reference lights the rightmost star
             // first and fills leftward, so a single star sits at the right end
             // of the row rather than the left.
-            if (i >= total - filled) cls += spotted ? ' on' : ' searching';
+            if (i >= total - filled && state) cls += ' ' + state;
             svg.setAttribute('class', cls);
             var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             p.setAttribute('d', STAR_PATH);
@@ -244,28 +250,27 @@
         });
     }
 
-    /* The notification says two different things, because the two star states
-       mean two different things. `spotted` is police with actual line of sight
-       on you -- they have your description. Without it they know something
-       happened and are sweeping the area, which is a warning, not a manhunt.
+    /* The notification says a different thing per state, because each one
+       means something different to the player (see renderStars' comment).
        The box's own star mirrors the corner row so the two never disagree. */
     var WANTED_COPY = {
-        spotted:   'The cops are searching for you<br>and they have your description',
-        searching: 'The police are searching the area<br>for a suspect'
+        contact:   'The cops are searching for you<br>and they have your description',
+        searching: 'The police are searching the area<br>for a suspect',
+        hollow:    'A crime has been reported<br>police are looking into it',
+        red:       'You\'ve lost them, but stay sharp<br>you\'re still in the search area'
     };
 
     function onWanted(d) {
         var stars = d.stars || 0;
         var maxStars = d.maxStars || 6;
-        var spotted = !!d.spotted;
-        renderStars($('stars'), stars, stars > 0 ? maxStars : 0, spotted);
+        var state = d.state || null;
+        renderStars($('stars'), stars, stars > 0 ? maxStars : 0, state);
 
         var copy = $('wanted-copy');
-        if (copy) copy.innerHTML = spotted ? WANTED_COPY.spotted : WANTED_COPY.searching;
-        // Same two classes renderStars uses, so it flashes or sits solid red in
-        // step with the corner row.
+        if (copy) copy.innerHTML = WANTED_COPY[state] || WANTED_COPY.hollow;
+        // Same class renderStars uses, so it matches the corner row exactly.
         var wstar = $('wanted-star');
-        if (wstar) wstar.setAttribute('class', 'star ' + (spotted ? 'on' : 'searching'));
+        if (wstar) wstar.setAttribute('class', 'star' + (state ? ' ' + state : ''));
 
         // The three "tells" (outfit / voice / vehicle) track independently of the
         // notification box — the reference shows them top-right under the stars
@@ -1140,6 +1145,22 @@
         slotAppear(compass);
         mapBadgeWanted = false;
         applyMapChrome();
+    }
+
+    /* The nav-turn tile's character-gender default, teal for a male
+       character, pink for a female one, same accent client.lua repaints the
+       native waypoint cross/route with (see applyWaypointPalette there),
+       pushed once it resolves. Written to its OWN --*-gender-default
+       properties, not --nav-accent/--nav-accent-ink directly, so that
+       applyOffsets() clearing an unset editor customisation on every layout
+       load (onLayout -> applyOffsets, including at resource start) cannot
+       wipe this out along with it, see the fallback chain on #nav-turn-arrow
+       in style.css. An explicit /movehud "Turn tile colour" customisation
+       still wins over this either way, via the same var() chain. */
+    function onNavAccent(d) {
+        if (!stage || !d) return;
+        if (d.accent) stage.style.setProperty('--nav-accent-gender-default', d.accent);
+        if (d.ink) stage.style.setProperty('--nav-accent-ink-gender-default', d.ink);
     }
 
     /* --- vehicle panel --------------------------------------------------- */
@@ -2985,7 +3006,7 @@
     function editorPreview(on) {
         if (on) {
             onStatus({ health: 62, focus: 45, stamina: 54 });
-            onWanted({ active: true, stars: 3, maxStars: 6,
+            onWanted({ active: true, stars: 3, maxStars: 6, state: 'contact',
                        tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
             onWeapon({ armed: true, clip: 12, reserve: 84 });
             onCash({ cash: 28163, bank: 154200, show: true });
@@ -3421,6 +3442,7 @@
         mapDebug: onMapDebug,
         zone: onZone,
         nav: onNav,
+        navAccent: onNavAccent,
         vehicle: onVehicle,
         brandTour: onBrandTour,
         logoCheck: onLogoCheck,
@@ -3502,7 +3524,7 @@
         onStatus({ health: 66, focus: 40, stamina: 58 });
         onCash({ cash: 28163, bank: 154200, show: true });
         onDuffle({ value: 4820 });
-        onWanted({ active: true, stars: 2, maxStars: 6, tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
+        onWanted({ active: true, stars: 2, maxStars: 6, state: 'searching', tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
         onWeapon({ armed: true, clip: 20, reserve: 80 });
         // Keep these in step with Config.Minimap in config.lua.
         onMapRect({ left: 1.75, width: 15.8, bottom: 17.9, height: 15.4 });

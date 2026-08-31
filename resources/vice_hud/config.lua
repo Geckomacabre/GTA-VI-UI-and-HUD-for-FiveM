@@ -545,16 +545,23 @@ Config.Nav = {
     --
     -- `stock` is what each slot is put back to on resource stop --
     -- REPLACE_HUD_COLOUR_WITH_RGBA outlives this resource, so leaving them
-    -- pink would repaint waypoints for the rest of the client's session.
+    -- recoloured would repaint waypoints for the rest of the client's
+    -- session.
     --
-    -- The pink itself is the accent colour this HUD already uses everywhere
-    -- else (wheel selection wash, lap-timer pips, lockpick ring) -- #e8467a --
-    -- with light/dark companions mixed to the same ratios Rockstar used for
-    -- 150/151 against 142 (55% toward white, 50% toward black).
+    -- Two colours now, not one: teal for a male character, pink for a
+    -- female one (client.lua's characterAccentKey(), read from qbx_core's
+    -- charinfo.gender, see its own comment for why gender rather than a
+    -- config toggle), each with light/dark companions mixed to the same
+    -- ratios Rockstar used for 150/151 against 142 (55% toward white, 50%
+    -- toward black). #fc74a4 and #47aba7 respectively, picked to match
+    -- this HUD's own accent colours, not the earlier #e8467a/#6fd5c3 guess.
     waypointColour = {
-        { index = 142, rgb = { 232,  70, 122 }, stock = { 164,  76, 242 } }, -- HUD_COLOUR_WAYPOINT
-        { index = 150, rgb = { 245, 172, 195 }, stock = { 210, 166, 249 } }, -- HUD_COLOUR_WAYPOINTLIGHT
-        { index = 151, rgb = { 116,  35,  61 }, stock = {  82,  38, 121 } }, -- HUD_COLOUR_WAYPOINTDARK
+        { index = 142, stock = { 164,  76, 242 }, -- HUD_COLOUR_WAYPOINT
+          pink = { 252, 116, 164 }, teal = {  71, 171, 167 } },
+        { index = 150, stock = { 210, 166, 249 }, -- HUD_COLOUR_WAYPOINTLIGHT
+          pink = { 254, 192, 214 }, teal = { 172, 217, 215 } },
+        { index = 151, stock = {  82,  38, 121 }, -- HUD_COLOUR_WAYPOINTDARK
+          pink = { 126,  58,  82 }, teal = {  36,  86,  84 } },
     },
 }
 

@@ -574,7 +574,16 @@ html, body {
     stroke-width: 6;
     stroke-linejoin: round;
 }
-.star.on path { fill: #d4565c; stroke: #f2f2f0; }
+/* Four earned-star states, straight off the reference frames, see
+   renderStars()'s comment in app.js for what each actually means. Literal
+   colours, not the pink/teal character accent (that's the waypoint/nav bar's
+   own thing, not the stars'): white for contact, red for red. */
+.star.contact path { fill: #f2f2f0; stroke: #f2f2f0; }
+.star.red path { fill: #d4565c; stroke: #f2f2f0; }
+/* Brighter, heavier stroke than a plain unearned star, still no fill, but
+   distinguishable up close, for stars the wanted level has earned while
+   police still don't know who did it. */
+.star.hollow path { stroke: #f2f2f0; stroke-width: 8; }
 
 /* Measured: plate 18.5px = 0.98% wide, ~24px = 2.2% tall, 31.5px = 1.64%
    centre-to-centre => gap 0.66%. Right margin is 1.09%, NOT the 1.87% the
@@ -1867,7 +1876,15 @@ html, body {
     width: calc(var(--nav-h) * var(--ic-navpopup, 1));
     height: 100%;
     flex-shrink: 0;
-    background: var(--nav-accent, #6fd5c3);
+    /* Three-deep: an explicit /movehud customisation (--nav-accent, set by
+       the "Turn tile colour" editor row) always wins; failing that, the
+       character-gender default client.lua pushes once it has resolved
+       (--nav-accent-gender-default, a SEPARATE property so applyOffsets()
+       clearing an unset --nav-accent on every layout load can't wipe this
+       one out too, see onNavAccent in app.js); failing even that (gender not
+       resolved yet, or client.lua too old to send it), the teal this always
+       shipped with. */
+    background: var(--nav-accent, var(--nav-accent-gender-default, #47aba7));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1876,7 +1893,7 @@ html, body {
     width: 58%;
     height: 58%;
     fill: none;
-    stroke: var(--nav-accent-ink, #0c2320);
+    stroke: var(--nav-accent-ink, var(--nav-accent-ink-gender-default, #0b1a19));
     stroke-width: 2.6;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -2626,10 +2643,11 @@ html, body {
     #exhaust.critical.breathing { animation: none; }
 }
 
-/* Wanted stars — searching vs spotted.
-   Police know about you but cannot see you: the star pulses between a hollow
-   cut-out and a white fill. Once they actually have eyes on you it goes solid
-   red and stops moving, so the change of state is unmistakable. */
+/* Wanted stars, searching.
+   Police lost contact but are still working your last known position: the
+   star pulses between a hollow cut-out and a white fill, literal colour same
+   as the other three states (see .star.contact/.red/.hollow above), not
+   the pink/teal character accent, that's the waypoint/nav bar's own thing. */
 .star.searching path {
     animation: starHunt 900ms steps(1, end) infinite;
 }
