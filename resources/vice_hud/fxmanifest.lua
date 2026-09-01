@@ -43,6 +43,13 @@ client_scripts {
     'vendor/ScaleformUI_Lua/src/utils/**/*.lua',
     'vendor/ScaleformUI_Lua/src/ScaleformUI/scaleform.lua',
     'vendor/ScaleformUI_Lua/src/ScaleformUI/mainScaleform.lua',
+    -- Still saw "attempt to index a nil value (field 'MinimapOverlays')" from
+    -- mainScaleform.lua even with the ordering above, see this file's own
+    -- header for why (most likely: the client needs a refresh, since this
+    -- glob split changed which files are matched and FXServer caches that at
+    -- refresh time, not restart time). Backfills whatever mainScaleform.lua
+    -- captured as nil, one tick later, as a second line of defense.
+    'client_scaleform_safety.lua',
     -- Split out of client.lua, and loaded BEFORE it so their published tables
     -- exist by the time anything can call them. Each .lua file is its own Lua
     -- chunk with its own 200-top-level-locals budget, which is the reason the
