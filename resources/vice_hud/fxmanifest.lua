@@ -44,8 +44,8 @@ client_scripts {
     'vendor/ScaleformUI_Lua/src/ScaleformUI/scaleform.lua',
     'vendor/ScaleformUI_Lua/src/ScaleformUI/mainScaleform.lua',
     -- Still saw "attempt to index a nil value (field 'MinimapOverlays')" from
-    -- mainScaleform.lua even with the ordering above, see this file's own
-    -- header for why (most likely: the client needs a refresh, since this
+    -- mainScaleform.lua even with the ordering above -- see this file's own
+    -- header for why (most likely: the client needs a `refresh`, since this
     -- glob split changed which files are matched and FXServer caches that at
     -- refresh time, not restart time). Backfills whatever mainScaleform.lua
     -- captured as nil, one tick later, as a second line of defense.
@@ -104,8 +104,18 @@ files {
     'html/fonts/*.ttf',
     -- The map badge's source art (#map-badge, a plain <img>). PNG rather than
     -- webp -- webp was the first thing tried and did not render in the
-    -- game's own NUI browser.
+    -- game's own NUI browser. Also covers the status-bar badges (heart/
+    -- stamina/eye) and the BuckMe badge -- all from the same reference pack,
+    -- see README credit.
     'html/icons/*.png',
+    -- The BuckMe ring's 33-frame mask sequence (onCash() in app.js swaps
+    -- which frame is the mask) -- a subfolder, so it needs its own glob;
+    -- the one above does not recurse.
+    'html/icons/buckme_ring/*.png',
+    -- weapon/person/people/vehicle tells (TELL_IMG in app.js), cropped
+    -- straight out of the reference screenshots -- another subfolder, same
+    -- non-recursing caveat as above.
+    'html/icons/tells/*.png',
 }
 
 -- The radar masks in stream/ are picked up AUTOMATICALLY — FiveM streams

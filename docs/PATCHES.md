@@ -6,8 +6,14 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
 (ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
-um_smallresources) to connect it to vice_hud. Copy the files into place, then
-make the one- or two-line edit shown below for that resource.
+um_smallresources, lb-phone) to connect it to vice_hud. Copy the files into
+place, then make the one- or two-line edit shown below for that resource.
+
+`lb-phone` is the one exception to "connect it to vice_hud" above; its patch
+is a standalone rebrand of that resource's own Wallet app (see the lb-phone
+section below) and doesn't touch vice_hud at all. It's grouped here anyway
+because lb-phone is paid, so, same as every other patch, only the handful of
+files actually changed are included, never the resource itself.
 
 Most of these are presentational only — a stylesheet plus a script that
 listens for a theme broadcast from vice_hud. Two are not: `speedlimits` and
@@ -470,3 +476,59 @@ The original — the infinite-stamina version — sits beside it as
 remove vice_hud's stamina bar instead (`Config.Stamina` in `vice_hud`).
 
 No `fxmanifest.lua` edit needed — same filename, same file list.
+
+## lb-phone (BuckMe)
+
+Rebrands lb-phone's stock Wallet app into "BuckMe": a Vice-styled debit card
+(front, a tap-to-flip back with a real signature and CVV), a purple accent
+scoped to just this one app, a bottom tab bar (Main / Pay / History), and a
+Pay/Request toggle on the send screen (Request is UI only for now — there's
+no request-money backend in lb-phone to hook into).
+
+**Version pinned against:** lb-phone 2.8.3. The two `Wallet-*` files under
+`ui/dist/assets/` are lb-phone's own Vite build output with content-hashed
+filenames — a different lb-phone version will ship different hashes and a
+different (minified) file, so these are a reference to hand-merge from
+rather than something to drop in blind.
+
+Copy into your `lb-phone/` install:
+
+```
+patches/lb-phone/server/apps/framework/wallet.lua
+patches/lb-phone/ui/dist/assets/Wallet-Da9Ipi6P.js
+patches/lb-phone/ui/dist/assets/Wallet-BB8GWuDZ.css
+patches/lb-phone/ui/dist/assets/img/card.png
+patches/lb-phone/ui/dist/assets/img/card-back.png
+patches/lb-phone/ui/dist/assets/img/buckme-logo.png
+patches/lb-phone/ui/dist/assets/img/icons/apps/Wallet.jpg
+patches/lb-phone/ui/dist/assets/fonts/buckme/GTAArtDecoMedium.ttf
+patches/lb-phone/ui/dist/assets/fonts/buckme/GTAArtDecoRegular.ttf
+patches/lb-phone/ui/dist/assets/fonts/buckme/CedarvilleCursive-Regular.ttf
+patches/lb-phone/config/locales/en.json
+```
+
+No `fxmanifest.lua` edit needed — lb-phone's manifest already ships
+`ui/dist/**/*` as one glob, so the new image and font files are picked up
+automatically.
+
+`wallet.lua` adds two new callbacks, `wallet:getCardholderName` and
+`wallet:getCardDetails`, both read by the client on load. Cardholder name
+comes straight from `GetCharacterName` (framework-provided — qbox, qb, esx,
+and standalone each define their own, so this works regardless of which one
+your server runs). The card number's last 4 digits and CVV are generated
+from `GetIdentifier` (the framework's persistent account id — citizenid for
+qbox) run through a small deterministic hash, so they're stable for that
+character across logins without needing a new database column, and unique
+per account rather than per phone number.
+
+`en.json` only changes two keys — `Wallet` (the home-screen app label) and
+`WALLET.TITLE` (the in-app header) — both to `BuckMe`. Everything else in
+the file is stock lb-phone; diff before overwriting if you've made your own
+locale edits elsewhere in it.
+
+If you swap in different card art later, the signature and card number/CVV
+are live overlays positioned by CSS percentage to match `card.png`'s masked
+number row and `card-back.png`'s blank signature strip — new art needs
+those percentages (`.card-number`, `.card-signature-strip`, `.card-cvv` in
+`Wallet-BB8GWuDZ.css`) nudged to match wherever the new art puts them, they
+won't move on their own.

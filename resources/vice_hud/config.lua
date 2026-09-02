@@ -45,6 +45,14 @@ Config.Debug = false
 -- it with /hudminimap; their choice persists in KVP and beats this value.
 Config.MinimapOnFootDefault = true
 
+-- The cash wallet cap the reference sheet describes ("a limited wallet that
+-- can hold up to $20,000 in cash... deposit into BuckMe at an ATM"). Not
+-- enforced here — vice_hud only draws the HUD — this just drives the
+-- purple ring round the BuckMe/bank icon, which fills up as the cash wallet
+-- approaches this cap, same as the reference art. Match whatever your
+-- inventory/economy resource actually caps cash at.
+Config.CashCap = 20000
+
 -- =============================================================================
 -- Stamina
 -- =============================================================================

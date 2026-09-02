@@ -1191,7 +1191,7 @@ RegisterCommand('hudtest', function()
     ui('status', { health = 55, focus = 40, stamina = 60 })
     ui('wanted', { active = true, stars = 2, maxStars = Config.MaxStars or 6,
         state = 'searching',
-        tells = { 'camera', 'medical', 'hanger', 'person', 'flag' } })
+        tells = { 'camera', 'weapon', 'person', 'people', 'hanger', 'vehicle' } })
     ui('weapon', { armed = true, clip = 20, reserve = 80 })
     ui('zone', { zone = 'TEST ZONE', duration = 15000 })
     ui('vehicle', { show = true, make = 'TESTMAKE', model = 'TESTMODEL', fuel = 70,
@@ -1905,11 +1905,57 @@ end
 -- =============================================================================
 -- Suppress GTA's native HUD
 -- =============================================================================
+-- Nothing in this thread should touch a scaleform (native minimap or
+-- otherwise) before the player has actually spawned in: the character-
+-- select/spawn-location screens (um_spawn's HEISTMAP_MP map among them)
+-- request their own scaleforms during that exact window, and this thread
+-- starting immediately on resource start -- well before the player has
+-- spawned -- put it in direct contention for the engine's scaleform pool at
+-- the worst possible moment.
+--
+-- NETWORK_IS_PLAYER_ACTIVE rather than a QBCore:Client:OnPlayerLoaded latch:
+-- that event fires exactly once per login/character-switch, so a `restart
+-- vice_hud` on an ALREADY-loaded player (an every-day dev/test workflow, not
+-- an edge case) started this thread with nothing left to ever flip the latch
+-- true again -- the whole suppression loop below silently never ran again
+-- for the rest of the session, which is what actually caused the native
+-- weapon/ammo HUD and the minimap's health/armour bars to reappear after a
+-- plain resource restart. The native re-checks live every call, so it is
+-- correct immediately after a restart instead of only after the next fresh
+-- login.
+local function playerIsActive()
+    return NetworkIsPlayerActive(PlayerId())
+end
+
 -- Runs every frame: both DisplayHud and HideHudComponentThisFrame reset each
 -- tick, so this has to be a per-frame thread rather than a one-shot.
+--
+-- The native-HUD suppression loop runs FIRST and is pcall-free/error-free by
+-- construction (HideHudComponentThisFrame never throws) -- the health-bar
+-- scaleform block below it is the one part of this thread that touches a
+-- scaleform handle and so CAN throw (a bad/expired handle, a native arg
+-- mismatch, ...). An uncaught error anywhere in a CreateThread body kills
+-- that thread outright, and everything after the failure point simply stops
+-- running for the rest of the session -- previously that included the
+-- HiddenHudComponents loop, which sat AFTER the scaleform block. One bad
+-- frame there would silently bring back every native HUD element this
+-- resource replaces (wanted stars, weapon icon + ammo, cash, street name,
+-- ...) with no further errors to explain why. Reordered so a scaleform
+-- hiccup can only ever cost the health-bar hide, never the suppression list,
+-- and wrapped in its own pcall so it can't kill the thread at all.
 CreateThread(function()
     while true do
         Wait(0)
+        if not playerIsActive() then goto continue end
+        for i = 1, #Config.HiddenHudComponents do
+            HideHudComponentThisFrame(Config.HiddenHudComponents[i])
+        end
+        -- HideHudComponentThisFrame(2) (WEAPON_ICON, in the list above) only
+        -- covers the corner icon+ammo readout while idle. The moment the
+        -- player aims, the game draws a SEPARATE ammo counter gated by its
+        -- own toggle rather than the component list, so component 2 being
+        -- hidden every frame was never enough to stop it reappearing on aim.
+        DisplayAmmoThisFrame(false)
         if Config.HideNativeHealthBars then
             -- Hides ONLY the health/armour bars drawn around the minimap, via the
             -- minimap scaleform's own SETUP_HEALTH_ARMOUR method (param 3 = hide
@@ -1918,17 +1964,33 @@ CreateThread(function()
             -- The previous approach was DisplayHud(false), which also killed the
             -- radio, help text, subtitles and native notifications — that is what
             -- broke the in-vehicle radio display.
-            if not minimapScaleform or not HasScaleformMovieLoaded(minimapScaleform) then
-                minimapScaleform = RequestScaleformMovie('minimap')
-            else
-                BeginScaleformMovieMethod(minimapScaleform, 'SETUP_HEALTH_ARMOUR')
-                ScaleformMovieMethodAddParamInt(3)
-                EndScaleformMovieMethod()
+            local ok, err = pcall(function()
+                if not minimapScaleform then
+                    -- Request once and let it stream in; re-requesting every frame
+                    -- while HasScaleformMovieLoaded is still false (which it is for
+                    -- several frames even on a normal successful load) leaked a new
+                    -- scaleform handle each tick and could exhaust the engine's
+                    -- scaleform pool, starving unrelated scaleform requests from
+                    -- other resources (e.g. um_spawn's spawn-selection map).
+                    minimapScaleform = RequestScaleformMovie('minimap')
+                elseif HasScaleformMovieLoaded(minimapScaleform) then
+                    BeginScaleformMovieMethod(minimapScaleform, 'SETUP_HEALTH_ARMOUR')
+                    ScaleformMovieMethodAddParamInt(3)
+                    EndScaleformMovieMethod()
+                end
+            end)
+            if not ok then
+                -- Drop the handle rather than keep retrying a scaleform method that
+                -- just errored on it -- RequestScaleformMovie runs again next frame
+                -- and either recovers cleanly or errors again harmlessly, forever
+                -- caught here instead of taking the thread down.
+                minimapScaleform = nil
+                if Config.Debug then
+                    print(('^1[vice_hud]^7 health-bar scaleform hide failed, dropping handle: %s'):format(tostring(err)))
+                end
             end
         end
-        for i = 1, #Config.HiddenHudComponents do
-            HideHudComponentThisFrame(Config.HiddenHudComponents[i])
-        end
+        ::continue::
     end
 end)
 
@@ -2075,46 +2137,61 @@ local NAV_ACCENT_HEX = {
     pink = { accent = '#fc74a4', ink = '#280d14' },
 }
 
---- Which of the outfit/voice/vehicle tells are still live, as an array of
---- strings matching html/app.js's TELL_SVG keys (array membership is the
---- signal — see renderTells()).
+--- Which of the wanted tells are still live, as an array of strings matching
+--- html/app.js's TELL_SVG keys (array membership is the signal — see
+--- renderTells()).
 ---
--- Overrides for the two tells nothing in this codebase can detect on its
--- own — see exports.vice_hud:SetWantedTellOverride. Both default off:
--- there's no CCTV/witness system to ask about `camera`, and qbox_bounties
--- (installed on this server) exposes no live per-player query for `flag`,
--- only a DB-backed board UI. Wiring either up for real is future work; this
--- just gives some other resource a place to push the answer once it exists.
+-- Override for the one tell nothing in this codebase can detect on its own
+-- — see exports.vice_hud:SetWantedTellOverride. Defaults off: there's no
+-- CCTV/witness system installed on this server to ask about `camera`.
+-- Wiring one up for real is future work; this just gives some other
+-- resource a place to push the answer once it exists.
 -- Not `local` — same reasoning as HEAD_BONE above.
-tellOverrides = { camera = false, flag = false }
+tellOverrides = { camera = false }
 
 exports('SetWantedTellOverride', function(id, on)
     if tellOverrides[id] == nil then return end -- unknown id — ignore rather than create a tell nothing draws
     tellOverrides[id] = not not on
 end)
 
---- Five tells, not the three this shipped with — a later reference frame
---- showed camera / medical / hanger / person / flag instead of outfit /
---- voice / vehicle (see TELL_SVG in app.js for the icon rename), so what
---- feeds the row changed too:
----   hanger  — fenix-police's `outfit` signal, unchanged, just renamed
----   person  — fenix-police's `voice` signal. fenix-police has no separate
----             "your face is known" concept, only "dispatch has heard you" —
----             this reuses that under the new icon rather than inventing a
----             second signal fenix-police doesn't actually track
----   medical — vice_hud's OWN reading of the player's health, independent of
----             fenix-police entirely: below half health reads as visibly
----             hurt, the same normalisation the status bar uses (raw health
----             is 100 at dead, not 0 — see onStatus's health push below)
----   camera, flag — tellOverrides above; false until another resource starts
+--- Six tells, matching the "GRAND THEFT AUTO VI: HUD DEFINITIONS" reference
+--- sheet (see TELL_SVG in app.js for the icons themselves):
+---   camera  — tellOverrides above; false until another resource starts
 ---             calling SetWantedTellOverride
---- fenix-police's `vehicle` signal has no icon in the five and simply isn't
---- surfaced here any more — the signal itself is untouched, still readable
---- from GetTells() by anything else that wants it.
+---   weapon  — currently holding a weapon police would have seen/logged
+---   person / people — fenix-police's `voice` signal (dispatch has heard a
+---             description). Split into "one" vs "multiple" suspects
+---             identified by whether another player is right next to you
+---             when the signal fires — the reference's own "Lucia & Jason"
+---             frame is just that duo case, generalised to any group rather
+---             than hardcoded to a pair.
+---   hanger  — fenix-police's `outfit` signal
+---   vehicle — fenix-police's `vehicle` signal. Previously dropped on the
+---             floor because the old five-icon set had nowhere to draw it;
+---             the reference sheet gives it its own icon, so it is surfaced
+---             again here.
 ---
 --- Falls back to "hanger + person, always" when fenix-police isn't
---- installed — this resource's original placeholder, under the new names —
---- so a server without it sees the same thing this always showed.
+--- installed — this resource's original placeholder — so a server without
+--- it sees the same thing this always showed.
+local NEARBY_SUSPECT_RANGE = 15.0
+
+--- How many other players are close enough right now to plausibly be swept
+--- up in the same "suspect(s) identified" report as us.
+local function countNearbyPlayers(ped)
+    local coords = GetEntityCoords(ped)
+    local n = 0
+    for _, playerId in ipairs(GetActivePlayers()) do
+        if playerId ~= PlayerId() then
+            local otherPed = GetPlayerPed(playerId)
+            if otherPed and otherPed ~= 0 and #(coords - GetEntityCoords(otherPed)) <= NEARBY_SUSPECT_RANGE then
+                n = n + 1
+            end
+        end
+    end
+    return n
+end
+
 local function getWantedTells(wanted)
     if wanted <= 0 then return {} end
 
@@ -2122,24 +2199,21 @@ local function getWantedTells(wanted)
     if tellOverrides.camera then out[#out + 1] = 'camera' end
 
     local ped = cache.ped or PlayerPedId()
-    local maxHp = GetEntityMaxHealth(ped)
-    if not maxHp or maxHp <= 100 then maxHp = 200 end
-    local raw = GetEntityHealth(ped)
-    local healthPct = raw > 100 and ((raw - 100) / (maxHp - 100)) * 100 or 0
-    if healthPct < 50 then out[#out + 1] = 'medical' end
+    local _, wep = GetCurrentPedWeapon(ped, true)
+    if wep and wep ~= `WEAPON_UNARMED` then out[#out + 1] = 'weapon' end
 
     if GetResourceState('fenix-police') == 'started' then
         local ok, t = pcall(function() return exports['fenix-police']:GetTells() end)
         if ok and type(t) == 'table' then
             if t.outfit then out[#out + 1] = 'hanger' end
-            if t.voice then out[#out + 1] = 'person' end
+            if t.voice then out[#out + 1] = (countNearbyPlayers(ped) > 0) and 'people' or 'person' end
+            if t.vehicle then out[#out + 1] = 'vehicle' end
         end
     else
         out[#out + 1] = 'hanger'
-        out[#out + 1] = 'person'
+        out[#out + 1] = (countNearbyPlayers(ped) > 0) and 'people' or 'person'
     end
 
-    if tellOverrides.flag then out[#out + 1] = 'flag' end
     return out
 end
 
@@ -2378,7 +2452,14 @@ CreateThread(function()
         -- state, and from vice_hud's side nothing had changed, so it never
         -- re-sent the mapRect hide. The frame and badge floated over the
         -- inventory screen with nothing behind them.
-        setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen) and not LocalPlayer.state.invOpen)
+        --
+        -- `and not IsPauseMenuActive()`: the same floating-frame bug, but for
+        -- Escape's pause menu -- GTA hides its OWN minimap component there,
+        -- but that native flag change is invisible to vice_hud's belief about
+        -- radar state (same as the ox_inventory case above), so #map-frame/
+        -- #map-badge stayed drawn over the pause menu with nothing behind them.
+        setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen)
+            and not LocalPlayer.state.invOpen and not IsPauseMenuActive())
 
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()
@@ -2472,16 +2553,28 @@ CreateThread(function()
         -- ammo at all rather than off the count being non-zero.
         local _, wep = GetCurrentPedWeapon(ped, true)
         if wep and wep ~= `WEAPON_UNARMED` then
-            local inClip = select(2, GetAmmoInClip(ped, wep)) or 0
-            -- GET_MAX_AMMO_IN_CLIP returns a plain int, not a bool+outparam
-            -- pair like GET_AMMO_IN_CLIP above it. select(2, ...) on a
-            -- single return is always nil, which is why maxClip was always 0
-            -- and the ammo numbers never showed, only the weapon icon.
-            local maxClip = GetMaxAmmoInClip(ped, wep, true) or 0
             -- Icon comes from ox_inventory's own art via nui://, so the HUD and
             -- the inventory show the same image. WeaponIcons is generated in
-            -- weapons.lua from ox_inventory/data/weapons.lua.
+            -- weapons.lua from ox_inventory/data/weapons.lua, i.e. it only has
+            -- entries for weapons ox_inventory actually knows about.
             local icon = WeaponIcons and WeaponIcons[wep] or nil
+            -- GET_AMMO_IN_CLIP/GET_MAX_AMMO_IN_CLIP index the game's own
+            -- CWeaponInfo table for the hash; a weapon hash with no matching
+            -- entry there (unregistered/custom weapon, or a stale hash from a
+            -- weapon swap mid-tick) makes GET_MAX_AMMO_IN_CLIP hard-crash the
+            -- native with a memory access exception instead of erroring
+            -- cleanly. Only call these for weapons ox_inventory itself knows
+            -- about (i.e. have a WeaponIcons entry) to avoid feeding it a
+            -- hash the game has no info for.
+            local inClip, maxClip = 0, 0
+            if icon then
+                inClip = select(2, GetAmmoInClip(ped, wep)) or 0
+                -- GET_MAX_AMMO_IN_CLIP returns a plain int, not a bool+outparam
+                -- pair like GET_AMMO_IN_CLIP above it. select(2, ...) on a
+                -- single return is always nil, which is why maxClip was always 0
+                -- and the ammo numbers never showed, only the weapon icon.
+                maxClip = GetMaxAmmoInClip(ped, wep, true) or 0
+            end
             if maxClip > 0 then
                 -- GetAmmoInPedWeapon reads the NATIVE pool, which ox_inventory
                 -- only ever fills from the equipped weapon item's OWN
@@ -2517,7 +2610,7 @@ CreateThread(function()
             local key = tostring(cash) .. '|' .. tostring(bank)
             if key ~= lastCash then
                 lastCash = key
-                ui('cash', { cash = cash, bank = bank, show = true })
+                ui('cash', { cash = cash, bank = bank, cashCap = Config.CashCap, show = true })
             end
         end
 
@@ -3026,7 +3119,7 @@ local HUD_ELEMENTS = {
     status   = 'health / stamina bars (top-left)',
     topright = 'wanted stars, tells, ammo, weapon icon',
     money    = 'cash + bank (moves with topright)',
-    tells    = 'the three round wanted tells',
+    tells    = 'the six round wanted tells',
     slots    = 'zone bar + vehicle panel, moved together',
     vehicle  = 'vehicle make/model panel (the upper one)',
     zone     = 'zone bar (the lower one)',

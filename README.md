@@ -44,7 +44,8 @@ GTA VI Resources/
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
 │                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
-│                  zseatbelt, um_smallresources).
+│                  zseatbelt, um_smallresources), plus a standalone lb-phone
+│                  Wallet app rebrand that doesn't touch vice_hud at all.
 │                  See docs/PATCHES.md for exact install steps per resource.
 │
 └── docs/          Extra documentation, including the patch install guide.
@@ -116,6 +117,10 @@ Overlays for resources you install separately:
   draw through their own NUI page.
 - **`um_smallresources`**: not theming, a functional fix for a stamina
   script in this pack that conflicts with vice_hud's stamina bar.
+- **`lb-phone`**: a Vice-styled rebrand of lb-phone's stock Wallet app into
+  "BuckMe" (card front/back with a tap-to-flip signature and CVV, a bottom
+  tab bar, a Pay/Request toggle). Standalone, not part of the vice_hud glass
+  system, doesn't touch vice_hud at all.
 
 **Read [`docs/PATCHES.md`](docs/PATCHES.md) before touching any of these.**
 Each one needs a couple of files copied into an existing install plus, for
@@ -155,8 +160,10 @@ once it's installed.
 These are not resources, so do not `ensure` a `patches/` folder. Follow
 [`docs/PATCHES.md`](docs/PATCHES.md), which walks through each of `ox_lib`,
 `ox_target`, `ox_inventory`, `qb-menu`, `qb-input`, `speedlimits`,
-`zseatbelt`, and `um_smallresources` individually: which files to copy in,
-and the exact manifest/HTML edits (where one is needed).
+`zseatbelt`, `um_smallresources`, and `lb-phone` individually: which files
+to copy in, and the exact manifest/HTML edits (where one is needed). Every
+one of these needs an existing install of the resource it patches; none of
+them work standing alone.
 
 An update to any of those patched resources will silently wipe its patch.
 That's expected, and `PATCHES.md` says so per-resource. Re-apply after
@@ -193,6 +200,11 @@ Not bundled here, these are separate projects you install yourself:
   reads a small export added to the resource's own client code
   (`GetPlayerChips` / `RefreshPlayerChips`) rather than touching anything
   else about how it plays.
+- **lb-phone**: a commercial phone resource, not linked here since it's paid
+  and closed source. `um_gigs` (bundled above) is served through it, and
+  `patches/lb-phone` is a standalone rebrand of its stock Wallet app into
+  "BuckMe", so both need it installed regardless of whether you also touch
+  vice_hud at all. See `docs/PATCHES.md` for the Wallet rebrand.
 
 ## The arista-pro font
 
@@ -233,6 +245,12 @@ upstream license:
 | `um_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
 | ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
+
+`lb-phone` is different again: it's a paid, closed-source resource, not
+under any of the licenses above. Nothing of lb-phone's own code or assets is
+included here, only the handful of files this project changed or added on
+top of it (`patches/lb-phone/`), which is why that patch needs an lb-phone
+install of your own to apply onto in the first place.
 
 Check each project's own repository for its full license text before
 redistributing patched files from this bundle outside your own server.

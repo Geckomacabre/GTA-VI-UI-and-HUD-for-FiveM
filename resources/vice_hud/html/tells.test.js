@@ -1,4 +1,4 @@
-/* Headless test for the wanted-tells row's five icons.
+/* Headless test for the wanted-tells row's six icons.
  *
  *   node html/tells.test.js
  *
@@ -32,23 +32,28 @@ d.dispatchEvent(new window.Event('DOMContentLoaded'));
 
 const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { data }));
 
-console.log('\n-- all five current tells render actual SVG content --');
+console.log('\n-- all six current tells render actual content --');
 msg({ action: 'wanted', active: true, stars: 3, maxStars: 6,
-      tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
+      tells: ['camera', 'weapon', 'person', 'people', 'hanger', 'vehicle'] });
 const tells = [...d.querySelectorAll('#tells .tell')];
-ok(tells.length === 5, '5 tell badges rendered', tells.length);
+ok(tells.length === 6, '6 tell badges rendered', tells.length);
+// hanger is still hand-drawn inline SVG; camera/weapon/person/people/vehicle
+// are now cropped PNGs (TELL_IMG in app.js) -- see BUCKME_HANDOFF.md 2a/2b on
+// why hand-traced SVG was dropped for those five.
 tells.forEach(function (t) {
   const svg = t.querySelector('svg');
-  ok(!!svg && svg.children.length > 0, 'badge "' + t.title + '" has real SVG content', t.innerHTML);
+  const img = t.querySelector('img');
+  ok((!!svg && svg.children.length > 0) || (!!img && !!img.src),
+     'badge "' + t.title + '" has real content', t.innerHTML);
 });
 
-console.log('\n-- the old three keys no longer exist (renamed/dropped) --');
+console.log('\n-- the old placeholder keys no longer exist (renamed/dropped) --');
 msg({ action: 'wanted', active: true, stars: 3, maxStars: 6,
-      tells: ['outfit', 'voice', 'vehicle'] });
+      tells: ['medical', 'flag'] });
 const staleTells = [...d.querySelectorAll('#tells .tell')];
-ok(staleTells.length === 3, 'still draws 3 badges (renderTells does not filter)', staleTells.length);
-ok(staleTells.every(function (t) { return !t.querySelector('svg'); }),
-   'but every one of them is empty -- confirms outfit/voice/vehicle are gone from TELL_SVG',
+ok(staleTells.length === 2, 'still draws 2 badges (renderTells does not filter)', staleTells.length);
+ok(staleTells.every(function (t) { return !t.querySelector('svg') && !t.querySelector('img'); }),
+   'but every one of them is empty -- confirms medical/flag are gone from TELL_SVG/TELL_IMG',
    staleTells.map(function (t) { return t.innerHTML; }));
 
 console.log(fails === 0 ? '\nALL PASS' : ('\n' + fails + ' FAILURES'));

@@ -16,18 +16,25 @@
              layers on top -- a full bar under a cap has to still read as full,
              dimmed at the end, rather than as a short bar. -->
         <div class="srow hidden" id="s-health">
-            <div class="sic">&#9829;</div>
+            <div class="sic has-badge"><img src="icons/badge_heart.png" alt=""></div>
             <div class="strack">
                 <div class="sfill" style="width:100%"></div>
                 <div class="scap"></div>
             </div>
         </div>
         <div class="srow hidden" id="s-stamina">
-            <div class="sic">&#9889;</div>
+            <!-- Underwater this row becomes the OXYGEN row (see setStaminaMode
+                 in app.js) -- the bolt badge hides and a plain bubble glyph
+                 takes its place, since there's no oxygen badge in the
+                 reference art. CSS-driven off .oxygen, see style.css. -->
+            <div class="sic has-badge">
+                <img src="icons/badge_stamina.png" alt="" class="stamina-badge-img">
+                <span class="stamina-oxygen-glyph" aria-hidden="true">&#9675;</span>
+            </div>
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
         </div>
         <div class="srow hidden" id="s-focus">
-            <div class="sic">&#128065;</div>
+            <div class="sic has-badge"><img src="icons/badge_eye.png" alt=""></div>
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
         </div>
     </div>
@@ -53,19 +60,29 @@
             <div class="money-row hidden" id="cash-row">
                 <span class="money-amt" id="cash">$0</span>
                 <span class="money-ic money-ic-cash" title="Cash">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <rect x="2" y="6" width="20" height="12" rx="2"/>
-                        <circle cx="12" cy="12" r="3.1" class="hole"/>
-                    </svg>
+                    <!-- Same treatment as BuckMe below: badge/glyph art copied
+                         from the reference icon (see README credit), its
+                         baked-in ring flattened off, and a real ring layered
+                         back on with the same radial_ring_00..32 mask
+                         sequence, filled by onCash() off cash / Config.CashCap. -->
+                    <img src="icons/cash.png" alt="">
+                    <div id="cash-ring-fill" class="cash-ring"></div>
                 </span>
             </div>
             <div class="money-row hidden" id="bank-row">
                 <span class="money-amt" id="bank">$0</span>
-                <span class="money-ic money-ic-bank" title="Bank">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <rect x="2" y="5" width="20" height="14" rx="2"/>
-                        <rect x="2" y="8.5" width="20" height="2.6" class="stripe"/>
-                    </svg>
+                <span class="money-ic money-ic-bank" title="BuckMe">
+                    <!-- BuckMe is GTA VI's bank account -- badge/glyph art
+                         copied straight from the reference icon; see README
+                         credit. The reference's ring round the rim is NOT
+                         baked into the PNG -- it's the actual reference ring
+                         art too (icons/buckme_ring/radial_ring_00..32.png, a
+                         33-step white mask) tinted with icons/fill_purple.png
+                         via a CSS mask and stepped by onCash() to show how
+                         close the cash wallet is to Config.CashCap, not a
+                         static decoration. -->
+                    <img src="icons/buckme.png" alt="">
+                    <div id="buckme-ring-fill" class="buckme-ring"></div>
                 </span>
             </div>
             <!-- What the duffle bag would fetch at a fence/pawn shop right now --

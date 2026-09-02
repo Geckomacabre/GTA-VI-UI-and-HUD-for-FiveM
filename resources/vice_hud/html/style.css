@@ -383,6 +383,14 @@ html, body {
     flex-shrink: 0;
 }
 
+/* health/stamina/focus now use the actual reference badge art (dark disc +
+   glyph already baked in) instead of a tinted emoji glyph over .sic's own
+   disc -- so the disc/border/font-size above are switched off here rather
+   than doubled up. */
+.sic.has-badge { background: none; border: none; }
+.sic.has-badge img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+.stamina-oxygen-glyph { display: none; }
+
 /* Colours sampled across 166 reference frames, taking the BRIGHTEST readings
    per element so a dark backdrop doesn't drag them down (these bars are
    translucent, so every sample is a composite):
@@ -459,10 +467,6 @@ html, body {
 #s-stamina .strack { width: 5.6cqw; background: rgba(62, 92, 94, 0.62); }
 #s-focus   .strack { width: 5.8cqw; background: rgba(78, 70, 116, 0.62); }
 
-#s-health  .sic { color: #f5acc6; }
-#s-stamina .sic { color: #a3c6c4; }
-#s-focus   .sic { color: #bdaae6; }
-
 /* Engaged focus: the eye glows rather than sitting flat, so the one moment
    the world visibly slows down is also the one moment this row visibly says
    why. Pulses instead of holding steady so it reads as "active", not just
@@ -471,6 +475,12 @@ html, body {
     color: #d6c8ff;
     text-shadow: 0 0 0.5cqw rgba(189, 170, 230, 0.85);
     animation: focus-pulse 1.1s ease-in-out infinite;
+}
+/* text-shadow above does nothing on an <img> -- drop-shadow is the
+   img-compatible equivalent, so the badge still glows rather than just
+   pulsing opacity with the colour cue gone. */
+#s-focus.active .sic.has-badge img {
+    filter: drop-shadow(0 0 0.5cqw rgba(189, 170, 230, 0.85)) brightness(1.15);
 }
 @keyframes focus-pulse {
     0%, 100% { opacity: 1; }
@@ -525,8 +535,23 @@ html, body {
    a cooler, bluer cast than the stamina teal so the swap is unmistakable at a
    glance without the eye having to find a new bar first. */
 #s-stamina.oxygen .strack { background: rgba(52, 78, 108, 0.62); }
-#s-stamina.oxygen .sic    { color: #9ec4e8; }
 #s-stamina.oxygen .sfill  { background: #9ec4e8; }
+/* The bolt badge PNG has no oxygen equivalent, so oxygen mode swaps it for a
+   plain bubble glyph -- which means the badge's own dark disc has to come
+   back too, since that disc lived in the (now hidden) PNG, not in .sic. */
+#s-stamina.oxygen .sic {
+    background: rgba(28, 26, 32, 0.72);
+    border: 0.045cqw solid rgba(255, 255, 255, 0.22);
+    color: #9ec4e8;
+}
+#s-stamina.oxygen .stamina-badge-img { display: none; }
+#s-stamina.oxygen .stamina-oxygen-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
 
 /* -----------------------------------------------------------------------------
    Top-right: wanted stars, the three "tells", money
@@ -609,7 +634,10 @@ html, body {
     width: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
     height: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
     border-radius: 50%;
-    background: #c0393f;
+    /* Matched to the plate red baked into the cropped reference PNGs
+       (weapon/person/people/vehicle, see TELL_IMG in app.js) so their
+       transparent edges blend with no fringing. Was #c0393f. */
+    background: #8d161c;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -629,6 +657,16 @@ html, body {
 /* The microphone capsule and the wheels read better filled than outlined. */
 .tell svg rect,
 .tell svg circle { fill: #fff; stroke: none; }
+/* camera/weapon/person/people/vehicle are cropped straight out of the actual
+   reference screenshots (see TELL_IMG in app.js), not inline SVG --
+   object-fit: contain since their source crops aren't square like hanger's
+   (the one remaining hand-drawn icon) 24x24 viewBox. */
+.tell img {
+    width: 74%;
+    height: 74%;
+    object-fit: contain;
+    display: block;
+}
 
 /* Money. Cash and bank on their own rows, amounts right-aligned against the
    icon so the digits line up as the value changes. */
@@ -666,15 +704,39 @@ html, body {
     flex-shrink: 0;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
-.money-ic svg { width: 100%; height: 100%; display: block; }
+.money-ic svg, .money-ic img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .money-ic rect, .money-ic circle { fill: currentColor; }
 .money-ic .hole { fill: rgba(0, 0, 0, 0.38); }
 .money-ic .stripe { fill: rgba(0, 0, 0, 0.42); }
 
-.money-ic-cash   { color: #4fc27b; }   /* green banknote */
-.money-ic-bank   { color: #4f8fd6; }   /* blue card      */
+/* money-ic-cash/-bank have no color rule -- both are PNGs, not currentColor shapes. */
 .money-ic-duffle { color: #3ddbe0; }   /* cyan duffle bag */
 .money-ic-chips  { color: #c9a13b; }   /* gold chip stack */
+
+/* Cash and BuckMe's rings are layered over their flat PNGs rather than baked
+   in, so they can be real meters -- see onCash() in app.js, which fills both
+   off cash / Config.CashCap. They're the actual reference ring art: a
+   33-frame white mask sequence (icons/buckme_ring/radial_ring_00..32.png,
+   one per ~3% step, shared by both) cut out of a solid colour tile via CSS
+   mask, rather than a hand-drawn arc -- onCash() just swaps which frame is
+   the mask. Frame 00 is empty, so nothing needs to render before the first
+   payload arrives. */
+.money-ic-cash, .money-ic-bank { position: relative; }
+#cash-ring-fill, #buckme-ring-fill {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    -webkit-mask-image: url('icons/buckme_ring/radial_ring_00.png');
+    mask-image: url('icons/buckme_ring/radial_ring_00.png');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+#cash-ring-fill  { background-image: url('icons/fill_green.png'); }
+#buckme-ring-fill { background-image: url('icons/fill_purple.png'); }
 
 /* Ammo readout, now its own /movehud element (#ammo-wrap) rather than sharing
    #topright's position and Font/Icon size rows with the wanted stars, so

@@ -65,19 +65,13 @@
 
        The presence of `oxygen` in the payload IS the mode switch: one value
        decides the state, so there is nothing for two flags to disagree about. */
-    var OXYGEN_GLYPH = '○';   // a bubble; the stamina glyph is a bolt
-    var staminaGlyph = null;       // read off the markup, so it lives in one place
-
+    /* Swapping which glyph shows (bolt badge vs. the plain oxygen bubble) is
+       CSS's job now -- see .stamina-badge-img/.stamina-oxygen-glyph in
+       style.css -- since the badge is an <img>, not text a glyph string can
+       overwrite the way the old emoji swap did. */
     function setStaminaMode(row, submerged) {
         if (!row) return;
         row.classList.toggle('oxygen', submerged);
-        var ic = row.querySelector('.sic');
-        if (!ic) return;
-        // Captured before the first swap, so it is always the markup's glyph
-        // even if the very first payload arrives while underwater.
-        if (staminaGlyph === null) staminaGlyph = ic.textContent;
-        var want = submerged ? OXYGEN_GLYPH : staminaGlyph;
-        if (ic.textContent !== want) ic.textContent = want;
     }
 
     /* Health used to show continuously whenever it was below 100 -- which in
@@ -172,39 +166,39 @@
        circles. Drawn as inline SVG so they stay crisp and match the reference
        weight.
 
-       A LATER reference frame showed five of these instead of the original
-       three, and different ones: camera, a medical cross, a hanger, a person
-       silhouette, and a flag — not the outfit/voice/vehicle set this row
-       shipped with first. Renamed here to match; see getWantedTells() in
-       client.lua for what each one is actually driven by, since none of them
-       carry the same meaning as before:
-         hanger  — was 'outfit', same glyph, same fenix-police signal
-         person  — was 'voice'; fenix-police has no separate "physical
-                   description" concept, so this reuses that signal under the
-                   new icon rather than inventing a second one
-         medical — new: vice_hud's own reading of the player's health, not
-                   from fenix-police at all
-         camera, flag — new, no detection wired yet; see
+       A later, more complete reference set ("GRAND THEFT AUTO VI: HUD
+       DEFINITIONS") replaced the placeholder five with six specific police-
+       knowledge tells; see getWantedTells() in client.lua for what drives
+       each one:
+         camera  — CCTV: you're on camera and revisiting the spot risks being
+                   made. No detector wired to this yet; see
                    exports.vice_hud:SetWantedTellOverride
-       The old 'vehicle' tell has no icon in the five-icon set and is simply
-       not drawn any more — the underlying fenix-police signal is untouched. */
+         weapon  — police know exactly which weapon you're carrying
+         person  — one suspect identified (fenix-police's `voice` signal,
+                   nobody else nearby when it fired)
+         people  — MULTIPLE suspects identified (same `voice` signal, but
+                   another player was nearby when it fired) — the reference
+                   frame's "Lucia & Jason" duo-specific icon, generalised to
+                   any group rather than hardcoded to a pair
+         hanger  — clothing identified (fenix-police's `outfit` signal)
+         vehicle — the vehicle used in the crime is identified */
     var TELL_SVG = {
         hanger:
             '<svg viewBox="0 0 24 24"><path d="M12 3.2a1.9 1.9 0 1 0 1.35 3.24c.2.5.06.9-.4 1.2' +
-            'L3.4 14.1a1.35 1.35 0 0 0 .78 2.45h15.64a1.35 1.35 0 0 0 .78-2.45l-8.2-5.3"/></svg>',
-        person:
-            '<svg viewBox="0 0 24 24"><circle cx="12" cy="7.2" r="3.3"/>' +
-            '<path d="M4.7 20.4c0-4.3 3.3-6.9 7.3-6.9s7.3 2.6 7.3 6.9"/></svg>',
-        medical:
-            '<svg viewBox="0 0 24 24"><path d="M10 3.6h4v6.4h6.4v4H14v6.4h-4v-6.4H3.6v-4H10z" ' +
-            'fill="#fff" stroke="none"/></svg>',
-        camera:
-            '<svg viewBox="0 0 24 24"><path d="M3.6 8.2a1.6 1.6 0 0 1 1.6-1.6h2l1.1-1.7a1.6 1.6 0 0 1 1.35-.7h4.7' +
-            'a1.6 1.6 0 0 1 1.35.7l1.1 1.7h2a1.6 1.6 0 0 1 1.6 1.6v9a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6z"/>' +
-            '<circle cx="12" cy="13" r="3"/></svg>',
-        flag:
-            '<svg viewBox="0 0 24 24"><path d="M5.4 21V3.4"/>' +
-            '<path d="M5.4 4.2h12.4l-3 3.6 3 3.6H5.4" fill="#fff" stroke="none"/></svg>'
+            'L3.4 14.1a1.35 1.35 0 0 0 .78 2.45h15.64a1.35 1.35 0 0 0 .78-2.45l-8.2-5.3"/></svg>'
+    };
+    /* camera/weapon/person/people/vehicle are cropped straight out of the
+       actual HUD DEFINITIONS reference screenshots (not hand-traced) -- see
+       tools/extract_tell_icons.py. .tell's plate colour is matched to the
+       plate red baked into these PNGs (#8d161c) so the transparent edges
+       blend with no fringing. hanger is the only one left hand-drawn --
+       no reference screenshot for it yet. */
+    var TELL_IMG = {
+        camera: 'icons/tells/tell_camera.png',
+        weapon: 'icons/tells/tell_weapon.png',
+        person: 'icons/tells/tell_person.png',
+        people: 'icons/tells/tell_people.png',
+        vehicle: 'icons/tells/tell_vehicle.png'
     };
 
     /* Four star states, matching the reference frames exactly, all literal
@@ -245,7 +239,14 @@
             var d = document.createElement('div');
             d.className = 'tell';
             d.title = t;
-            d.innerHTML = TELL_SVG[t] || '';
+            if (TELL_IMG[t]) {
+                var img = document.createElement('img');
+                img.src = TELL_IMG[t];
+                img.alt = t;
+                d.appendChild(img);
+            } else {
+                d.innerHTML = TELL_SVG[t] || '';
+            }
             container.appendChild(d);
         });
     }
@@ -292,6 +293,20 @@
         return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
 
+    // The reference ring art is a 33-frame white mask sequence, frame 00
+    // (empty) through frame 32 (full) -- see #cash-ring-fill/#buckme-ring-fill
+    // in style.css.
+    var MONEY_RING_FRAMES = 32;
+
+    function setMoneyRing(id, pct) {
+        var ring = $(id);
+        if (!ring) return;
+        var frame = ('0' + Math.round(pct * MONEY_RING_FRAMES)).slice(-2);
+        var url = 'url("icons/buckme_ring/radial_ring_' + frame + '.png")';
+        ring.style.webkitMaskImage = url;
+        ring.style.maskImage = url;
+    }
+
     function onCash(d) {
         var c = $('cash'), b = $('bank');
         if (d.cash != null && c) c.textContent = money(d.cash);
@@ -300,6 +315,13 @@
         // only one of the two never shows an empty second row.
         show($('cash-row'), d.show !== false && d.cash != null);
         show($('bank-row'), d.show !== false && d.bank != null);
+
+        // Neither ring is decoration -- both fill as the CASH wallet
+        // approaches d.cashCap (Config.CashCap), the same "deposit before
+        // you're capped" nudge the reference art shows on both icons.
+        var pct = d.cashCap ? Math.max(0, Math.min(1, (Number(d.cash) || 0) / d.cashCap)) : 0;
+        setMoneyRing('cash-ring-fill', pct);
+        setMoneyRing('buckme-ring-fill', pct);
     }
 
     /* What the duffle bag on the player's back is worth at a fence/pawn shop
@@ -1899,7 +1921,7 @@
     var EDITOR_ELEMENTS = [
         ['status',   'Status bars',    '#status',    'health / stamina, top-left',      'HUD'],
         ['topright', 'Wanted stars',   '#topright',  'stars (also moves ammo/tells/money together)', 'HUD'],
-        ['tells',    'Wanted tells',   '#tells',     'the five round tell icons',       'HUD'],
+        ['tells',    'Wanted tells',   '#tells',     'the six round tell icons',       'HUD'],
         // Its own row, separate from the wanted stars above. It previously
         // shared #topright's position (and its Font/Icon size rows), which
         // meant nudging the ammo readout also nudged the stars.
@@ -3020,13 +3042,13 @@
         if (on) {
             onStatus({ health: 62, focus: 45, stamina: 54 });
             onWanted({ active: true, stars: 3, maxStars: 6, state: 'contact',
-                       tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
+                       tells: ['camera', 'weapon', 'person', 'people', 'hanger', 'vehicle'] });
             // A real icon, not just the clip/reserve numbers, so the ammo row
             // has actual art to line up against instead of an empty box.
             // weapon_pistol is ox_inventory's own art, the same nui:// path
             // client.lua's WeaponIcons table points at in game.
             onWeapon({ armed: true, icon: 'nui://ox_inventory/web/images/weapon_pistol.png', clip: 12, reserve: 84 });
-            onCash({ cash: 28163, bank: 154200, show: true });
+            onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true });
             onDuffle({ value: 4820 });
             onChips({ value: 3450 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
@@ -3541,10 +3563,10 @@
        This is inert in game. */
     if (typeof GetParentResourceName === 'undefined') {
         onStatus({ health: 66, focus: 40, stamina: 58 });
-        onCash({ cash: 28163, bank: 154200, show: true });
+        onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true });
         onDuffle({ value: 4820 });
         onChips({ value: 3450 });
-        onWanted({ active: true, stars: 2, maxStars: 6, state: 'searching', tells: ['camera', 'medical', 'hanger', 'person', 'flag'] });
+        onWanted({ active: true, stars: 2, maxStars: 6, state: 'searching', tells: ['camera', 'weapon', 'person', 'people', 'hanger', 'vehicle'] });
         onWeapon({ armed: true, clip: 20, reserve: 80 });
         // Keep these in step with Config.Minimap in config.lua.
         onMapRect({ left: 1.75, width: 15.8, bottom: 17.9, height: 15.4 });
