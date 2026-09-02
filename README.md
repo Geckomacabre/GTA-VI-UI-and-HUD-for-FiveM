@@ -31,8 +31,8 @@ CyberLeek's videos and GTA VI Extended Look.
 | `ox_inventory`: GTA6 weapon wheel hotbar | |
 | ![vice_hud money close-up](docs/screenshots/vice_hud-money-closeup.png) | ![vice_hud minimap with frame and logo](docs/screenshots/vice_hud-minimap-frame-logo.png) |
 | Cash / bank / duffle bag value | Minimap with the outline frame and map badge on |
-| ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | |
-| Full HUD in a live scene | |
+| ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | ![lb-phone BuckMe card front and back](docs/screenshots/lb-phone-buckme-card.png) |
+| Full HUD in a live scene | `lb-phone` BuckMe card, front and back |
 
 ## What's in here
 

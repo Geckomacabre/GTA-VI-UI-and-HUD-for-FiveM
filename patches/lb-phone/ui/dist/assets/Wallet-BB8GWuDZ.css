@@ -59,7 +59,35 @@
 .wallet-app-container .overview .wrapper .card-flip-inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
 .wallet-app-container .overview .wrapper .card-flip.flipped .card-flip-inner{transform:rotateY(180deg)}
 .wallet-app-container .overview .wrapper .card-flip .card{position:absolute;top:0;left:0;width:100%;height:100%;backface-visibility:hidden}
+/* Live text sitting inside the flipping 3D context (card-number, card-name,
+   card-signature, card-cvv) renders visibly blurrier than normal DOM text --
+   a known behavior where text inside a preserve-3d/backface-visibility
+   hierarchy gets bitmap-composited instead of drawn as normal vector text.
+   Promoting each text node to its own compositing layer (a harmless
+   sub-pixel translateZ) makes the browser re-rasterize it independently at
+   full resolution instead of inheriting the flip layer's, which fixes it. */
+.wallet-app-container .overview .wrapper .card-flip .card-number,
+.wallet-app-container .overview .wrapper .card-flip .card-name,
+.wallet-app-container .overview .wrapper .card-flip .card-cvv{transform:translateZ(.01px);-webkit-font-smoothing:antialiased}
+/* .card-signature already carries its own rotate() transform for the tilt
+   (see the "signature" comment above) -- can't add a second `transform`
+   declaration without clobbering it, so translateZ is folded into that
+   same value instead, at its own rule further down. */
 .wallet-app-container .overview .wrapper .card-flip .card.back{transform:rotateY(180deg);background-image:url(/ui/dist/assets/img/card-back.png)}
+/* Slow, subtle color drift across the card art -- both card.png/card-back.png
+   are baked raster images (gradient + logo + text all flattened together),
+   so a background-position animation on a second gradient layer isn't an
+   option without splitting them into separate content/background images.
+   hue-rotate sidesteps that: it only shifts chromatic pixels (the purple/
+   pink gradient, the purple logo mark), and leaves the white text/near-white
+   chip essentially untouched, so legibility holds up through the whole
+   cycle. 12s is slow enough to read as a living card rather than a strobe.
+   Animated on .card-flip itself (the non-rotating outer wrapper), NOT on
+   .card or .card-flip-inner: a `filter` on an element inside a preserve-3d
+   hierarchy forces it to flatten, which silently breaks backface-visibility
+   and left both faces showing the front at once when this sat on .card. */
+@keyframes buckme-card-hue{0%{filter:hue-rotate(0deg)}50%{filter:hue-rotate(35deg)}100%{filter:hue-rotate(0deg)}}
+.wallet-app-container .overview .wrapper .card-flip{animation:buckme-card-hue 12s ease-in-out infinite}
 /* Fake signature over the card-back's blank signature strip, filled in with
    the player's own character name (server's GetCharacterName, wallet.lua
    action getCardholderName) -- card-back.png itself can't bake this in since
@@ -71,8 +99,13 @@
    overflow hidden, so the signature can still sit off-centre and tilted
    (that's what sells it as handwritten on plastic) without its ascenders/
    descenders poking out above or below the strip. */
-.wallet-app-container .overview .wrapper .card-flip .card.back .card-signature-strip{position:absolute;left:5.9%;top:35.4%;width:69.4%;height:11%;overflow:hidden;display:flex;align-items:center}
-.wallet-app-container .overview .wrapper .card-flip .card.back .card-signature{font-family:Cedarville Cursive,cursive !important;font-size:1.25rem;color:#2b2430;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform:rotate(-3deg);transform-origin:left center;padding-left:8%}
+/* Cash-App-style back layout: printed cardholder name up top (live, real
+   player name), a blank sign-here strip below it (live cursive signature),
+   then a CVV/EXP row (CVV live, EXP baked static since there's no per-
+   player expiry logic). Percentages measured off the 405x254 source. */
+.wallet-app-container .overview .wrapper .card-flip .card.back .card-name{position:absolute;left:3.95%;top:20.5%;font-family:GTA Art Deco,sans-serif !important;font-weight:500 !important;font-size:.9375rem;color:#fff}
+.wallet-app-container .overview .wrapper .card-flip .card.back .card-signature-strip{position:absolute;left:3.95%;top:32.3%;width:88%;height:13.4%;overflow:hidden;display:flex;align-items:center}
+.wallet-app-container .overview .wrapper .card-flip .card.back .card-signature{font-family:Cedarville Cursive,cursive !important;font-size:1.1rem;color:#2b2430;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform:rotate(-3deg) translateZ(.01px);transform-origin:left center;-webkit-font-smoothing:antialiased;padding-left:8%}
 
 /* Card number (front) and CVV (back) -- both live overlays over blank space
    left in card.png/card-back.png (see wallet.lua's getCardDetails), tied to
@@ -81,4 +114,17 @@
    stock card's masked-number row and this card-back's blank CVV spot are;
    swapping either image later needs these numbers nudged to match. */
 .wallet-app-container .overview .wrapper .card-flip .card.front .card-number{position:absolute;left:6.9%;top:67.3%;font-size:1.125rem;font-weight:700;color:#fff;letter-spacing:.05rem}
-.wallet-app-container .overview .wrapper .card-flip .card.back .card-cvv{position:absolute;right:8%;top:37.5%;font-size:.8125rem;color:#2b2430}
+.wallet-app-container .overview .wrapper .card-flip .card.back .card-cvv{position:absolute;left:10.9%;top:48%;font-size:.8125rem;color:#fff;font-weight:500}
+
+/* Help tab: a fake support chatbot, purely satirical (see HELP_QUESTIONS in
+   Wallet-Da9Ipi6P.js) -- canned questions on tap, a canned unhelpful answer
+   back after a short "typing" delay. Not a real support channel. */
+.wallet-app-container .help-chat{flex-direction:column;display:flex;gap:1rem}
+.wallet-app-container .help-messages{flex-direction:column;gap:.6rem;display:flex}
+.wallet-app-container .help-bubble{max-width:78%;padding:.6rem .9rem;border-radius:1.1rem;font-size:.9375rem;line-height:1.35}
+.wallet-app-container .help-bubble.bot{align-self:flex-start;background:var(--phone-color-highlight2);color:var(--phone-text-primary);border-bottom-left-radius:.3rem}
+.wallet-app-container .help-bubble.user{align-self:flex-end;background:#a77af5;color:#fff;border-bottom-right-radius:.3rem}
+.wallet-app-container .help-bubble.typing{font-weight:700;letter-spacing:.15rem}
+.wallet-app-container .help-quickreplies{flex-direction:column;gap:.5rem;padding-bottom:1.5rem;display:flex}
+.wallet-app-container .help-quickreply{background:var(--phone-color-highlight2);color:var(--phone-text-primary);border-radius:1.25rem;padding:.6rem 1rem;text-align:center;cursor:pointer;font-size:.875rem;transition:filter .15s ease-in-out}
+.wallet-app-container .help-quickreply:hover{filter:brightness(.92)}
