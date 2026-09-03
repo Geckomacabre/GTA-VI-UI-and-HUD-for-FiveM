@@ -1231,15 +1231,15 @@
     }
 
     /* The three pips.
-       Fuel and engine are the two that carry a real reading; lock is a state
-       rather than a health.
+       Fuel and engine are the two that carry a real reading; the tracker is a
+       state rather than a health.
 
-       A SHUT-OFF CAR IS MONOCHROME, all three of them. Not an oversight and not
+       A SHUT-OFF CAR IS MONOCHROME on fuel and engine. Not an oversight and not
        a missing reading: green / amber / red on a parked car is the HUD
        shouting about a fuel level nothing is currently burning, and once you
        have seen a whole car park of them light up you stop reading any of them.
-       Turning the key is what makes the pips mean something, so turning the key
-       is what gives them colour. */
+       Turning the key is what makes those two pips mean something, so turning
+       the key is what gives them colour. */
     /* Engine health as a percentage for the ring. The native runs 1000 down to
        0 and then keeps going negative for an engine past seized, so the floor
        is a clamp rather than a range. */
@@ -1251,50 +1251,37 @@
     /* A pip EARNS its place on the panel by having something to report.
        'warn' and 'bad' are the two tones that mean "look at this"; 'good' and
        'unknown' are not worth a permanent icon, so those are hidden outright
-       rather than shown in a colour that says nothing. A full tank, a healthy
-       engine and a locked door are the normal case, and three discs that are
-       lit green for the entire time you are driving are three discs nobody
-       reads by the second day. */
+       rather than shown in a colour that says nothing. A full tank and a
+       healthy engine are the normal case, and two discs that are lit green
+       for the entire time you are driving are two discs nobody reads by the
+       second day. */
     function pipShows(t) { return t === 'warn' || t === 'bad'; }
 
-    /* The lock is the odd one out and cannot use pipShows.
-       Fuel and engine are CONTINUOUS: "low" is a condition that persists, so a
-       threshold is the whole rule. A door lock is neither low nor high -- it
-       is one of two perfectly normal states, and while you are sitting in the
-       car driving it, unlocked is the ordinary one. Treating "unlocked" as a
-       standing warning is what pinned this pip on screen for the entire drive.
-       So it is shown as an EVENT instead: it appears when the state actually
-       changes -- you locked or unlocked the car -- confirms that for a few
-       seconds, then leaves, which is the same "only here when it has something
-       to say" rule the other two follow, expressed for a state rather than a
-       level. */
-    var LOCK_PIP_MS = 3200;
-    var lockPipState = null;    // last lockState seen, to detect a change
-    var lockPipUntil = 0;       // timestamp the pip stops being shown
-
-    function lockPipVisible(d, running) {
-        var st = running ? (d.lockState || 'unknown') : 'unknown';
-        // First sighting of a car is not a change: getting in should not
-        // flash the lock at you.
-        if (lockPipState === null) { lockPipState = st; return false; }
-        if (st !== lockPipState) {
-            lockPipState = st;
-            // Going 'unknown' is the engine stopping, not a lock action.
-            lockPipUntil = (st === 'unknown') ? 0 : Date.now() + LOCK_PIP_MS;
-        }
-        return Date.now() < lockPipUntil;
+    /* The tracker is the odd one out and cannot use pipShows or the engine
+       gate: door lock status moved to qbx_vehiclekeys, so vice_hud has no
+       opinion left on what should light this pip up. It is whatever the
+       LAST call to exports.vice_hud:SetVehicleTracker said -- 'clear',
+       'searching' or 'spotted' -- and stays hidden until something has
+       actually called it at least once, engine on or off. */
+    function trackerTone(state) {
+        if (state === 'clear') return 'good';
+        if (state === 'searching') return 'warn';
+        if (state === 'spotted') return 'bad';
+        return 'unknown';
     }
 
     /* `expanded` is the vehicle panel's ANNOUNCEMENT state -- the few seconds
-       after you get in, while the make and model are still up. All three pips
-       show there, because "here is the car you just got into" is exactly when
-       a readout of its fuel, engine and lock is worth having, healthy or not.
+       after you get in, while the make and model are still up. Fuel and
+       engine both show there, because "here is the car you just got into" is
+       exactly when a reading of its condition is worth having, healthy or
+       not. The tracker gets no such courtesy -- it has no reading of its
+       own, only a state something else decided matters, so it is on screen
+       ONLY while actually active, expanded or not.
 
        Once the panel COLLAPSES to the pip row and stays there for the rest of
-       the drive, the warning rule takes over and only fuel/engine in the amber
-       or red bands survive. Same principle either way -- a pip is on screen
-       while it has something to say -- it is just that on entry, everything
-       has something to say.
+       the drive, the warning rule takes over for fuel/engine too, and only the
+       amber or red bands survive. Same principle either way -- a pip is on
+       screen while it has something to say.
 
        Returns whether anything is left, so the caller can drop the panel
        rather than leave an empty box on the map. */
@@ -1305,35 +1292,31 @@
         var fuelTone = !running ? 'unknown'
             : fuel <= 10 ? 'bad' : fuel <= 25 ? 'warn' : 'good';
         var engTone = !running ? 'unknown' : engineTone(d.engineHealth);
-        // The lock is a state, not a quantity, so it gets no ring. Its colour
-        // still says WHICH state, for the few seconds it is up.
-        var lockTone = !running ? 'unknown'
-            : d.lockState === 'locked' ? 'good'
-            : d.lockState === 'unlocked' ? 'warn' : 'unknown';
+        var trackTone = trackerTone(d.trackerState);
 
         /* The RING keeps its real reading whenever the pip is shown at all --
            it is a measurement, and a warning disc with no figure behind it
            just says "something". */
         tone($('pip-fuel'), fuelTone, fuel);
         tone($('pip-engine'), engTone, enginePct(d.engineHealth));
-        tone($('pip-lock'), lockTone);
+        tone($('pip-tracker'), trackTone);
 
         /* NOTE: tone() above rewrites className wholesale, which drops the
            `hidden` class -- so these have to run AFTER it, not before. */
-        // lockPipVisible has to run either way: it is what tracks the state
-        // changes, and skipping it while expanded would make the pip fire on
-        // whatever the lock happened to be doing when the panel collapsed.
-        var lockEvent = lockPipVisible(d, running);
         var anyFuel = expanded || pipShows(fuelTone);
         var anyEng = expanded || pipShows(engTone);
-        var anyLock = expanded || lockEvent;
+        // Unlike fuel/engine, the tracker does NOT get an expanded bypass --
+        // it has no reading to show off on entry, only a state someone else
+        // decided matters. It shows ONLY while actually active (searching or
+        // spotted), announcement or not; 'clear' and unset both stay hidden.
+        var anyTrack = pipShows(trackTone);
         show($('pip-fuel'), anyFuel);
         show($('pip-engine'), anyEng);
-        show($('pip-lock'), anyLock);
+        show($('pip-tracker'), anyTrack);
 
         /* With every pip hidden the strip is an empty band with a border on
            it, so drop the whole band. */
-        var any = anyFuel || anyEng || anyLock;
+        var any = anyFuel || anyEng || anyTrack;
         show($('veh-foot'), any);
         return any;
     }
@@ -1517,8 +1500,7 @@
             // are actually asking of it: whose badge is this, and does it look
             // like the real-world one it is standing in for.
             onVehicle({ show: true, make: m[0], model: m[2],
-                        fuel: 70, engineOn: true, engineHealth: 1000,
-                        lockState: 'locked' });
+                        fuel: 70, engineOn: true, engineHealth: 1000 });
             tourTimer = setTimeout(step, ms);
         }());
     }
@@ -1939,7 +1921,7 @@
         // panel scales. Scaling it from the panel grew the three discs and left
         // the gap between them alone, which is the "wonky" — the icons need
         // their own spacing, position and scale to stay a proportionate row.
-        ['vehpips',  'Vehicle icons',  '#veh-pips',  'lock / engine / fuel pips',       'HUD'],
+        ['vehpips',  'Vehicle icons',  '#veh-pips',  'tracker / engine / fuel pips',    'HUD'],
         /* The manufacturer badge is its own element for the same reason the pip
            row is: it is behind the names rather than part of them, and the two
            things people will want from it — how big it is and how strongly it
@@ -3053,15 +3035,13 @@
             onChips({ value: 3450 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
             /* Fuel and engine are pushed into their WARNING bands, and the
-               lock pip's event window is held open, so all three discs are on
+               tracker is forced into 'spotted', so all three discs are on
                screen to be positioned. In normal play each only appears when
                it has something to say (see setPips), which would otherwise
                leave the pip row unpositionable in a healthy car. */
-            lockPipState = 'locked';
-            lockPipUntil = Date.now() + 9e6;
             onVehicle({ show: true, make: 'Nagasaki', model: 'Chimera',
                         fuel: 18, engineOn: true, engineHealth: 420,
-                        lockState: 'locked' });
+                        trackerState: 'spotted' });
             onHonor({ emoji: '😈', honor: -50, showValue: true,
                       reason: 'Killed a bystander', duration: 9e6, broken: true });
             onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
@@ -3088,9 +3068,6 @@
             var ffx = $('focus-fx'); if (ffx) ffx.classList.add('active');
             var frow = $('s-focus'); if (frow) frow.classList.add('active');
         } else {
-            // Drop the held-open lock pip, or it would stay up for hours
-            // after the editor closed.
-            lockPipUntil = 0;
             editorHonorCycle(false);
             editorReputationCycle(false);
             editorSkillUpHold(false);
@@ -3574,7 +3551,7 @@
         onNav({ active: true, near: true, street: 'Bayside', remaining: '0.69 mi',
                 instruction: 'Turn Left', dir: 'left', distance: '130 ft' });
         onVehicle({ show: true, make: 'Pegassi', model: 'Bati 801', fuel: 72,
-                    engineOn: true, engineHealth: 900, lockState: 'locked' });
+                    engineOn: true, engineHealth: 900, trackerState: 'searching' });
         onHonor({ emoji: '😈', honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999, broken: true });
         onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
                         showValue: true, reason: 'Robbed an armoured truck', holdMs: 999999 });

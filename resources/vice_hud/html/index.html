@@ -212,16 +212,20 @@
                 <span class="vname" id="veh-model"></span>
             </div>
             <div id="veh-foot">
-                <!-- Lock, engine, fuel.
+                <!-- Tracker, engine, fuel.
                      Engine and fuel carry a RING that fills to the real reading,
                      because "how much" is the question you actually have about
-                     them; the lock has no quantity, so it gets no ring and says
-                     what it has to say in colour alone. -->
+                     them; the tracker has no quantity, so it gets no ring and
+                     says what it has to say in colour alone. Door lock status is
+                     qbx_vehiclekeys's job now, not vice_hud's -- this pip is
+                     driven entirely by whatever other resource calls
+                     exports.vice_hud:SetVehicleTracker, and stays hidden until
+                     one does. -->
                 <div id="veh-pips">
-                    <div class="pip unknown" id="pip-lock" title="lock">
+                    <div class="pip unknown" id="pip-tracker" title="tracker">
                         <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="4.2" y="10" width="15.6" height="10.8" rx="2.2"/>
-                            <path d="M8 10V7.2a4 4 0 0 1 8 0V10"/>
+                            <path d="M12 21s7-7.58 7-12A7 7 0 0 0 5 9c0 4.42 7 12 7 12z"/>
+                            <circle cx="12" cy="9" r="2.4"/>
                         </svg>
                     </div>
                     <div class="pip unknown gauge" id="pip-engine" title="engine">
@@ -233,12 +237,13 @@
                         <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
                         <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
                     </svg>
-                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="12" cy="12" r="3.2"/>
-                            <path d="M12 3.1v2.5M12 18.4v2.5M3.1 12h2.5M18.4 12h2.5
-                                     M5.8 5.8l1.8 1.8M16.4 16.4l1.8 1.8
-                                     M18.2 5.8l-1.8 1.8M7.6 16.4l-1.8 1.8"/>
-                        </svg>
+                        <!-- Reference art (see README credit), stripped of its
+                             own baked-in disc so only the glyph remains --
+                             the pip's dark disc and ring already do that job.
+                             Masked rather than inline SVG so the exact
+                             reference shape ships as-is, still tinted by the
+                             same currentColor tone system as every other pip. -->
+                        <span class="pip-glyph pip-glyph-engine" aria-hidden="true"></span>
                     </div>
                     <div class="pip unknown gauge" id="pip-fuel" title="fuel">
                     <!-- The gauge. pathLength="100" is the whole trick: it
@@ -249,12 +254,10 @@
                         <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
                         <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
                     </svg>
-                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M3.9 20.8V5.6A2.6 2.6 0 0 1 6.5 3h4.4a2.6 2.6 0 0 1 2.6 2.6v15.2"/>
-                            <path d="M2.6 20.8h12.2"/>
-                            <rect x="6.2" y="6.1" width="5" height="3.6" rx="0.7"/>
-                            <path d="M13.5 10.6h3.2a1.3 1.3 0 0 1 1.3 1.3v5.3a1.9 1.9 0 0 0 3.8 0V8.5l-2.5-2.5"/>
-                        </svg>
+                        <!-- Same reference art / masking approach as the engine
+                             glyph above; see the comment there and the README
+                             credit. -->
+                        <span class="pip-glyph pip-glyph-fuel" aria-hidden="true"></span>
                     </div>
                 </div>
             </div>

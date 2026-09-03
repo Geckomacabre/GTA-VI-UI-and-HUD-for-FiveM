@@ -97,27 +97,27 @@ ok(withMark >= 50, 'at least 50 manufacturers have a mark', withMark);
 
 console.log('\n-- the panel wires the mark up --');
 msg({ action: 'vehicle', show: true, make: 'Truffade', model: 'Thrax',
-      fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' });
+      fuel: 70, engineOn: true, engineHealth: 1000 });
 ok($('vehicle').classList.contains('badged'), 'a known marque badges the panel');
 ok($('veh-logo').getAttribute('src') === 'logos/TRUFFADE.png', 'and points at its mark',
    $('veh-logo').getAttribute('src'));
 ok($('veh-make').textContent === 'TRUFFADE', 'make line still set');
 
 msg({ action: 'vehicle', show: true, make: 'Vapid', model: 'Dominator',
-      fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' });
+      fuel: 70, engineOn: true, engineHealth: 1000 });
 ok(!$('vehicle').classList.contains('badged'),
    'a marque whose only mark is its own name gets no badge');
 ok(!$('veh-logo').getAttribute('src'), 'and the src is cleared, not left stale',
    $('veh-logo').getAttribute('src'));
 
 msg({ action: 'vehicle', show: true, make: '', model: 'SEGWAYCIV',
-      fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' });
+      fuel: 70, engineOn: true, engineHealth: 1000 });
 ok(!$('vehicle').classList.contains('badged'), 'an addon with no make gets no badge');
 
 console.log('\n-- pip tones --');
 // Just the tone token. The class list also carries `pip` and, on the two that
 // have a ring, `gauge` -- neither of which is what these cases are about.
-const tones = () => ['pip-lock', 'pip-engine', 'pip-fuel']
+const tones = () => ['pip-tracker', 'pip-engine', 'pip-fuel']
   .map((id) => $(id).className.split(/\s+/)
     .filter((c) => c && c !== 'pip' && c !== 'gauge')[0] || '')
   .join(' ');
@@ -131,34 +131,60 @@ function pips(label, payload, want) {
   ok(tones() === want, label + ' -> ' + want, tones());
 }
 
-pips('running, healthy, locked, full tank',
-     { fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' },
+pips('running, healthy, tracker clear, full tank',
+     { fuel: 70, engineOn: true, engineHealth: 1000, trackerState: 'clear' },
      'good good good');
-pips('worn engine, unlocked',
-     { fuel: 70, engineOn: true, engineHealth: 450, lockState: 'unlocked' },
+pips('worn engine, tracker searching',
+     { fuel: 70, engineOn: true, engineHealth: 450, trackerState: 'searching' },
      'warn warn good');
-pips('broken engine, a quarter tank',
-     { fuel: 20, engineOn: true, engineHealth: 80, lockState: 'locked' },
-     'good bad warn');
+pips('broken engine, a quarter tank, tracker spotted',
+     { fuel: 20, engineOn: true, engineHealth: 80, trackerState: 'spotted' },
+     'bad bad warn');
 // GetVehicleEngineHealth goes NEGATIVE past seized, so the bad band cannot
 // have a floor on it.
-pips('destroyed engine reads negative, still bad',
-     { fuel: 5, engineOn: true, engineHealth: -4000, lockState: 'locked' },
-     'good bad bad');
-// The rule the whole thing hangs on: a parked car says nothing in colour.
-pips('SHUT OFF is monochrome whatever else is wrong',
-     { fuel: 5, engineOn: false, engineHealth: -4000, lockState: 'locked' },
-     'unknown unknown unknown');
+pips('destroyed engine reads negative, still bad, tracker spotted',
+     { fuel: 5, engineOn: true, engineHealth: -4000, trackerState: 'spotted' },
+     'bad bad bad');
+// Fuel and engine go monochrome with the engine off; the tracker does not --
+// it is owned entirely by whatever called SetVehicleTracker, and a driver
+// killing the engine to hide from a search should not also blind the HUD.
+pips('SHUT OFF still leaves the tracker lit, unlike fuel and engine',
+     { fuel: 5, engineOn: false, engineHealth: -4000, trackerState: 'spotted' },
+     'bad unknown unknown');
 pips('an older client.lua sending no engineHealth is not "broken"',
-     { fuel: 70, engineOn: true, lockState: 'locked' },
+     { fuel: 70, engineOn: true, trackerState: 'clear' },
      'good good good');
+pips('no tracker state set at all -- reads as unknown',
+     { fuel: 70, engineOn: true, engineHealth: 1000, trackerState: null },
+     'unknown good good');
+
+console.log('\n-- the tracker shows ONLY while actually active --');
+// Unlike fuel/engine, the tracker gets no expanded bypass and no "healthy is
+// still worth a glance on entry" grace -- 'clear' and unset both mean there
+// is nothing to report, so it stays hidden even during the announcement.
+// Only 'searching'/'spotted' earn it a place on screen.
+msg({ action: 'vehicle', show: true, collapsed: true, make: 'Karin', model: 'Kuruma',
+      fuel: 70, engineOn: true, engineHealth: 1000, trackerState: null });
+ok($('pip-tracker').classList.contains('hidden'), 'collapsed, unset: hidden');
+msg({ action: 'vehicle', show: true, collapsed: true, make: 'Karin', model: 'Kuruma',
+      fuel: 70, engineOn: true, engineHealth: 1000, trackerState: 'clear' });
+ok($('pip-tracker').classList.contains('hidden'), 'collapsed, clear: still hidden');
+msg({ action: 'vehicle', show: true, collapsed: true, make: 'Karin', model: 'Kuruma',
+      fuel: 70, engineOn: true, engineHealth: 1000, trackerState: 'searching' });
+ok(!$('pip-tracker').classList.contains('hidden'), 'collapsed, searching: shows');
+msg({ action: 'vehicle', show: true, collapsed: false, make: 'Karin', model: 'Kuruma',
+      fuel: 70, engineOn: true, engineHealth: 1000, trackerState: null });
+ok($('pip-tracker').classList.contains('hidden'), 'expanded, unset: still hidden -- no free pass on entry');
+msg({ action: 'vehicle', show: true, collapsed: false, make: 'Karin', model: 'Kuruma',
+      fuel: 70, engineOn: true, engineHealth: 1000, trackerState: 'spotted' });
+ok(!$('pip-tracker').classList.contains('hidden'), 'expanded, spotted: shows');
 
 console.log('\n-- pip glyphs are drawn, not typed --');
 // They were emoji, and Windows renders the padlock orange and the pump red
 // whatever `color` says. Inline SVG is what keeps the trio one colour.
-const glyphs = ['pip-lock', 'pip-engine', 'pip-fuel'].map((id) => $(id).querySelector('.pip-glyph'));
+const glyphs = ['pip-tracker', 'pip-engine', 'pip-fuel'].map((id) => $(id).querySelector('.pip-glyph'));
 ok(glyphs.every(Boolean), 'every pip holds a glyph svg');
-ok(['pip-lock', 'pip-engine', 'pip-fuel'].every((id) => !$(id).textContent.trim()),
+ok(['pip-tracker', 'pip-engine', 'pip-fuel'].every((id) => !$(id).textContent.trim()),
    'and no text content that a font could colour');
 
 console.log('\n-- the gauge rings read the real numbers --');
@@ -166,18 +192,18 @@ const pct = (id) => $(id).style.getPropertyValue('--pct');
 const ring = (id) => $(id).querySelector('.pip-fill');
 
 ok(ring('pip-fuel') && ring('pip-engine'), 'fuel and engine have a ring');
-// The lock is a STATE, not a quantity. A ring on it would be a gauge that only
-// ever reads full or empty, which is a worse way of saying what the colour
-// already says.
-ok(!ring('pip-lock'), 'the lock does not');
+// The tracker is a STATE, not a quantity. A ring on it would be a gauge that
+// only ever reads full or empty, which is a worse way of saying what the
+// colour already says.
+ok(!ring('pip-tracker'), 'the tracker does not');
 
 msg({ action: 'vehicle', show: true, make: 'Karin', model: 'Kuruma',
-      fuel: 64, engineOn: true, engineHealth: 730, lockState: 'locked' });
+      fuel: 64, engineOn: true, engineHealth: 730 });
 ok(pct('pip-fuel') === '64.0', 'fuel ring reads the fuel level', pct('pip-fuel'));
 ok(pct('pip-engine') === '73.0', 'engine ring reads health/10', pct('pip-engine'));
 
 msg({ action: 'vehicle', show: true, make: 'Karin', model: 'Kuruma',
-      fuel: 0, engineOn: true, engineHealth: -4000, lockState: 'locked' });
+      fuel: 0, engineOn: true, engineHealth: -4000 });
 ok(pct('pip-fuel') === '0.0', 'an empty tank reads zero', pct('pip-fuel'));
 // The native goes far below zero for a destroyed engine; the ring must clamp
 // rather than compute a negative dash offset.
@@ -189,25 +215,25 @@ ok(ring('pip-fuel').getAttribute('data-empty') === '1',
    'and zero switches the cap so it draws nothing at all');
 
 msg({ action: 'vehicle', show: true, make: 'Karin', model: 'Kuruma',
-      fuel: 140, engineOn: true, engineHealth: 4000, lockState: 'locked' });
+      fuel: 140, engineOn: true, engineHealth: 4000 });
 ok(pct('pip-fuel') === '100.0', 'over-full clamps to 100', pct('pip-fuel'));
 ok(pct('pip-engine') === '100.0', 'so does a better-than-new engine', pct('pip-engine'));
 
 // The reading survives the engine being off: only the COLOUR goes monochrome.
 msg({ action: 'vehicle', show: true, make: 'Karin', model: 'Kuruma',
-      fuel: 42, engineOn: false, engineHealth: 800, lockState: 'locked' });
+      fuel: 42, engineOn: false, engineHealth: 800 });
 ok(pct('pip-fuel') === '42.0', 'a parked car still shows how much fuel it has',
    pct('pip-fuel'));
 ok($('pip-fuel').classList.contains('unknown'), 'but says it in grey');
 
 console.log('\n-- the panel collapses to just the icons --');
 msg({ action: 'vehicle', show: true, collapsed: false, make: 'Truffade', model: 'Thrax',
-      fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' });
+      fuel: 70, engineOn: true, engineHealth: 1000 });
 ok(!$('vehicle').classList.contains('collapsed'), 'the announcement draws the whole plate');
 ok($('veh-make').textContent === 'TRUFFADE', 'names are filled in');
 
 msg({ action: 'vehicle', show: true, collapsed: true, make: 'Truffade', model: 'Thrax',
-      fuel: 55, engineOn: true, engineHealth: 900, lockState: 'locked' });
+      fuel: 55, engineOn: true, engineHealth: 900 });
 ok($('vehicle').classList.contains('collapsed'), 'and then collapses');
 ok(!$('vehicle').classList.contains('hidden'), 'without hiding the element');
 ok(pct('pip-fuel') === '55.0', 'the gauges keep updating while collapsed',
@@ -311,7 +337,7 @@ console.log('\n-- the page survives makes.js not being served --');
     w2.document.dispatchEvent(new w2.Event('DOMContentLoaded'));
     w2.dispatchEvent(new w2.MessageEvent('message', { data: {
       action: 'vehicle', show: true, make: 'Truffade', model: 'Thrax',
-      fuel: 70, engineOn: true, engineHealth: 1000, lockState: 'locked' } }));
+      fuel: 70, engineOn: true, engineHealth: 1000 } }));
   } catch (e) { threw = e; }
   ok(!threw, 'app.js loads and runs without the table', threw && threw.message);
   ok(w2.document.getElementById('veh-model').textContent === 'THRAX',

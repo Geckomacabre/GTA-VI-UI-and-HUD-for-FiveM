@@ -2,7 +2,7 @@
  *
  *   npm i fengari && node tools/vehpanel.test.js
  *
- * The collapsed pips (lock / engine / fuel) are pushed every tick for the whole
+ * The collapsed pips (tracker / engine / fuel) are pushed every tick for the whole
  * drive, long after the announcement window has latched panelUntil back to 0.
  * The exit branch therefore cannot key its hide off panelUntil -- by then it is
  * already 0 and the hide never fires, which is the bug this covers.
@@ -38,12 +38,12 @@ function DisplayRadar(v) radar = v end
 function setRadar(v) DisplayRadar(v) end
 function fuelLevel() return 55 end
 function GetIsVehicleEngineRunning() return true end
-function lockState() return 1 end
 function GetVehicleEngineHealth() return 1000.0 end
 function ui(name, data) if name == 'vehicle' then pushes[#pushes+1] = data end end
 
 cache = { vehicle = nil }
 veh = {}
+vehicleTracker = nil
 panelUntil = 0
 vehShown = false
 minimapOnFoot, editorOpen = false, false
