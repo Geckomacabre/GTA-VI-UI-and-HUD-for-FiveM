@@ -389,14 +389,14 @@ these related repositories:
 - [natives](https://github.com/QuadrupleTurbo/natives)
 - [NativeUI-scaleform_flash](https://github.com/QuadrupleTurbo/NativeUI-scaleform_flash)
 
-The cash and BuckMe bank icons and their rings (`html/icons/cash.png`,
-`html/icons/buckme.png`, `html/icons/buckme_ring/`,
-`html/icons/fill_green.png`, `html/icons/fill_purple.png`), the health/
-stamina/focus badges (`html/icons/badge_*.png`), the vehicle panel's
-tracker/engine/fuel pip glyphs (traced/masked from the same set's badge art),
-and the wanted-tell icon set are from the
+The cash icon and its ring (`html/icons/cash.png`, `html/icons/fill_green.png`),
+the health/stamina/focus badges (`html/icons/badge_*.png`), the vehicle
+panel's tracker/engine/fuel pip glyphs (traced/masked from the same set's
+badge art), and the wanted-tell icon set are from the
 [Enhanced OIV GTA 6 Inspired HUD](https://www.gta5-mods.com/misc/enhanced-oiv-gta-6-inspired-hud)
-mod on GTA5-Mods.com.
+mod on GTA5-Mods.com. The BuckMe bank icon and its ring
+(`html/icons/buckme.png`, `html/icons/buckme_ring/`,
+`html/icons/fill_purple.png`) are original, made in-house.
 
 Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
 BuckMe card design.
