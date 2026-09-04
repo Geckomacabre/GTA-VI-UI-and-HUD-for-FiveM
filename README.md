@@ -17,6 +17,10 @@ CyberLeek's videos and GTA VI Extended Look.
 > please [open an issue](../../issues) or send a
 > [pull request](../../pulls) rather than assuming it's intentional.
 
+> [!NOTE]
+> **Want to see it running before you install anything?** This is the HUD
+> and UI set for Upstate Mafia, a FiveM server: [cfx.re/join/v6pzj5](https://cfx.re/join/v6pzj5).
+
 ## Screenshots
 
 | | |
