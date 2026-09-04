@@ -21,18 +21,24 @@ CyberLeek's videos and GTA VI Extended Look.
 
 | | |
 | --- | --- |
-| ![vice_hud status bars](docs/screenshots/vice_hud-status-bars.png) | ![vice_hud stamina/oxygen](docs/screenshots/vice_hud-stamina-oxygen.png) |
-| Health / stamina / oxygen bars | Stamina + oxygen, anti-flicker auto-hide |
-| ![vice_hud day drive panel](docs/screenshots/vice_hud-day-drive-panel.png) | ![vice_hud night drive panel](docs/screenshots/vice_hud-night-drive-panel.png) |
-| Vehicle panel, minimap, speed limit sign (day) | Vehicle panel + turn-by-turn (night) |
-| ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
-| `um_gigs`, Ryde Me driver profile | Driver profile, close up |
-| ![ox_inventory weapon wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | |
-| `ox_inventory`: GTA6 weapon wheel hotbar | |
-| ![vice_hud money close-up](docs/screenshots/vice_hud-money-closeup.png) | ![vice_hud minimap with frame and logo](docs/screenshots/vice_hud-minimap-frame-logo.png) |
-| Cash / bank / duffle bag value | Minimap with the outline frame and map badge on |
-| ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | ![lb-phone BuckMe card front and back](docs/screenshots/lb-phone-buckme-card.png) |
-| Full HUD in a live scene | `lb-phone` BuckMe card, front and back |
+| ![vice_hud status bars](docs/screenshots/status-bars.png) | ![vice_hud money close-up](docs/screenshots/money-closeup.png) |
+| Health / stamina / oxygen bars | Cash / bank close-up |
+| ![vice_hud vehicle panel, day](docs/screenshots/vehicle-panel-day.png) | ![vice_hud turn-by-turn, night](docs/screenshots/turn-by-turn-night.png) |
+| Vehicle panel + minimap, on approach | Turn-by-turn + speed limit sign (night) |
+| ![vice_hud turn-by-turn, day](docs/screenshots/turn-by-turn-day.png) | ![vice_hud minimap with frame and logo](docs/screenshots/minimap-frame-badge.png) |
+| Turn-by-turn + speed limit sign (day) | Minimap with the outline frame and map badge on |
+| ![ox_inventory weapon wheel](docs/screenshots/weapon-wheel.png) | ![ox_inventory item wheel](docs/screenshots/item-wheel.png) |
+| `ox_inventory`: GTA6 weapon wheel hotbar | Matching items wheel |
+| ![Ryde Me, driver online](docs/screenshots/rydeme-driver-online.png) | ![Ryde Me, rider requesting a ride](docs/screenshots/rydeme-rider-whereto.png) |
+| `um_gigs`, Ryde Me driver app, online | Rider app, requesting a ride |
+| ![Ryde Me, driver profile](docs/screenshots/rydeme-driver-profile.png) | ![Snarf, delivery board](docs/screenshots/snarf-deliveries.png) |
+| Driver profile / ride history | `um_gigs`, Snarf delivery board |
+| ![Snarf, delivery profile](docs/screenshots/snarf-delivery-profile.png) | ![lb-phone BuckMe card, front](docs/screenshots/buckme-card-front.png) |
+| Delivery profile | `lb-phone` BuckMe card, front |
+| ![lb-phone BuckMe card, back](docs/screenshots/buckme-card-back.png) | ![lb-phone BuckMe, pay a contact](docs/screenshots/buckme-pay.png) |
+| BuckMe card, back | Pay a contact |
+| ![lb-phone BuckMe, BuckBot support chat](docs/screenshots/buckbot-help.png) | |
+| BuckBot support chat | |
 
 ## What's in here
 
@@ -110,7 +116,7 @@ Overlays for resources you install separately:
   (free/melee/handheld/fist) plus a matching items wheel, medical-only
   quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
   installed) a hard 17-slot pocket cap that lifts while a bag is carried.
-  See the [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png). Not
+  See the [screenshot](docs/screenshots/weapon-wheel.png). Not
   part of the vice_hud glass system above.
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
