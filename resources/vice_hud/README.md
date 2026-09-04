@@ -82,10 +82,16 @@ on entering                          for the rest of the drive
   truncated spawn tokens and all.
 - **Gauge rings** on engine and fuel that fill to the actual reading, so the
   strip answers *how much* rather than only *is it bad yet*.
-- **The pips earn their place.** All three show while the panel is announcing
-  the car. After it collapses only the ones with something to say stay —
-  fuel and engine in the amber or red bands, and the lock for a few seconds
-  when it actually changes. A healthy car stops drawing a panel at all.
+- **The pips earn their place.** Fuel and engine show while the panel is
+  announcing the car, then only the ones with something to say stay once it
+  collapses, meaning fuel and engine in the amber or red bands. A healthy car
+  stops drawing a panel at all. The third pip is a tracker that follows the
+  player's wanted state automatically (police have eyes on you: red, still
+  hunting: amber, no stars: hidden), and stays hidden the rest of the time.
+  Other resources can drive it directly too, with `exports.vice_hud:
+  SetVehicleTracker` (clear, searching, spotted), for anything with nothing
+  to do with wanted stars. Door lock status lives in qbx_vehiclekeys now, not
+  here.
 - **A parked car goes monochrome.** Green, amber and red on a car nothing is
   burning fuel in is just noise.
 
@@ -185,6 +191,8 @@ exports.vice_hud:GetHudOffset(element)             -- returns x, y
 
 exports.vice_hud:AddSkillXp(id, amount)
 exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, need, frac }
+
+exports.vice_hud:SetVehicleTracker(state)          -- 'clear' | 'searching' | 'spotted' | nil
 ```
 
 Prompts are cleaned up automatically when the resource that registered them
@@ -381,9 +389,13 @@ these related repositories:
 - [natives](https://github.com/QuadrupleTurbo/natives)
 - [NativeUI-scaleform_flash](https://github.com/QuadrupleTurbo/NativeUI-scaleform_flash)
 
-The cash and BuckMe bank icons and their rings (`html/icons/cash.png`,
-`html/icons/buckme.png`, `html/icons/buckme_ring/`,
-`html/icons/fill_green.png`, `html/icons/fill_purple.png`), the health/
-stamina/focus badges (`html/icons/badge_*.png`), and the wanted-tell icon set
-are from the [Enhanced OIV GTA 6 Inspired HUD](https://www.gta5-mods.com/misc/enhanced-oiv-gta-6-inspired-hud)
-mod on GTA5-Mods.com.
+The health/stamina/focus badges (`html/icons/badge_*.png`), the vehicle
+panel's tracker/engine/fuel pip glyphs (traced/masked from the same set's
+badge art), and the wanted-tell icon set are from the
+[Enhanced OIV GTA 6 Inspired HUD](https://www.gta5-mods.com/misc/enhanced-oiv-gta-6-inspired-hud)
+mod on GTA5-Mods.com. The BuckMe bank icon and its ring
+(`html/icons/buckme.png`, `html/icons/buckme_ring/`,
+`html/icons/fill_purple.png`) are original, made in-house.
+
+Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
+BuckMe card design.

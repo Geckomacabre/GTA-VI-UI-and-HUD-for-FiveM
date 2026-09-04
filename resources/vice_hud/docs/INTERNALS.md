@@ -153,11 +153,11 @@ once the animation ends, so hiding late is invisible while hiding early cuts the
 fade off mid-way. `editor.test.js` asserts that inequality, because the two
 numbers live in different files and nothing else would notice them drifting.
 
-The **Vehicle icons** row is the lock / engine / fuel pips inside the vehicle
-panel, split out as their own element for the same reason: scaling them from the
-panel grew the three discs and left the gap alone. Left untouched they still
-follow the panel's own icon size, so an existing layout renders unchanged; the
-moment you set them, they take over.
+The **Vehicle icons** row is the tracker / engine / fuel pips inside the
+vehicle panel, split out as their own element for the same reason: scaling
+them from the panel grew the three discs and left the gap alone. Left
+untouched they still follow the panel's own icon size, so an existing layout
+renders unchanged; the moment you set them, they take over.
 
 **Every number can be typed.** Click the value between the `−` and the `+`, type
 a figure, press Enter. Stepping is for finding a value and hopeless for reaching
@@ -563,17 +563,32 @@ set. The whole directory is about 400 kB.
 
 #### The status pips
 
-Lock, engine and fuel, in that order. Each is a dark disc with coloured ink;
+Tracker, engine and fuel, in that order. Each is a dark disc with coloured ink;
 engine and fuel also carry a **ring that fills to the real reading**, so the
 strip answers "how much fuel" and "how broken" rather than only "is it bad yet".
 
-The lock deliberately has no ring. It is a state, not a quantity, and a gauge
-that only ever reads full or empty is a worse way of saying what the colour
-already says.
+The tracker deliberately has no ring. It is a state, not a quantity, and a
+gauge that only ever reads full or empty is a worse way of saying what the
+colour already says.
+
+The tracker is also the odd one out in what drives it. vice_hud does not
+detect door lock status any more (that moved to qbx_vehiclekeys); the slot
+carries the player's wanted state instead, by default, straight off the SAME
+`wantedState()` the wanted stars themselves read (see "Wanted"): `contact`
+(police have you in their sights right now) reads as `spotted`, anything
+that still counts as being hunted (`searching`, `red`, a crime reported but
+never sighted `hollow`) reads as `searching`, and no wanted level clears it.
+This only runs while `wanted > 0` -- at 0 stars it stands aside and leaves the
+pip at whatever `exports.vice_hud:SetVehicleTracker('clear' | 'searching' |
+'spotted' | nil)` last set, so a script with its own reason to flag a vehicle
+that has nothing to do with police stars (a heist getaway beat, say) can still
+drive it directly. `nil` clears it and hides the pip. Unlike fuel and engine
+it is not gated by the engine running, since a driver killing the engine to
+hide from a search should not also blind the HUD about it.
 
 | | Green | Amber | Red | Ring |
 | --- | --- | --- | --- | --- |
-| Lock | locked | unlocked | — | none |
+| Tracker | clear | searching | spotted | none |
 | Engine | health >= 700 | >= 300 | below that, including the negatives a destroyed engine reports | health / 10 |
 | Fuel | above 25% | 25% or less | 10% or less | fuel % |
 
@@ -592,11 +607,12 @@ runs past zero into the negatives for a destroyed engine and a negative dash
 offset draws a full ring; and at zero the stroke's round linecap is swapped for
 a butt cap, or an empty tank would still show a pip of fuel at twelve o'clock.
 
-**A shut-off car is monochrome — all three of them.** Green, amber and red on a
-parked car is the HUD shouting about a fuel level nothing is currently burning,
-and once a whole car park of them lights up you stop reading any of them.
-Turning the key is what makes the pips mean something, so turning the key is
-what gives them colour.
+**A shut-off car is monochrome on fuel and engine.** Green, amber and red on a
+parked car is the HUD shouting about a fuel level nothing is currently
+burning, and once a whole car park of them lights up you stop reading any of
+them. Turning the key is what makes those two pips mean something, so turning
+the key is what gives them colour. The tracker is the exception: it stays
+whatever colour the last `SetVehicleTracker` call set, engine on or off.
 
 Only the **colour** goes grey. The rings keep their real reading, because they
 are a measurement and hiding it would mean walking up to a car and being told
