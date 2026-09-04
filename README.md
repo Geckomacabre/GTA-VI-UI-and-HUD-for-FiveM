@@ -19,7 +19,7 @@ CyberLeek's videos and GTA VI Extended Look.
 
 > [!NOTE]
 > **Want to see it running before you install anything?** This is the HUD
-> and UI set for Upstate Mafia, a FiveM server: [cfx.re/join/v6pzj5](https://cfx.re/join/v6pzj5).
+> and UI set up for Upstate Mafia: [Test the server!](https://cfx.re/join/v6pzj5).
 
 ## Screenshots
 
