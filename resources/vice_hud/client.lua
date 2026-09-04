@@ -75,7 +75,23 @@ local manualRect = nil
 
 -- Forward-declared so /hudtest (registered above the vehicle section) closes
 -- over the real upvalue rather than a nil global.
-local veh = { make = '', model = '', lock = 'unknown', fuel = 0, engine = false, health = 1000 }
+local veh = { make = '', model = '', fuel = 0, engine = false, health = 1000 }
+
+-- Vehicle panel's tracker pip. Door lock status is qbx_vehiclekeys's job now,
+-- not vice_hud's -- by default this just mirrors the player's wanted state
+-- (see the wanted block in the main loop), and any other resource can still
+-- drive it directly via exports.vice_hud:SetVehicleTracker. nil means
+-- nothing has claimed it, and the pip stays hidden; see setPips() in
+-- html/app.js.
+local vehicleTracker = nil
+-- Whether the wanted block currently owns vehicleTracker (true) or a
+-- SetVehicleTracker export call does (false). Needed so losing the stars
+-- actually CLEARS the pip instead of leaving it stuck on the last state --
+-- the wanted block only runs while wanted > 0, so without this it has no
+-- chance to write nil the one tick wanted drops back to 0. An export call
+-- flips this off so the wanted block leaves its value alone until the next
+-- time there actually is a wanted level to report.
+local vehicleTrackerAuto = true
 
 -- Forward-declared for the same reason. Defined down in the /movehud section,
 -- next to the caches it clears. /hudtest needs it too: the sample payloads it
@@ -430,6 +446,16 @@ end
 -- finaliser so it runs even if the enable errors.
 local rebuilding = false
 
+-- Escape hatch for another resource's own LEGITIMATE fullscreen use of the
+-- minimap component (a custom pause-menu map, for one -- see gk_pausemenu),
+-- as opposed to the "something else is stomping our layout by mistake" case
+-- the watchdogs below exist to catch. Exported rather than a convar so it can
+-- only be flipped by code, not left on by a stale server.cfg setting.
+local minimapSuspended = false
+exports('SetMinimapSuspended', function(state)
+    minimapSuspended = state and true or false
+end)
+
 local function rebuildMinimap()
     if rebuilding then return end
     rebuilding = true
@@ -451,7 +477,7 @@ end
 CreateThread(function()
     while true do
         Wait(1000)
-        if not rebuilding and IsBigmapActive() then
+        if not rebuilding and not minimapSuspended and IsBigmapActive() then
             SetRadarBigmapEnabled(false, false)
         end
     end
@@ -1195,7 +1221,7 @@ RegisterCommand('hudtest', function()
     ui('weapon', { armed = true, clip = 20, reserve = 80 })
     ui('zone', { zone = 'TEST ZONE', duration = 15000 })
     ui('vehicle', { show = true, make = 'TESTMAKE', model = 'TESTMODEL', fuel = 70,
-        engineOn = true, engineHealth = 1000, lockState = 'locked' })
+        engineOn = true, engineHealth = 1000, trackerState = 'spotted' })
     -- A non-zero `delta` is what fires the centre-screen +/- indicator; without
     -- it /hudtest only ever showed the corner standing panel, so the one piece
     -- of the honor UI most worth eyeballing was the piece it never drew.
@@ -1273,7 +1299,7 @@ RegisterCommand('hudbrand', function(_, args)
         print(('^3[vice_hud]^7 /hudbrand — showing "%s" for 20s.'):format(make))
         ui('vehicle', {
             show = true, make = make, model = 'SAMPLE',
-            fuel = 70, engineOn = true, engineHealth = 1000, lockState = 'locked',
+            fuel = 70, engineOn = true, engineHealth = 1000,
         })
         CreateThread(function()
             Wait(20000)
@@ -1627,14 +1653,22 @@ exports('ShowReputationToast', ShowReputationToast)
 
 local currentZone = nil
 local zoneReady = false
+local currentWater = false
 
 local function checkZone(ped)
     local label = GetLabelText(GetNameOfZone(GetEntityCoords(ped)))
-    if label == currentZone then return end
+    local water = IsPedSwimming(ped)
+    -- Swimming state has to be re-sent on its own, not just on a zone-label
+    -- change -- walking into the ocean usually doesn't cross a zone boundary,
+    -- so gating this on `label == currentZone` left the bar stuck on land
+    -- colouring until the player happened to also cross into a new zone.
+    if label == currentZone and water == currentWater then return end
+    local zoneChanged = label ~= currentZone
     currentZone = label
+    currentWater = water
     -- Skip the very first resolution after spawn so a popup doesn't fire on load.
-    if not zoneReady then zoneReady = true return end
-    ui('zone', { zone = label, water = IsPedSwimming(ped) })
+    if zoneChanged and not zoneReady then zoneReady = true return end
+    ui('zone', { zone = label, water = water })
 end
 
 -- =============================================================================
@@ -1885,14 +1919,6 @@ local function resolveVehicle(vehicle)
     veh.make, veh.model = make, modelName
 end
 
-local function lockState(vehicle)
-    local ok, st = pcall(function() return Entity(vehicle).state.doorslockstate end)
-    if not ok or st == nil then st = GetVehicleDoorLockStatus(vehicle) end
-    if st == 2 then return 'locked' end
-    if st == 1 then return 'unlocked' end
-    return 'unknown'
-end
-
 local function fuelLevel(vehicle)
     -- LegacyFuel keeps the tank in the "_FUEL_LEVEL" decorator; fall back to the
     -- native so the pip still means something if that resource isn't present.
@@ -1901,6 +1927,23 @@ local function fuelLevel(vehicle)
     end
     return math.floor(GetVehicleFuelLevel(vehicle) or 0)
 end
+
+--- Sets (or clears) the vehicle panel's tracker pip. vice_hud has no opinion
+--- on what should turn it red, amber or green -- that is entirely up to
+--- whatever resource calls this. Anything else lands on 'clear' rather than
+--- being silently ignored, so a caller sending an unrecognised state does not
+--- leave a stuck pip nobody can explain.
+--- @param state 'clear'|'searching'|'spotted'|nil  nil hides the pip.
+exports('SetVehicleTracker', function(state)
+    if state ~= 'searching' and state ~= 'spotted' and state ~= nil then
+        state = 'clear'
+    end
+    vehicleTracker = state
+    -- Hand ownership to the caller: the wanted block below reclaims it the
+    -- moment there is an actual wanted level to report, but stands aside
+    -- until then so this doesn't get silently overwritten mid-tick.
+    vehicleTrackerAuto = false
+end)
 
 -- =============================================================================
 -- Suppress GTA's native HUD
@@ -2219,6 +2262,17 @@ end
 
 local lastCash = nil
 
+-- Also invalidated by resetPushCaches (closing the HUD editor), for the same
+-- reason as lastCash above: the editor's preview forces these rows to fake
+-- values, and both poll threads below only push a NUI update when the value
+-- CHANGES -- so if the real duffle/chips value was already what it still is
+-- once the editor closes, nothing ever tells the page to overwrite the fake
+-- number, and it stays on screen indefinitely. Hoisted out of their own
+-- CreateThread blocks (where each started as a thread-local named the same
+-- thing) so resetPushCaches, a different top-level function, can reach them.
+local lastDuffleValue = 'unset'
+local lastChips = 'unset'
+
 -------------------------------------------------------------------------------
 -- Police search-radius overlay (fed by fenix-police's contact model)
 -------------------------------------------------------------------------------
@@ -2300,7 +2354,8 @@ CreateThread(function()
     local cfgD = Config.Duffle
     if not cfgD or not cfgD.enable then return end
 
-    local lastDuffleValue = 'unset' -- distinct from nil, so the first hide still fires ui()
+    -- lastDuffleValue is file-scoped now (see its declaration, above
+    -- lastCash) so resetPushCaches can invalidate it too.
 
     local function pushDuffle(value)
         if value == lastDuffleValue then return end
@@ -2340,7 +2395,8 @@ CreateThread(function()
     local cfgC = Config.Chips
     if not cfgC or not cfgC.enable then return end
 
-    local lastChips = 'unset' -- distinct from nil, so the first hide still fires ui()
+    -- lastChips is file-scoped now (see its declaration, above lastCash) so
+    -- resetPushCaches can invalidate it too.
 
     local function pushChips(value)
         if value == lastChips then return end
@@ -2458,8 +2514,17 @@ CreateThread(function()
         -- but that native flag change is invisible to vice_hud's belief about
         -- radar state (same as the ox_inventory case above), so #map-frame/
         -- #map-badge stayed drawn over the pause menu with nothing behind them.
+        --
+        -- `and not LocalPlayer.state.pauseMenuOpen`: gk_pausemenu forces
+        -- SetPauseMenuActive(false) every frame so the REAL native menu never
+        -- renders (see its client/main.lua header comment) -- which means
+        -- IsPauseMenuActive() above never actually goes true while its own
+        -- custom pause screen is up, and the frame/badge bug this comment
+        -- already describes happened there too. gk_pausemenu sets this state
+        -- bag itself on open/close, the same mechanism as invOpen above.
         setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen)
-            and not LocalPlayer.state.invOpen and not IsPauseMenuActive())
+            and not LocalPlayer.state.invOpen and not IsPauseMenuActive()
+            and not LocalPlayer.state.pauseMenuOpen)
 
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()
@@ -2546,6 +2611,25 @@ CreateThread(function()
                 tells = tells,
             })
         end
+        -- The vehicle panel's tracker pip follows the SAME wanted state by
+        -- default -- 'contact' (they see you right now) is 'spotted', anything
+        -- else that still counts as being hunted ('searching', 'red', a crime
+        -- reported but never sighted 'hollow') reads as 'searching'. Losing
+        -- the stars has to ACTIVELY clear it, not just stop touching it --
+        -- this block only runs the write while wanted > 0, so without the
+        -- explicit else the pip would simply freeze on its last colour
+        -- forever the moment the wanted level hit 0 instead of going quiet.
+        -- The `vehicleTrackerAuto` check is what stops that clear from
+        -- stomping a SetVehicleTracker export call that has nothing to do
+        -- with police stars: once one of those fires it owns the pip until
+        -- there is an actual wanted level to report again.
+        if wanted > 0 then
+            vehicleTracker = wstate == 'contact' and 'spotted'
+                or wstate and 'searching' or nil
+            vehicleTrackerAuto = true
+        elseif vehicleTrackerAuto then
+            vehicleTracker = nil
+        end
 
         -- ---- weapon + ammo ------------------------------------------------
         -- The frames show clip/reserve for a ranged weapon and the icon alone
@@ -2631,7 +2715,6 @@ CreateThread(function()
         if vehicle then
             veh.fuel = fuelLevel(vehicle)
             veh.engine = GetIsVehicleEngineRunning(vehicle)
-            veh.lock = lockState(vehicle)
             -- Engine HEALTH as well as running/not, because "the engine is on"
             -- and "the engine is in one piece" are different questions and the
             -- pip is asked the second one. 1000 is factory-fresh, 0 is seized
@@ -2658,8 +2741,8 @@ CreateThread(function()
             ui('vehicle', {
                 show = true, collapsed = not full,
                 make = veh.make, model = veh.model,
-                fuel = veh.fuel, engineOn = veh.engine, lockState = veh.lock,
-                engineHealth = veh.health,
+                fuel = veh.fuel, engineOn = veh.engine,
+                engineHealth = veh.health, trackerState = vehicleTracker,
             })
             vehShown = true
         else
@@ -2701,7 +2784,11 @@ CreateThread(function()
         -- Reassert ours so the map cannot silently grow back to another
         -- resource's scale. applyMinimap only messages the NUI when the
         -- resulting rect actually changes, so this is cheap to run on a timer.
-        applyMinimap()
+        -- Skipped while minimapSuspended -- another resource's own legitimate
+        -- fullscreen use of the component (see SetMinimapSuspended above).
+        if not minimapSuspended then
+            applyMinimap()
+        end
     end
 end)
 
@@ -3123,7 +3210,7 @@ local HUD_ELEMENTS = {
     slots    = 'zone bar + vehicle panel, moved together',
     vehicle  = 'vehicle make/model panel (the upper one)',
     zone     = 'zone bar (the lower one)',
-    vehpips  = 'lock / engine / fuel pips inside the vehicle panel',
+    vehpips  = 'tracker / engine / fuel pips inside the vehicle panel',
     wanted   = '"cops are searching for you" box',
     honor    = 'honor standing (mugshot + face)',
     honorpop = 'centre-screen honor +/- indicator',
@@ -3996,6 +4083,15 @@ function resetPushCaches()
     ui('vehicle', { show = false })
     ui('honor', { show = false })
     ui('reputation', { show = false })
+    -- Duffle and chips poll on their own slow timer (3-5s), not every tick
+    -- like the rows above -- so invalidating the cache alone would still
+    -- leave the editor's fake numbers on screen until that timer next fires.
+    -- Hiding both outright here means the preview values are gone the moment
+    -- the editor closes; the poll thread redraws the real ones (or leaves
+    -- them hidden) within its next cycle, same as it does on every other tick.
+    lastDuffleValue, lastChips = 'unset', 'unset'
+    ui('duffle', { value = nil })
+    ui('chips', { value = nil })
 end
 
 RegisterCommand('movehud', function()

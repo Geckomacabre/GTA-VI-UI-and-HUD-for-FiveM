@@ -6,8 +6,9 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
 (ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
-um_smallresources, lb-phone) to connect it to vice_hud. Copy the files into
-place, then make the one- or two-line edit shown below for that resource.
+um_smallresources, um_clothing, lb-phone) to connect it to vice_hud. Copy the
+files into place, then make the one- or two-line edit shown below for that
+resource.
 
 `lb-phone` is the one exception to "connect it to vice_hud" above; its patch
 is a standalone rebrand of that resource's own Wallet app (see the lb-phone
@@ -25,7 +26,8 @@ competing script that resets player stamina every 500ms, which pins vice_hud's
 stamina bar at full and makes it look broken).
 
 **Version pinned against:** ox_lib 3.32.3, ox_target 1.18.0, ox_inventory
-2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um.
+2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um,
+um_clothing 1.0.3.
 If your copy of any of these is on a different version, check the target
 file still looks like the snippet below before you paste the patch in — a
 big upstream version jump can move things around.
@@ -250,14 +252,23 @@ now hides `.durability-bar`/`.weight-bar` too.
 
 The ITEMS tab (`InventoryTabs.tsx`) is a second wheel now, `ItemWheel.tsx`,
 not the plain square grid it used to fall back to. It reuses `WeaponWheel.tsx`'s
-exact eight measured cell positions and the same `gta6-wheel-slot` chrome, but
-every cell is a plain `free` role — no fist button, no weapon/melee/handheld
-restriction, since this tab holds ordinary carried items rather than guns. It
-claims its own slot range (8-15), immediately after the weapon wheel's 1-7, so
-the two wheels never fight over the same inventory slot. `LeftInventory.tsx`
-now renders one wheel or the other depending on the active tab and never the
-square grid — a player's own inventory is meant to be nothing but these two
-wheels.
+exact eight measured cell positions and the same `gta6-wheel-slot` chrome.
+Four of the eight cells stay plain `free` slots, ordinary carried items,
+same as before. `LeftInventory.tsx` renders one wheel or the other depending
+on the active tab and never the square grid, so a player's own inventory is
+nothing but these two wheels.
+
+The other four cells are fixed clothing toggles, not inventory slots at
+all: top (12 o'clock) is bandana/mask, 10 o'clock is eyewear, 3 o'clock is
+hat, and the remaining cell (roughly 4 to 5 o'clock) is a plain hanger icon
+reserved for later, no behavior yet. Clicking the mask/eyewear/hat cells
+calls out to um_clothing (see the um_clothing section right below) through
+two new NUI callbacks, `getClothingState` and `toggleClothing`, and shows
+the item's current on/off state. Since um_clothing tracks worn items as ped
+props/components rather than inventory items, these three cells have no
+underlying `InventorySlot` and don't consume inventory space, so the free
+cells now claim slots 8 through 11 (one per free cell) instead of the full
+8 through 15 range they used to.
 
 The two bottom-left medical quickslots (also `LeftInventory.tsx`) are a
 read-only auto-populated readout, not a drop target: whatever medical items
@@ -314,6 +325,7 @@ patches/ox_inventory/web/src/components/inventory/InventorySlot.tsx
 patches/ox_inventory/web/src/components/inventory/PromptGlyph.tsx
 patches/ox_inventory/web/src/components/inventory/PlayerStatusBars.tsx
 patches/ox_inventory/web/src/dnd/onDisarm.ts
+patches/ox_inventory/web/src/dnd/onToggleClothing.ts
 patches/ox_inventory/web/src/store/honor.ts
 patches/ox_inventory/web/src/store/wheelCategories.ts
 ```
@@ -333,11 +345,16 @@ the `local Inventory = require 'modules.inventory.server'` line near the top:
 require 'modules.gta6pockets.server'
 ```
 
-New image asset the fist cell needs (already covered by ox_inventory's own
-`'web/images/*.png'` manifest glob, no manifest edit needed):
+New image assets the fist cell and the three clothing toggle cells need
+(already covered by ox_inventory's own `'web/images/*.png'` manifest glob,
+no manifest edit needed):
 
 ```
 patches/ox_inventory/web/images/fist.png
+patches/ox_inventory/web/images/mask.png
+patches/ox_inventory/web/images/hat.png
+patches/ox_inventory/web/images/eyewear.png
+patches/ox_inventory/web/images/hanger.png
 ```
 
 `client.lua` (the Lua entry point, not the web UI) also carries two small
@@ -380,6 +397,31 @@ end
 AddEventHandler('qbx_honor:client:syncHonor', pushHonor)
 ```
 
+Clothing toggle cells (mask/hat/eyewear, see the ITEMS wheel section above)
+need two new NUI callbacks. Add these near the existing `disarmWeapon`
+callback. Both are wrapped in `pcall`, so a server without the um_clothing
+patch applied just gets an empty state back instead of an NUI error:
+
+```lua
+-- ITEMS wheel's mask/hat/eyewear cells aren't inventory items at all, um_clothing
+-- owns that state as worn ped props/components. pcall guards both callbacks so a
+-- server without um_clothing running just gets an empty/unchanged state back
+-- instead of an NUI error.
+local function getClothingWheelState()
+	local ok, state = pcall(function() return exports.um_clothing:GetClothingWheelState() end)
+	return ok and state or {}
+end
+
+RegisterNUICallback('getClothingState', function(_, cb)
+	cb(getClothingWheelState())
+end)
+
+RegisterNUICallback('toggleClothing', function(role, cb)
+	pcall(function() exports.um_clothing:ToggleClothingWheelSlot(role) end)
+	cb(getClothingWheelState())
+end)
+```
+
 In the existing `RegisterNUICallback('uiLoaded', ...)` handler, add the
 `pushHonor()` call (seeds the badge the moment the page loads, not just on
 the next honor change):
@@ -396,8 +438,8 @@ Already-built output — copy these directly into your `ox_inventory/`
 install and it just works, no build step required:
 
 ```
-patches/ox_inventory/web/build/assets/index-2555cb6f.js
-patches/ox_inventory/web/build/assets/index-93b7c2d3.css
+patches/ox_inventory/web/build/assets/index-aae84f38.js
+patches/ox_inventory/web/build/assets/index-87551f63.css
 patches/ox_inventory/web/build/index.html
 ```
 
@@ -409,6 +451,83 @@ rather than dropping the build output in blind.
 
 Colors are exposed as CSS custom properties in `gta6-theme.scss`, so you can
 retheme without touching component code.
+
+## um_clothing
+
+Two exports appended to the end of `Client/Clothing.lua`, needed by the
+mask/hat/eyewear cells on ox_inventory's ITEMS wheel above. um_clothing
+tracks worn items as ped props (hat, glasses) and a drawable component
+(mask), toggled on and off, rather than as inventory items, so this is the
+only way ox_inventory's NUI can reach that state without knowing about
+drawable/prop IDs itself.
+
+Copy into your `um_clothing/` install:
+
+```
+patches/um_clothing/Client/Clothing.lua
+```
+
+This is the full file, not a hand-edit snippet, since the only change is
+two `exports(...)` calls appended at the very end: `ToggleClothingWheelSlot(role)`
+dispatches to the resource's own `ToggleClothing('Mask')` / `ToggleProps('Hat'
+| 'Glasses')`, and `GetClothingWheelState()` reads the on/off state straight
+off the ped (`GetPedDrawableVariation`/`GetPedPropIndex`) rather than off
+this resource's own internal bookkeeping, so it stays correct even if a
+mask/hat/glasses changes through some other resource (a clothing store,
+a character reload).
+
+## qbx_core
+
+Not theming, a functional requirement for `qbx_relog` (bundled under
+`resources/`, see its own README). Two small exports and a one-line check
+in the multicharacter flow, appended to `client/character.lua`. Without
+this, `qbx_relog`'s quick-switch fights with the normal character-select
+screen and refuses to run (it checks for these exports at startup and
+prints an explicit error to F8 if they're missing).
+
+Add near the top of `client/character.lua`, after
+`if config.characters.useExternalCharacters then return end`:
+
+```lua
+local skipNextCharacterSelect = false
+
+---Skip the multicharacter select screen the next time the player logs out.
+---Consumed once. For resources that log a player straight into a different
+---character instead of returning to the picker (e.g. qbx_relog's quick-switch).
+exports('SkipNextCharacterSelect', function()
+    skipNextCharacterSelect = true
+end)
+```
+
+Just above `RegisterNetEvent('qbx_core:client:spawnNoApartments', ...)`,
+right after the end of the `chooseCharacter` function:
+
+```lua
+---Fallback for a skipped character select that didn't get a character loaded
+---(e.g. qbx_relog's quick-switch failed after the skip flag was already set).
+exports('OpenCharacterSelect', chooseCharacter)
+```
+
+In the existing `RegisterNetEvent('qbx_core:client:playerLoggedOut', ...)`
+handler, add the flag check right after the invoking-resource guard:
+
+```lua
+RegisterNetEvent('qbx_core:client:playerLoggedOut', function()
+    if GetInvokingResource() then return end -- Make sure this can only be triggered from the server
+
+    if skipNextCharacterSelect then
+        skipNextCharacterSelect = false
+        return
+    end
+
+    chooseCharacter()
+end)
+```
+
+That's the whole patch, three small additions to one file. Version pinned
+against `qbx_core` as of this repo's last commit; check the target file
+still matches the snippets above before pasting in if your copy is far
+ahead or behind.
 
 ## speedlimits
 

@@ -27,12 +27,16 @@ CyberLeek's videos and GTA VI Extended Look.
 | Vehicle panel, minimap, speed limit sign (day) | Vehicle panel + turn-by-turn (night) |
 | ![Ryde Me driver profile, in world](docs/screenshots/rydeme-driver-profile-inworld.png) | ![Ryde Me driver profile close-up](docs/screenshots/rydeme-driver-profile-closeup.png) |
 | `um_gigs`, Ryde Me driver profile | Driver profile, close up |
-| ![ox_inventory weapon wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | |
-| `ox_inventory`: GTA6 weapon wheel hotbar | |
+| ![ox_inventory items wheel](docs/screenshots/ox_inventory-weapon-wheel.png) | ![qbx_relog character switcher](docs/screenshots/qbx_relog-character-switcher.png) |
+| `ox_inventory`: items wheel, with the mask/eyewear/hat toggles | `qbx_relog`: hold-to-switch character strip |
 | ![vice_hud money close-up](docs/screenshots/vice_hud-money-closeup.png) | ![vice_hud minimap with frame and logo](docs/screenshots/vice_hud-minimap-frame-logo.png) |
 | Cash / bank / duffle bag value | Minimap with the outline frame and map badge on |
 | ![vice_hud full HUD](docs/screenshots/vice_hud-full-hud.png) | ![lb-phone BuckMe card front and back](docs/screenshots/lb-phone-buckme-card.png) |
 | Full HUD in a live scene | `lb-phone` BuckMe card, front and back |
+| ![gk_pausemenu quick menu, male accent](docs/screenshots/gk_pausemenu-quickmenu-male.png) | ![gk_pausemenu quick menu, female accent](docs/screenshots/gk_pausemenu-quickmenu-female.png) |
+| `gk_pausemenu`: quick menu, male accent colour | Quick menu, female accent colour |
+| ![gk_pausemenu map tab](docs/screenshots/gk_pausemenu-map.png) | |
+| `gk_pausemenu`: Map tab with the Locations panel | |
 
 ## What's in here
 
@@ -44,9 +48,10 @@ GTA VI Resources/
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
 │                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
-│                  zseatbelt, um_smallresources), plus a standalone lb-phone
-│                  Wallet app rebrand that doesn't touch vice_hud at all.
-│                  See docs/PATCHES.md for exact install steps per resource.
+│                  zseatbelt, um_smallresources, um_clothing, qbx_core), plus
+│                  a standalone lb-phone Wallet app rebrand that doesn't touch
+│                  vice_hud at all. See docs/PATCHES.md for exact install
+│                  steps per resource.
 │
 └── docs/          Extra documentation, including the patch install guide.
 ```
@@ -97,6 +102,24 @@ included here.
   if vice_hud isn't running. Depends on `qbx_core`, `ox_target`,
   `ox_inventory`.
 
+- **`gk_pausemenu`**: A fully custom NUI pause menu that replaces the native
+  ESC menu, with a self-drawn map (real GTA V map art) and a Locations panel
+  fed by a live scan of every real blip on the server (search, sprite-grouped
+  colour accents, per-location preview/waypoint). Settings still hands off to
+  the real native Settings screen. No hard dependency on vice_hud; matches
+  its gender-based accent colour when it's running, otherwise looks the same
+  either way. Depends on `ox_lib`.
+
+- **`qbx_relog`**: Singleplayer-style character switching. `/relog` still
+  works as before (confirmation, anti-combat-log wait, back to the
+  multicharacter picker), and holding a key now opens a row of portrait cards
+  in the corner you can cycle through and release to switch, using the
+  engine's real singleplayer switch cinematic rather than a loading screen.
+  See `resources/qbx_relog/README.md` for controls, config, and the required
+  `qbx_core` patch (`patches/qbx_core`, below) this resource cannot run
+  without. Depends on `ox_lib`, `qbx_core`. Optional: `illenium-appearance`
+  (for real portraits instead of initials), `vice_hud`, `qbx_honor`.
+
 ### `patches/`
 
 Overlays for resources you install separately:
@@ -109,14 +132,25 @@ Overlays for resources you install separately:
   inventory screen and the in-world hotbar: an 8-cell role-based weapon wheel
   (free/melee/handheld/fist) plus a matching items wheel, medical-only
   quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
-  installed) a hard 17-slot pocket cap that lifts while a bag is carried.
-  See the [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png). Not
-  part of the vice_hud glass system above.
+  installed) a hard 17-slot pocket cap that lifts while a bag is carried. The
+  items wheel also carries three fixed clothing toggles (bandana/mask,
+  eyewear, hat) that call into the `um_clothing` patch below, plus a hanger
+  icon cell held in reserve. See the
+  [screenshot](docs/screenshots/ox_inventory-weapon-wheel.png). Not part of
+  the vice_hud glass system above.
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
 - **`um_smallresources`**: not theming, a functional fix for a stamina
   script in this pack that conflicts with vice_hud's stamina bar.
+- **`um_clothing`**: two exports appended to the end of the file so
+  ox_inventory's items wheel can toggle a worn mask/hat/glasses on and off
+  and read whether each is currently on. Needed for the ox_inventory patch's
+  clothing cells above to do anything.
+- **`qbx_core`**: two small exports and a one-line check in the multicharacter
+  flow, needed by `qbx_relog` (bundled above) so a quick character switch
+  doesn't fight with the normal character-select screen. Not theming, a
+  functional requirement.
 - **`lb-phone`**: a Vice-styled rebrand of lb-phone's stock Wallet app into
   "BuckMe" (card front/back with a tap-to-flip signature and CVV, a bottom
   tab bar, a Pay/Request toggle). Standalone, not part of the vice_hud glass
@@ -130,8 +164,9 @@ its own.
 ## Installing (drag-and-drop resources)
 
 1. Copy `resources/vice_hud`, `resources/ScaleformUI_Assets`,
-   `resources/um_gigs`, `resources/qbx_honor`, and/or
-   `resources/qbx_vehiclekeys` into your server's `resources/` folder.
+   `resources/um_gigs`, `resources/qbx_honor`, `resources/qbx_vehiclekeys`,
+   `resources/gk_pausemenu`, and/or `resources/qbx_relog` into your server's
+   `resources/` folder.
 2. Add them to `server.cfg`:
    ```
    ensure ScaleformUI_Assets
@@ -139,6 +174,8 @@ its own.
    ensure um_gigs
    ensure qbx_honor
    ensure qbx_vehiclekeys
+   ensure gk_pausemenu
+   ensure qbx_relog
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
@@ -148,6 +185,10 @@ its own.
    - `qbx_honor` needs **qbx_core**, **ox_target**.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
      Its Slim Jim ring only shows up while `vice_hud` is also running.
+   - `gk_pausemenu` needs **ox_lib**.
+   - `qbx_relog` needs **ox_lib** and **qbx_core**, and won't run at all
+     without the `patches/qbx_core` hand-edit below applied first. See
+     `resources/qbx_relog/README.md`.
 4. Restart the resource (or the server) and confirm it starts clean in the
    server console.
 
@@ -160,10 +201,10 @@ once it's installed.
 These are not resources, so do not `ensure` a `patches/` folder. Follow
 [`docs/PATCHES.md`](docs/PATCHES.md), which walks through each of `ox_lib`,
 `ox_target`, `ox_inventory`, `qb-menu`, `qb-input`, `speedlimits`,
-`zseatbelt`, `um_smallresources`, and `lb-phone` individually: which files
-to copy in, and the exact manifest/HTML edits (where one is needed). Every
-one of these needs an existing install of the resource it patches; none of
-them work standing alone.
+`zseatbelt`, `um_smallresources`, `um_clothing`, `qbx_core`, and `lb-phone`
+individually: which files to copy in, and the exact manifest/HTML edits
+(where one is needed). Every one of these needs an existing install of the
+resource it patches; none of them work standing alone.
 
 An update to any of those patched resources will silently wipe its patch.
 That's expected, and `PATCHES.md` says so per-resource. Re-apply after
@@ -244,6 +285,7 @@ upstream license:
 | `speedlimits`, `zseatbelt` | MIT |
 | `um_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
+| `qbx_core` | GPL-3.0 |
 | ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
 
 `lb-phone` is different again: it's a paid, closed-source resource, not

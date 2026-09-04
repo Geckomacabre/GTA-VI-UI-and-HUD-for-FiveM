@@ -1,0 +1,406 @@
+/* -----------------------------------------------------------------------------
+   qbx_relog character switcher
+   -----------------------------------------------------------------------------
+   SHAPE is GTA VI's, MATERIAL is vice_hud's.
+
+   VI's switcher is a row of portrait cards sitting in line, with a button
+   prompt on the left saying which control cycles them and the card you are on
+   picked out by a bright rim while the rest are knocked back. That layout is
+   what this copies. It is deliberately NOT V's diamond: vice_hud is a GTA6-style
+   HUD, and a wheel in the corner of it would be the odd one out.
+
+   It could not use the real PLAYER_SWITCH scaleform either -- that is V's
+   diamond, four fixed slots of baked Michael/Franklin/Trevor artwork, with a
+   live portrait allowed in exactly one of them.
+
+   The faces are real pedheadshots. `https://nui-img/<txd>/<txd>` renders a live
+   game texture straight into CEF, so nothing is converted to base64 and no HTTP
+   round trip happens -- the portrait the engine rendered is the portrait in the
+   <img>.
+
+   WHICH MATERIAL THIS IS -- vice_hud has two surfaces and they must not be
+   merged. This is .plate (the zone bar / vehicle panel: warm purple-grey at
+   0.88, hairline INSET ring, top-lit line, two-gradient sheen, and crucially NO
+   specular cap), not .glass (the near-black popup material ox_lib uses). The
+   recipe is copied from [standalone]/vice_hud/html/style.css; change it there
+   and this has to move with it.
+
+   NO backdrop-filter, deliberately -- on a transparent NUI page CEF has no
+   backdrop to sample and rasterises the whole region as opaque black.
+
+   Every themed value is a custom property that client/vice_theme.lua fills in
+   from the `vice_hud:theme` state bag. The fallbacks below are vice_hud's own
+   measured values, so with vice_hud stopped this still looks like itself.
+   -------------------------------------------------------------------------- */
+
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500 700;
+    font-style: normal;
+    font-display: block;
+}
+
+:root {
+    --vice-plate: rgba(57, 53, 59, 0.88);
+    --vice-plate-edge: rgba(255, 255, 255, 0.10);
+    --vice-plate-toplit: rgba(255, 255, 255, 0.055);
+    --vice-plate-band: rgba(255, 255, 255, 0.052);
+    --vice-plate-barrier: rgba(255, 255, 255, 0.16);
+    --vice-line: rgba(255, 255, 255, 0.10);
+    --vice-text: #f4f4f2;
+    --vice-text-dim: #c2c2c6;
+    --vice-accent: #5fd8c8;
+    /* 0.30cqw at 16:9 -- vice_hud's --r-md, the zone bar's radius. */
+    --vice-radius: 6px;
+
+    /* Where the strip sits. Overwritten from Config.wheelMargin. */
+    --edge-right: 2.4cqw;
+    --edge-bottom: 4.4cqh;
+
+    /* Card geometry. Slightly taller than wide, as the reference is, and big
+       enough that the face reads as a portrait rather than an icon. */
+    --card-h: 15.6cqh;
+    --card-w: 13.2cqh;
+    --gap: 0.7cqh;
+
+    --ink-shadow: 0 0.10cqh 0.22cqh rgba(0, 0, 0, 0.88);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: transparent;
+    overflow: hidden;
+    font-family: 'HelveticaNeueHUD', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* cqh/cqw resolve against this, which is what lets every measurement above be
+   written once and hold at any resolution. */
+.stage {
+    position: fixed;
+    inset: 0;
+    container-type: size;
+    pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   The strip
+   -------------------------------------------------------------------------- */
+
+.switcher {
+    position: absolute;
+    right: var(--edge-right);
+    bottom: var(--edge-bottom);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5cqh;
+}
+
+.switcher[hidden] { display: none; }
+
+.strip {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.9cqh;
+}
+
+.cards {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--gap);
+}
+
+/* One character: the portrait card with its honor chip beneath. The chip sits
+   outside the card because the reference puts its per-character marker below
+   the portrait, not on top of it -- and a chip inside would have to fight the
+   face for the bottom of the frame. */
+.slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.42cqh;
+}
+
+/* The button prompt, as in the reference: a light chip carrying the control
+   that cycles the strip, sitting to the left of the cards. Light-on-dark is
+   inverted here relative to everything else on purpose -- a prompt is telling
+   you to press something, and the reference makes it the brightest thing in
+   the group for exactly that reason. */
+.prompt {
+    flex: 0 0 auto;
+    min-width: 3.1cqh;
+    height: 2.5cqh;
+    padding: 0 0.7cqh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: calc(var(--vice-radius) * 0.9);
+    font-family: 'GTAArtDeco', 'HelveticaNeueHUD', Arial, sans-serif;
+    font-weight: 500;
+    font-size: 1.5cqh;
+    letter-spacing: 0.06cqh;
+    text-transform: uppercase;
+    color: #14141a;
+    background: rgba(244, 244, 242, 0.92);
+    box-shadow: 0 0.2cqh 0.5cqh rgba(0, 0, 0, 0.45);
+}
+
+/* -----------------------------------------------------------------------------
+   A card
+   -----------------------------------------------------------------------------
+   The plate: two gradients over the plate colour -- a soft top-down wash plus
+   the wide diagonal highlight from #vehicle::after. Dropping either leaves a
+   flat grey box. The edge is an INSET ring rather than a border so it costs no
+   layout width, which is how a card can gain an edge without changing size or
+   shifting its neighbours.
+   -------------------------------------------------------------------------- */
+
+.card {
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: var(--vice-radius);
+    overflow: hidden;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--vice-plate);
+    box-shadow:
+        0 0.25cqh 0.70cqh rgba(0, 0, 0, 0.46),
+        inset 0 0 0 0.055cqw var(--vice-plate-edge),
+        inset 0 0.09cqh 0 var(--vice-plate-toplit);
+    /* The cards you are not on sit back, but they stay readable -- in the
+       reference the unselected portrait is still clearly a person you can
+       recognise, it just isn't the one wearing the bright frame. An earlier
+       pass crushed them to near-black, which turned the strip into one card
+       and some shadows. */
+    filter: saturate(0.62) brightness(0.84);
+    transform: scale(0.955);
+    transition:
+        transform 130ms cubic-bezier(0.2, 0.8, 0.3, 1),
+        filter 110ms linear,
+        box-shadow 110ms linear;
+}
+
+/* The bright rim is the whole selection cue in the reference -- no fill, no
+   glow, just a clean light edge around the card you are on. */
+.slot.on .card {
+    filter: none;
+    transform: scale(1);
+    box-shadow:
+        0 0.45cqh 1.2cqh rgba(0, 0, 0, 0.58),
+        inset 0 0 0 0.1cqw rgba(255, 255, 255, 0.85);
+}
+
+.face {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Pedheadshots are rendered head-on with a lot of headroom; nudging the
+       crop up puts the face in the middle of the card instead of the hairline. */
+    object-position: 50% 18%;
+}
+
+.face[hidden] { display: none; }
+
+/* Shown until the portrait has rendered, or instead of it if the renderer
+   refused, so a card never opens empty. */
+.initials {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'GTAArtDeco', 'HelveticaNeueHUD', Arial, sans-serif;
+    font-weight: 500;
+    font-size: 2.6cqh;
+    letter-spacing: 0.08cqh;
+    color: var(--vice-text-dim);
+    text-shadow: var(--ink-shadow);
+}
+
+.initials[hidden] { display: none; }
+
+/* The accent strip along the bottom of the card you are on. Present but zero
+   height on the rest, so cycling grows a colour rather than adding a box. This
+   is the one place the HUD's own accent appears -- the reference has nothing
+   here, but a switcher carrying no accent at all would be the only piece of
+   this HUD that does not. */
+.bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0;
+    background: var(--vice-accent);
+    transition: height 110ms linear;
+}
+
+.slot.on .bar { height: 0.42cqh; }
+
+/* The character already being played. Cycling skips straight past it -- see
+   nextSelectable() in client/wheel.lua -- so it can never take the bright rim,
+   and it is styled as a fixed point rather than a choice: permanently knocked
+   back, with its marker bar always lit in the neutral colour to say "this is
+   where you are" instead of "this is where you could go". It stays on the strip
+   because seeing who you currently are is half of what the strip is for. */
+.slot.current .card {
+    filter: saturate(0.28) brightness(0.62);
+}
+
+.slot.current .bar {
+    height: 0.42cqh;
+    background: var(--vice-text-dim);
+}
+
+/* -----------------------------------------------------------------------------
+   Honor chip
+   -----------------------------------------------------------------------------
+   qbx_honor keeps a -100..100 standing per character in metadata.honor, and
+   vice_hud renders the two ends as an angel and a devil face. Both are shown
+   here: the face for anyone who has reached a tier, and the number always,
+   because "show each character's honor" is a comparison between characters and
+   two neutral characters with no badge would otherwise look identical.
+
+   Built from the plate's own band rather than a new fill, for the same reason
+   the cards are plate: this is part of the HUD, not a tooltip on top of it.
+   -------------------------------------------------------------------------- */
+
+.honor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28cqh;
+    min-width: 4.2cqh;
+    padding: 0.12cqh 0.55cqh;
+    border-radius: 999px;
+    background: var(--vice-plate-band);
+    box-shadow: inset 0 0 0 1px var(--vice-line);
+    text-shadow: var(--ink-shadow);
+    opacity: 0.72;
+    transition: opacity 110ms linear, box-shadow 110ms linear;
+}
+
+.slot.on .honor {
+    opacity: 1;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.honor-emoji {
+    font-size: 1.32cqh;
+    line-height: 1;
+}
+
+.honor-emoji[hidden] { display: none; }
+
+.honor-value {
+    font-family: 'GTAArtDeco', 'HelveticaNeueHUD', Arial, sans-serif;
+    font-weight: 500;
+    font-size: 1.28cqh;
+    line-height: 1;
+    letter-spacing: 0.04cqh;
+    color: var(--vice-text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The two ends of the axis get the colour; the middle stays dim, because
+   neutral is the absence of a standing rather than a third one. */
+.honor.angel .honor-value { color: var(--vice-accent); }
+.honor.devil .honor-value { color: #ff6b6b; }
+
+/* honorBroken latches at qbx_honor's floor and never clears. vice_hud draws
+   the badge grey and cracked from then on; the equivalent here is draining the
+   colour out of both halves so it reads as spent rather than merely low. */
+.honor.broken .honor-value { color: var(--vice-text-dim); }
+.honor.broken .honor-emoji { filter: grayscale(1) brightness(0.75); }
+.honor.broken { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+
+/* -----------------------------------------------------------------------------
+   The label under the strip
+   -------------------------------------------------------------------------- */
+
+.label {
+    text-align: right;
+    white-space: nowrap;
+    padding-right: 0.2cqh;
+}
+
+.name {
+    font-family: 'GTAArtDeco', 'HelveticaNeueHUD', Arial, sans-serif;
+    font-weight: 500;
+    font-size: 1.95cqh;
+    line-height: 1.15;
+    letter-spacing: 0.10cqh;
+    text-transform: uppercase;
+    color: var(--vice-text);
+    text-shadow: var(--ink-shadow);
+}
+
+.sub {
+    font-size: 1.25cqh;
+    line-height: 1.3;
+    letter-spacing: 0.05cqh;
+    color: var(--vice-text-dim);
+    text-shadow: var(--ink-shadow);
+}
+
+/* Shown until the player cycles onto something, in place of the name. */
+.hint {
+    font-size: 1.25cqh;
+    line-height: 1.3;
+    letter-spacing: 0.06cqh;
+    text-transform: uppercase;
+    color: var(--vice-text-dim);
+    text-shadow: var(--ink-shadow);
+    opacity: 0.75;
+}
+
+.name[hidden], .sub[hidden], .hint[hidden] { display: none; }
+
+/* -----------------------------------------------------------------------------
+   Material off -- /hudtheme's "Panel surface" toggle
+   -----------------------------------------------------------------------------
+   Kept as its own block so the accent and the font still apply with the plate
+   switched off, the way vice_hud exposes them as three separate rows.
+   -------------------------------------------------------------------------- */
+
+html[data-vice-glass='0'] .card {
+    background: rgba(0, 0, 0, 0.62);
+    box-shadow: inset 0 0 0 1px var(--vice-line);
+}
+
+html[data-vice-glass='0'] .slot.on .card {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+html[data-vice-glass='0'] .honor {
+    background: rgba(0, 0, 0, 0.62);
+}
+
+html[data-vice-font='0'] .name,
+html[data-vice-font='0'] .initials,
+html[data-vice-font='0'] .honor-value,
+html[data-vice-font='0'] .prompt {
+    font-family: 'HelveticaNeueHUD', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}

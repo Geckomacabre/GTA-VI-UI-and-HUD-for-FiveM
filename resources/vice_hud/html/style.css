@@ -83,10 +83,20 @@
     font-display: block;
 }
 
-/* GTA Art Deco. Two real cuts, so Regular and Medium are separate faces rather
-   than one face the browser thickens by hand. TrueType, not OpenType — the
-   format() hint has to match or the browser rejects the file and falls back
-   without telling anyone. */
+/* GTA Art Deco. Three real cuts, so Regular/Medium/Bold are separate faces
+   rather than one face the browser thickens by hand -- a synthetic bold on
+   this typeface smears the same way it would on Helvetica Neue above.
+   TrueType, not OpenType — the format() hint has to match or the browser
+   rejects the file and falls back without telling anyone.
+
+   Medium used to be declared `font-weight: 500 700`, standing in for a
+   proper Bold that had not been sourced yet: any request in that range
+   (500 default zone bar, 700 default vehicle-panel make) matched the SAME
+   file. Now that a real Bold cut exists, Medium is pinned to its own single
+   weight so 700 stops being an alias for Medium and actually resolves to
+   Bold instead -- which is also what makes the vehicle panel's make/model
+   distinction from #veh-model below actually visible; 700 and Medium had
+   too little contrast against each other to read as different weights. */
 @font-face {
     font-family: 'GTAArtDeco';
     src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
@@ -97,7 +107,14 @@
 @font-face {
     font-family: 'GTAArtDeco';
     src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
-    font-weight: 500 700;
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoBold.ttf') format('truetype');
+    font-weight: 700;
     font-style: normal;
     font-display: block;
 }
@@ -389,7 +406,17 @@ html, body {
    than doubled up. */
 .sic.has-badge { background: none; border: none; }
 .sic.has-badge img { width: 100%; height: 100%; border-radius: 50%; display: block; }
-.stamina-oxygen-glyph { display: none; }
+
+/* O2 badge: a flat dark disc with a mint "O2" glyph -- no light ring, unlike
+   the icon badges above, matching the reference crop exactly. font-size
+   inherits .sic's, sub just needs to not go full-size or "O2" reads as "O 2". */
+.o2-badge {
+    background: rgba(45, 46, 48, 0.92);
+    border: none;
+    color: #a3c6c4;
+    font-weight: 700;
+}
+.o2-badge sub { font-size: 0.6em; bottom: -0.05em; }
 
 /* Colours sampled across 166 reference frames, taking the BRIGHTEST readings
    per element so a dark backdrop doesn't drag them down (these bars are
@@ -466,6 +493,7 @@ html, body {
 #s-health  .strack { width: 9.6cqw; background: rgba(122, 86, 96, 0.62); }
 #s-stamina .strack { width: 5.6cqw; background: rgba(62, 92, 94, 0.62); }
 #s-focus   .strack { width: 5.8cqw; background: rgba(78, 70, 116, 0.62); }
+#s-oxygen  .strack { width: 6.0cqw; background: rgba(62, 92, 94, 0.62); }
 
 /* Engaged focus: the eye glows rather than sitting flat, so the one moment
    the world visibly slows down is also the one moment this row visibly says
@@ -529,29 +557,9 @@ html, body {
 #s-health  .sfill { background: #f5acc6; }
 #s-stamina .sfill { background: #a3c6c4; }
 #s-focus   .sfill { background: #bdaae6; }
-
-/* Underwater the stamina row becomes the OXYGEN row -- same track, same length,
-   same place. Only the colour and the glyph change, and they change together:
-   a cooler, bluer cast than the stamina teal so the swap is unmistakable at a
-   glance without the eye having to find a new bar first. */
-#s-stamina.oxygen .strack { background: rgba(52, 78, 108, 0.62); }
-#s-stamina.oxygen .sfill  { background: #9ec4e8; }
-/* The bolt badge PNG has no oxygen equivalent, so oxygen mode swaps it for a
-   plain bubble glyph -- which means the badge's own dark disc has to come
-   back too, since that disc lived in the (now hidden) PNG, not in .sic. */
-#s-stamina.oxygen .sic {
-    background: rgba(28, 26, 32, 0.72);
-    border: 0.045cqw solid rgba(255, 255, 255, 0.22);
-    color: #9ec4e8;
-}
-#s-stamina.oxygen .stamina-badge-img { display: none; }
-#s-stamina.oxygen .stamina-oxygen-glyph {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-}
+/* Same teal as stamina, by explicit request -- not the mint from the
+   reference crop. */
+#s-oxygen  .sfill { background: #a3c6c4; }
 
 /* -----------------------------------------------------------------------------
    Top-right: wanted stars, the three "tells", money
@@ -948,7 +956,6 @@ html, body {
        height together, and gives --fit more room before a long name has to
        be shrunk at all. */
     font-size: calc((calc(0.75 * var(--w))) * var(--fs-vehicle, var(--fs-slots, 1)) * var(--fit, 1));
-    font-weight: var(--fw-vehicle, var(--fw-slots, 700));
     color: var(--text);
     /* Tracked out — the reference sets the make/model in wide caps. */
     letter-spacing: var(--ls-vehicle, var(--ls-slots, 0.075em));
@@ -959,8 +966,28 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    /* NOTE: no font-weight here on purpose -- see #veh-make/#veh-model
+       below. It used to read `var(--fw-vehicle, var(--fw-slots, 700))`, the
+       same shared variable the Vehicle panel's Weight row in /movehud
+       writes -- so a server that had ever tuned that row (this one had:
+       published layout.json carries `vehicle.fw: 400` from before the make
+       and model were split apart) pulled BOTH lines down to whatever was
+       last saved, and the two rules below asking for two different weights
+       made no visible difference because they were reading a variable that
+       was no longer 700 to begin with. Make and model are deliberately
+       fixed weights now, decoupled from that variable and from each other,
+       so a stale --fw-vehicle can't quietly re-match them again. */
 }
-/* The lock / engine / fuel pips are their own editor element ("Vehicle icons"),
+/* Bold vs Regular, not "whatever --fw-vehicle happens to be this week" --
+   see the note on `.vname` above for why reading that shared variable
+   stopped working the moment either line needed a DIFFERENT weight from
+   the other. GTAArtDeco's three real cuts are declared in the @font-face
+   block up top; these ask for two of them by name via a fixed weight, not
+   a synthetic in-between the rasteriser would have to fake. */
+#veh-make  { font-weight: var(--fw-vehicle-make, 700); }
+#veh-model { font-weight: var(--fw-vehicle-model, 400); }
+
+/* The tracker / engine / fuel pips are their own editor element ("Vehicle icons"),
    because scaling them from the panel alone looked wrong: the discs grew and
    the GAP between them did not, so three round icons turned into three round
    icons crowded against each other. Their own spacing, position and scale fix
@@ -1003,15 +1030,10 @@ html, body {
 .pip.bad     { --tone: #d9534f; }
 .pip.unknown { --tone: rgba(206, 206, 212, 0.82); }
 
-/* Stroked, not filled. A filled glyph needs its counters -- the padlock's
-   keyhole, the pump's window -- knocked out in the DISC's colour, which means
-   the icon would have to know what state it is in. Strokes get the same reading
-   from one colour, so `currentColor` alone is the whole of it.
-
-   They are also SVG rather than the emoji they started as: an emoji is drawn by
-   the platform's own font, and Windows renders the padlock orange and the pump
-   red whatever `color` says, so two of the three came out in colours the design
-   never picked. */
+/* Not emoji. An emoji is drawn by the platform's own font, and Windows
+   renders the padlock orange and the pump red whatever `color` says --
+   these all read `currentColor` instead, so the tone system in `.pip.good`
+   etc above is genuinely the only thing deciding what colour they are. */
 .pip-glyph {
     /* About 57% of the disc, which is where the reference sits. An emoji came
        with its own internal margin and a bare glyph does not, so matching the
@@ -1020,6 +1042,13 @@ html, body {
     height: 1em;
     display: block;
     position: relative;
+}
+
+/* The tracker is inline SVG, stroked rather than filled: a filled glyph
+   needs its counters (the pin's own hole) knocked out in the DISC's colour,
+   which means the icon would have to know what state it is in, where a
+   stroke gets the same reading from one colour for free. */
+#pip-tracker .pip-glyph {
     fill: none;
     stroke: currentColor;
     stroke-width: 1.9;
@@ -1027,12 +1056,36 @@ html, body {
     stroke-linejoin: round;
 }
 
+/* Engine and fuel are the reference art itself (see README credit),
+   stripped of its own baked-in disc and used as a mask so the shape ships
+   exactly as drawn rather than re-traced -- `background: currentColor`
+   through the mask is what makes it a plain <span> pick up the same tone
+   system the tracker's stroke gets from `currentColor` directly. */
+.pip-glyph-engine,
+.pip-glyph-fuel {
+    background: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+}
+.pip-glyph-engine {
+    -webkit-mask-image: url('icons/badge_engine_glyph.png');
+    mask-image: url('icons/badge_engine_glyph.png');
+}
+.pip-glyph-fuel {
+    -webkit-mask-image: url('icons/badge_fuel_glyph.png');
+    mask-image: url('icons/badge_fuel_glyph.png');
+}
+
 /* -----------------------------------------------------------------------------
    The gauge rings
    -----------------------------------------------------------------------------
    Engine and fuel fill a ring around the disc to their real reading, so the
-   panel answers "how much" rather than only "is it bad yet". The lock has no
-   quantity and deliberately has no ring.
+   panel answers "how much" rather than only "is it bad yet". The tracker has
+   no quantity and deliberately has no ring.
 
    --pct is written by app.js, 0..100. pathLength="100" on the circle relabels
    its own length as 100 units, so the dash offset IS the percentage and nothing
@@ -1583,7 +1636,11 @@ html, body {
    over either reticle -- so it stays in normal flow with opacity 0 rather
    than being display:none by default. Coloured by onKillMark() in app.js,
    which just adds one of the three classes; nothing here decides what a
-   clean kill is, see the classifier in client.lua. */
+   clean kill is, see the classifier in client.lua.
+   Four dart-shaped wedges baked into a PNG per colour (icons/hitmark_*.png)
+   rather than a stroked SVG X -- the reference's marks are filled shapes
+   with their own black outline, not thin crossing lines, so a flat
+   currentColor stroke couldn't reproduce them. */
 #cross-kill {
     position: absolute;
     left: 50%;
@@ -1592,22 +1649,22 @@ html, body {
     height: calc(2.2 * var(--w));
     transform: translate(-50%, -50%) scale(0.6);
     opacity: 0;
-    stroke-width: 9;
-    stroke-linecap: round;
-    fill: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
     transition: opacity 320ms ease, transform 320ms cubic-bezier(0.2, 0.8, 0.3, 1.3);
 }
 #cross-kill.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 #cross-kill.kill-red {
-    stroke: #e5484d;
+    background-image: url('icons/hitmark_red.png');
     filter: drop-shadow(0 0 0.3cqh rgba(229, 72, 77, 0.7));
 }
 #cross-kill.kill-yellow {
-    stroke: #e8c56a;
+    background-image: url('icons/hitmark_yellow.png');
     filter: drop-shadow(0 0 0.3cqh rgba(232, 197, 106, 0.7));
 }
 #cross-kill.kill-white {
-    stroke: #f2f2ef;
+    background-image: url('icons/hitmark_white.png');
     filter: drop-shadow(0 0 0.3cqh rgba(242, 242, 239, 0.6));
 }
 

@@ -1,10 +1,10 @@
-/* Checks the oxygen half of the stamina row -- both ends of it.
+/* Checks the oxygen system -- both ends of it.
  *
  *   npm i fengari jsdom && node tools/oxygen.test.js
  *
- * Underwater breath shares the stamina bar instead of adding a fourth one, so
- * the feature is only correct if BOTH halves agree about which mode the row is
- * in. That makes it one test file rather than two: the real readOxygen from
+ * Underwater breath gets its own row (#s-oxygen), independent of stamina's,
+ * so the feature is only correct if BOTH halves agree about when that row is
+ * shown. That makes it one test file rather than two: the real readOxygen from
  * client.lua under fengari, then the real app.js driving the real markup under
  * jsdom, checked against the payload the Lua half actually sends.
  *
@@ -251,8 +251,12 @@ console.log('\n-- the payload keeps a zero --');
 /* =============================================================================
  * The row
  * ========================================================================== */
+// Oxygen got its own row (#s-oxygen) instead of reskinning #s-stamina in
+// place -- see onStatus() in app.js. The two tracks are now independent:
+// stamina always shows stamina, and #s-oxygen shows/hides on the presence of
+// the `oxygen` key exactly as the old shared row's mode switch did.
 
-console.log('\n-- the row swaps mode --');
+console.log('\n-- the oxygen row is independent of stamina --');
 
 const dom = new JSDOM(fs.readFileSync(root + 'html/index.html', 'utf8'),
                       { url: 'http://localhost/', runScripts: 'outside-only', pretendToBeVisual: true });
@@ -268,54 +272,52 @@ window.eval(fs.readFileSync(root + 'html/app.js', 'utf8'));
 doc.dispatchEvent(new window.Event('DOMContentLoaded'));
 
 const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { data }));
-const row = doc.getElementById('s-stamina');
-const fillPct = () => {
+const staminaRow = doc.getElementById('s-stamina');
+const oxygenRow = doc.getElementById('s-oxygen');
+const fillPctOf = (row) => {
   const t = row.querySelector('.sfill').style.transform;
   return Math.round(parseFloat(/scaleX\(([\d.]+)\)/.exec(t)[1]) * 100);
 };
-const glyph = () => row.querySelector('.sic').textContent;
-const colour = () => window.getComputedStyle(row.querySelector('.sfill')).backgroundColor;
-
-const boltGlyph = glyph();
-const staminaColour = colour();
 
 // Surfaced, and tired. The ordinary case.
 msg({ action: 'status', health: 100, armor: 0, stamina: 40 });
-ok(!row.classList.contains('oxygen'), 'no oxygen key means the row is the stamina row');
-ok(fillPct() === 40, 'and it shows stamina', fillPct());
-ok(!row.classList.contains('hidden'), 'visible because stamina is down');
+ok(oxygenRow.classList.contains('hidden'), 'no oxygen key means the oxygen row stays hidden');
+ok(fillPctOf(staminaRow) === 40, 'stamina row shows stamina', fillPctOf(staminaRow));
+ok(!staminaRow.classList.contains('hidden'), 'stamina row visible because stamina is down');
 
-// Underwater with FULL stamina: the row has to appear anyway, because a full
-// breath still means a clock is running.
+// Underwater with FULL stamina: the oxygen row has to appear anyway, because
+// a full breath still means a clock is running.
 msg({ action: 'status', health: 100, armor: 0, stamina: 100, oxygen: 100 });
-ok(row.classList.contains('oxygen'), 'an oxygen key switches the row into oxygen mode');
-ok(!row.classList.contains('hidden'),
-   'and shows it at FULL breath, which stamina at 100 would never do');
-ok(fillPct() === 100, 'reading the breath, not the stamina', fillPct());
-ok(glyph() !== boltGlyph, 'the glyph changed', JSON.stringify(glyph()));
-ok(colour() !== staminaColour, 'so did the colour', colour() + ' vs ' + staminaColour);
+ok(!oxygenRow.classList.contains('hidden'),
+   'an oxygen key shows the oxygen row at FULL breath, which stamina at 100 would never do');
+ok(fillPctOf(oxygenRow) === 100, 'reading the breath', fillPctOf(oxygenRow));
+// Not asserting staminaRow is hidden here: setVisible only shows
+// synchronously, hiding goes through the HIDE_HOLD_MS timer (see
+// hideTimers in app.js), so it is still visible on this same tick even
+// though nothing further is keeping it up.
 
-// Mid-dive. Stamina underneath is irrelevant and must not leak through.
+// Mid-dive. Stamina underneath is irrelevant and must not leak into the
+// oxygen row -- they are two separate tracks now.
 msg({ action: 'status', health: 100, armor: 0, stamina: 12, oxygen: 35 });
-ok(fillPct() === 35, 'mid-dive it shows breath, not the stamina underneath it', fillPct());
+ok(fillPctOf(oxygenRow) === 35, 'oxygen row shows breath, not the stamina underneath it', fillPctOf(oxygenRow));
+ok(!staminaRow.classList.contains('hidden'), 'low stamina still shows its own row', fillPctOf(staminaRow));
+ok(fillPctOf(staminaRow) === 12, 'and it reads the real stamina value', fillPctOf(staminaRow));
 
 // Empty breath is the moment the bar matters most.
 msg({ action: 'status', health: 100, armor: 0, stamina: 12, oxygen: 0 });
-ok(fillPct() === 0 && !row.classList.contains('hidden'),
-   'out of breath the row is empty and still on screen');
+ok(fillPctOf(oxygenRow) === 0 && !oxygenRow.classList.contains('hidden'),
+   'out of breath the oxygen row is empty and still on screen');
 
-// Surfacing, still winded from the swim.
+// Surfacing, still winded from the swim. Same hold as above -- the oxygen
+// row's `hidden` class lands on a timer, not on this tick.
 msg({ action: 'status', health: 100, armor: 0, stamina: 12 });
-ok(!row.classList.contains('oxygen'), 'surfacing puts the row straight back to stamina');
-ok(glyph() === boltGlyph, 'with its own glyph back', JSON.stringify(glyph()));
-ok(colour() === staminaColour, 'and its own colour', colour());
-ok(fillPct() === 12, 'showing the stamina it had all along', fillPct());
+ok(fillPctOf(staminaRow) === 12, 'stamina row keeps showing the stamina it had all along', fillPctOf(staminaRow));
 
-// Surfacing with everything nominal: the row should go, but on the anti-flicker
-// hold rather than instantly, same as every other bar.
+// Surfacing with everything nominal: stamina's row should go, but on the
+// anti-flicker hold rather than instantly, same as every other bar.
 msg({ action: 'status', health: 100, armor: 0, stamina: 100 });
-ok(!row.classList.contains('hidden'),
-   'a fully nominal surfacing does not blink the row out on the same tick');
+ok(!staminaRow.classList.contains('hidden'),
+   'a fully nominal surfacing does not blink the stamina row out on the same tick');
 
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nall checks passed');
 process.exit(fails ? 1 : 0);

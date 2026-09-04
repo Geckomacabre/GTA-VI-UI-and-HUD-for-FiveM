@@ -392,6 +392,47 @@ $gta6-ws-h: ph(10.68);
 }
 
 // ---------------------------------------------------------------------------
+// ItemWheel's clothing toggle cells (mask/hat/eyewear/hanger) — not backed by
+// a real <InventorySlot>, same idea as .gta6-wheel-fist above, but these show
+// a live ON/OFF pill instead of just an icon (except the hanger cell, which
+// has no behaviour yet — see ItemWheel.tsx).
+// ---------------------------------------------------------------------------
+.gta6-wheel-clothing {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: ph(2) calc((#{$gta6-ws-w} - #{$gta6-art-w}) / 2) ph(4.6);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-origin: content-box;
+  background-size: contain;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.gta6-wheel-slot-equipped .gta6-wheel-clothing {
+  opacity: 1;
+}
+
+.gta6-clothing-state {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: ph(1.4);
+  text-align: center;
+  font-size: pw(0.85);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gta6-text-dim);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.gta6-wheel-slot-equipped .gta6-clothing-state {
+  color: var(--gta6-glow);
+}
+
+// ---------------------------------------------------------------------------
 // Centre caption — text only, deliberately no slot box behind it
 // ---------------------------------------------------------------------------
 .gta6-wheel-caption {

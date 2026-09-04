@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pause Menu</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Quick Menu: diagonal dark panel, list of tabs -->
+        <section id="quickmenu" class="panel">
+            <header>
+                <h1>QUICK MENU</h1>
+                <div class="rule"></div>
+            </header>
+            <nav id="quickmenu-list">
+                <button class="qm-row active" data-panel="quickmenu" data-action="resume">Resume</button>
+                <button class="qm-row" data-panel="map">Map</button>
+                <!-- Not a local panel -- hands off to FiveM's own real
+                     Settings screen instead of a custom NUI page, see
+                     client/main.lua's openNativeSettings. -->
+                <button class="qm-row" data-action="settings">Settings</button>
+                <button class="qm-row" data-panel="players">Players</button>
+            </nav>
+        </section>
+
+        <!-- Map: self-drawn (see html/images/README.md) -- no native bigmap involved -->
+        <section id="map" class="panel hidden">
+            <div id="map-viewport">
+                <div id="map-layer">
+                    <img id="map-image" alt="">
+                    <div id="map-blips"></div>
+                </div>
+                <div id="map-player-marker"></div>
+            </div>
+            <!-- Positioned in JS (app.js's positionBlipTooltip) to sit above
+                 whichever blip is currently hovered, clicked, or keyboard/
+                 gamepad-focused -- lives outside #map-layer so its own size
+                 isn't affected by that layer's pan/zoom transform. -->
+            <div id="map-blip-tooltip" class="hidden"></div>
+            <div id="map-missing-hint">
+                Drop a map image at <code>html/images/map.jpg</code> to see it here.<br>
+                See <code>html/images/README.md</code>.
+            </div>
+            <div id="map-zoom-controls">
+                <button id="map-zoom-in" type="button">+</button>
+                <button id="map-zoom-out" type="button">-</button>
+            </div>
+            <button id="map-recenter" class="hidden" type="button">Recenter</button>
+
+            <!-- Docked to the map itself, not a separate tab -->
+            <aside id="locations-panel">
+                <div class="locations-header">
+                    <h2>LOCATIONS</h2>
+                    <input id="location-search" type="text" placeholder="Search...">
+                </div>
+                <div id="locations-list">
+                    <div id="you-row" class="you-row" title="Recenter on you">
+                        <span class="you-icon">▲</span>
+                        <span>You</span>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="hint-bar">
+                <span><b>Drag / Right Stick</b> Pan Map</span>
+                <span><b>↑↓ / Left Stick</b> Navigate List</span>
+                <span><b>Click / A</b> Preview</span>
+                <span><b>Double-Click / X</b> Set Waypoint</span>
+                <span><b>Y</b> Toggle Visibility</span>
+                <span><b>Scroll / RT·LT</b> Zoom</span>
+                <span><b>ESC / B</b> Back</span>
+            </div>
+        </section>
+
+        <!-- Players -->
+        <section id="players" class="panel hidden">
+            <header>
+                <h1>PLAYERS</h1>
+                <div class="rule"></div>
+            </header>
+            <table id="players-table">
+                <thead><tr><th>ID</th><th>Name</th></tr></thead>
+                <tbody id="players-body"></tbody>
+            </table>
+        </section>
+
+        <div class="back-hint">↑↓/Left Stick Navigate · Enter/A Select · ESC/B Back</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

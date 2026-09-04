@@ -23,18 +23,20 @@
             </div>
         </div>
         <div class="srow hidden" id="s-stamina">
-            <!-- Underwater this row becomes the OXYGEN row (see setStaminaMode
-                 in app.js) -- the bolt badge hides and a plain bubble glyph
-                 takes its place, since there's no oxygen badge in the
-                 reference art. CSS-driven off .oxygen, see style.css. -->
-            <div class="sic has-badge">
-                <img src="icons/badge_stamina.png" alt="" class="stamina-badge-img">
-                <span class="stamina-oxygen-glyph" aria-hidden="true">&#9675;</span>
-            </div>
+            <div class="sic has-badge"><img src="icons/badge_stamina.png" alt=""></div>
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
         </div>
         <div class="srow hidden" id="s-focus">
             <div class="sic has-badge"><img src="icons/badge_eye.png" alt=""></div>
+            <div class="strack"><div class="sfill" style="width:100%"></div></div>
+        </div>
+        <!-- Its own row, not a stamina-bar reskin -- see onStatus() in app.js
+             and readOxygen() in client.lua for when this shows. Badge is text
+             ("O2"), not an image: the reference badge is a plain dark disc
+             with a coloured glyph, same shape family as the others but no
+             icon art exists for it. -->
+        <div class="srow hidden" id="s-oxygen">
+            <div class="sic o2-badge" aria-hidden="true">O<sub>2</sub></div>
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
         </div>
     </div>
@@ -212,16 +214,20 @@
                 <span class="vname" id="veh-model"></span>
             </div>
             <div id="veh-foot">
-                <!-- Lock, engine, fuel.
+                <!-- Tracker, engine, fuel.
                      Engine and fuel carry a RING that fills to the real reading,
                      because "how much" is the question you actually have about
-                     them; the lock has no quantity, so it gets no ring and says
-                     what it has to say in colour alone. -->
+                     them; the tracker has no quantity, so it gets no ring and
+                     says what it has to say in colour alone. Door lock status is
+                     qbx_vehiclekeys's job now, not vice_hud's -- this pip is
+                     driven entirely by whatever other resource calls
+                     exports.vice_hud:SetVehicleTracker, and stays hidden until
+                     one does. -->
                 <div id="veh-pips">
-                    <div class="pip unknown" id="pip-lock" title="lock">
+                    <div class="pip unknown" id="pip-tracker" title="tracker">
                         <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="4.2" y="10" width="15.6" height="10.8" rx="2.2"/>
-                            <path d="M8 10V7.2a4 4 0 0 1 8 0V10"/>
+                            <path d="M12 21s7-7.58 7-12A7 7 0 0 0 5 9c0 4.42 7 12 7 12z"/>
+                            <circle cx="12" cy="9" r="2.4"/>
                         </svg>
                     </div>
                     <div class="pip unknown gauge" id="pip-engine" title="engine">
@@ -233,12 +239,13 @@
                         <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
                         <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
                     </svg>
-                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="12" cy="12" r="3.2"/>
-                            <path d="M12 3.1v2.5M12 18.4v2.5M3.1 12h2.5M18.4 12h2.5
-                                     M5.8 5.8l1.8 1.8M16.4 16.4l1.8 1.8
-                                     M18.2 5.8l-1.8 1.8M7.6 16.4l-1.8 1.8"/>
-                        </svg>
+                        <!-- Reference art (see README credit), stripped of its
+                             own baked-in disc so only the glyph remains --
+                             the pip's dark disc and ring already do that job.
+                             Masked rather than inline SVG so the exact
+                             reference shape ships as-is, still tinted by the
+                             same currentColor tone system as every other pip. -->
+                        <span class="pip-glyph pip-glyph-engine" aria-hidden="true"></span>
                     </div>
                     <div class="pip unknown gauge" id="pip-fuel" title="fuel">
                     <!-- The gauge. pathLength="100" is the whole trick: it
@@ -249,12 +256,10 @@
                         <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
                         <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
                     </svg>
-                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M3.9 20.8V5.6A2.6 2.6 0 0 1 6.5 3h4.4a2.6 2.6 0 0 1 2.6 2.6v15.2"/>
-                            <path d="M2.6 20.8h12.2"/>
-                            <rect x="6.2" y="6.1" width="5" height="3.6" rx="0.7"/>
-                            <path d="M13.5 10.6h3.2a1.3 1.3 0 0 1 1.3 1.3v5.3a1.9 1.9 0 0 0 3.8 0V8.5l-2.5-2.5"/>
-                        </svg>
+                        <!-- Same reference art / masking approach as the engine
+                             glyph above; see the comment there and the README
+                             credit. -->
+                        <span class="pip-glyph pip-glyph-fuel" aria-hidden="true"></span>
                     </div>
                 </div>
             </div>
@@ -416,9 +421,12 @@
          both the reference and vanilla GTA's own reticle shape -- that kicks
          outward on every shot and eases back (see onCrossFire in app.js).
 
-         #cross-kill is independent of the mode switch: a coloured X that
-         flashes over whichever reticle is showing the instant a shot kills,
-         coloured by how clean the kill was. See the classifier next to the
+         #cross-kill is independent of the mode switch: four dart-shaped
+         hit-marker wedges that flash over whichever reticle is showing the
+         instant a shot kills, coloured by how clean the kill was via one of
+         the kill-red/kill-yellow/kill-white classes (each backed by its own
+         baked-in-colour/outline PNG in icons/, not a currentColor shape --
+         see #cross-kill in style.css). See the classifier next to the
          gameEventTriggered hook in client.lua for what "clean" means. -->
     <div id="crosshair" class="hidden" aria-hidden="true">
         <div id="cross-circle">
@@ -430,9 +438,7 @@
             <span class="ct ct-right"></span>
             <span class="ct ct-bottom"></span>
         </div>
-        <svg id="cross-kill" viewBox="0 0 100 100" aria-hidden="true">
-            <path d="M22 22 L78 78 M78 22 L22 78"/>
-        </svg>
+        <div id="cross-kill" aria-hidden="true"></div>
     </div>
 
     <!-- Race lap / checkpoint HUD --------------------------------------------

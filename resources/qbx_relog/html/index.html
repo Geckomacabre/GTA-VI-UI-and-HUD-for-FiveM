@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- container-type: size on the stage is what makes cqh/cqw resolve, so the
+         strip scales with the screen the same way vice_hud's own chrome does
+         rather than being pinned to a pixel size that only looks right at
+         1080p. -->
+    <div class="stage">
+        <div id="switcher" class="switcher" hidden>
+            <div class="strip">
+                <div id="prompt" class="prompt">B</div>
+                <div id="cards" class="cards"></div>
+            </div>
+            <div class="label">
+                <div id="name" class="name" hidden></div>
+                <div id="sub" class="sub" hidden></div>
+                <div id="hint" class="hint">Cycle to choose</div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
