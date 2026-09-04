@@ -24,9 +24,9 @@ CyberLeek's videos and GTA VI Extended Look.
 | ![vice_hud status bars](docs/screenshots/status-bars.png) | ![vice_hud money close-up](docs/screenshots/money-closeup.png) |
 | Health / stamina / oxygen bars | Cash / bank close-up |
 | ![vice_hud vehicle panel, day](docs/screenshots/vehicle-panel-day.png) | ![vice_hud turn-by-turn, night](docs/screenshots/turn-by-turn-night.png) |
-| Vehicle panel + minimap, on approach | Turn-by-turn + speed limit sign (night) |
+| Vehicle panel + minimap, on approach | Turn-by-turn + speed limit sign (Male) |
 | ![vice_hud turn-by-turn, day](docs/screenshots/turn-by-turn-day.png) | ![vice_hud minimap with frame and logo](docs/screenshots/minimap-frame-badge.png) |
-| Turn-by-turn + speed limit sign (day) | Minimap with the outline frame and map badge on |
+| Turn-by-turn + speed limit sign (Female) | Minimap with the outline frame and map badge on |
 | ![ox_inventory weapon wheel](docs/screenshots/weapon-wheel.png) | ![ox_inventory item wheel](docs/screenshots/item-wheel.png) |
 | `ox_inventory`: GTA6 weapon wheel hotbar | Matching items wheel |
 | ![Ryde Me, driver online](docs/screenshots/rydeme-driver-online.png) | ![Ryde Me, rider requesting a ride](docs/screenshots/rydeme-rider-whereto.png) |
