@@ -17,9 +17,9 @@ CyberLeek's videos and GTA VI Extended Look.
 > please [open an issue](../../issues) or send a
 > [pull request](../../pulls) rather than assuming it's intentional.
 
-> [!TEST SERVER]
+> [!NOTE]
 > **Want to see it running before you install anything?** This is the HUD
-> and UI set up for Upstate Mafia: [cfx.re/join/v6pzj5](https://cfx.re/join/v6pzj5).
+> and UI set up for Upstate Mafia: [Test the server!](https://cfx.re/join/v6pzj5).
 
 ## Screenshots
 
