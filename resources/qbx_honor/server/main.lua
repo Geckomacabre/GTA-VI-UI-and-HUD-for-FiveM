@@ -245,7 +245,7 @@ exports('IsHonorBroken', IsHonorBroken)
 -- qbx_core's own player.lua does not know about `honor`, so this resource is
 -- responsible for seeding the default the first time a character is loaded
 -- (mirrors the pattern other addon resources in this codebase use for their
--- own custom metadata fields, e.g. um_addiction / um_smallresources).
+-- own custom metadata fields, e.g. an addiction script / qbx_smallresources).
 -- ============================================================================
 
 AddEventHandler('QBCore:Server:PlayerLoaded', function(player)

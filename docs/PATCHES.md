@@ -6,7 +6,7 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
 (ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
-um_smallresources, um_clothing, lb-phone) to connect it to vice_hud. Copy the
+qbx_smallresources, dpclothing, lb-phone) to connect it to vice_hud. Copy the
 files into place, then make the one- or two-line edit shown below for that
 resource.
 
@@ -21,13 +21,13 @@ listens for a theme broadcast from vice_hud. Two are not: `speedlimits` and
 `zseatbelt` are **positioning hooks** (they let vice_hud's `/movehud` editor
 move that resource's own on-screen icon, which vice_hud otherwise has no way
 to reach since each one draws through its own NUI page rather than
-vice_hud's), and `um_smallresources` is a **functional conflict fix** (a
+vice_hud's), and `qbx_smallresources` is a **functional conflict fix** (a
 competing script that resets player stamina every 500ms, which pins vice_hud's
 stamina bar at full and makes it look broken).
 
 **Version pinned against:** ox_lib 3.32.3, ox_target 1.18.0, ox_inventory
 2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um,
-um_clothing 1.0.3.
+dpclothing 1.0.3.
 If your copy of any of these is on a different version, check the target
 file still looks like the snippet below before you paste the patch in — a
 big upstream version jump can move things around.
@@ -262,9 +262,9 @@ The other four cells are fixed clothing toggles, not inventory slots at
 all: top (12 o'clock) is bandana/mask, 10 o'clock is eyewear, 3 o'clock is
 hat, and the remaining cell (roughly 4 to 5 o'clock) is a plain hanger icon
 reserved for later, no behavior yet. Clicking the mask/eyewear/hat cells
-calls out to um_clothing (see the um_clothing section right below) through
+calls out to dpclothing (see the dpclothing section right below) through
 two new NUI callbacks, `getClothingState` and `toggleClothing`, and shows
-the item's current on/off state. Since um_clothing tracks worn items as ped
+the item's current on/off state. Since dpclothing tracks worn items as ped
 props/components rather than inventory items, these three cells have no
 underlying `InventorySlot` and don't consume inventory space, so the free
 cells now claim slots 8 through 11 (one per free cell) instead of the full
@@ -399,16 +399,19 @@ AddEventHandler('qbx_honor:client:syncHonor', pushHonor)
 
 Clothing toggle cells (mask/hat/eyewear, see the ITEMS wheel section above)
 need two new NUI callbacks. Add these near the existing `disarmWeapon`
-callback. Both are wrapped in `pcall`, so a server without the um_clothing
-patch applied just gets an empty state back instead of an NUI error:
+callback. Both are wrapped in `pcall`, so a server without the dpclothing
+patch applied just gets an empty state back instead of an NUI error. These
+assume your dpclothing install keeps its default resource name
+(`dpclothing`, its folder name); if you renamed the folder, change the
+`exports.dpclothing` calls below to match:
 
 ```lua
--- ITEMS wheel's mask/hat/eyewear cells aren't inventory items at all, um_clothing
+-- ITEMS wheel's mask/hat/eyewear cells aren't inventory items at all, dpclothing
 -- owns that state as worn ped props/components. pcall guards both callbacks so a
--- server without um_clothing running just gets an empty/unchanged state back
+-- server without dpclothing running just gets an empty/unchanged state back
 -- instead of an NUI error.
 local function getClothingWheelState()
-	local ok, state = pcall(function() return exports.um_clothing:GetClothingWheelState() end)
+	local ok, state = pcall(function() return exports.dpclothing:GetClothingWheelState() end)
 	return ok and state or {}
 end
 
@@ -417,7 +420,7 @@ RegisterNUICallback('getClothingState', function(_, cb)
 end)
 
 RegisterNUICallback('toggleClothing', function(role, cb)
-	pcall(function() exports.um_clothing:ToggleClothingWheelSlot(role) end)
+	pcall(function() exports.dpclothing:ToggleClothingWheelSlot(role) end)
 	cb(getClothingWheelState())
 end)
 ```
@@ -452,19 +455,19 @@ rather than dropping the build output in blind.
 Colors are exposed as CSS custom properties in `gta6-theme.scss`, so you can
 retheme without touching component code.
 
-## um_clothing
+## dpclothing
 
-Two exports appended to the end of `Client/Clothing.lua`, needed by the
-mask/hat/eyewear cells on ox_inventory's ITEMS wheel above. um_clothing
-tracks worn items as ped props (hat, glasses) and a drawable component
-(mask), toggled on and off, rather than as inventory items, so this is the
-only way ox_inventory's NUI can reach that state without knowing about
-drawable/prop IDs itself.
+[dpClothing+](https://forum.cfx.re/t/5158019) by dullpear. Two exports
+appended to the end of `Client/Clothing.lua`, needed by the mask/hat/eyewear
+cells on ox_inventory's ITEMS wheel above. dpclothing tracks worn items as
+ped props (hat, glasses) and a drawable component (mask), toggled on and
+off, rather than as inventory items, so this is the only way ox_inventory's
+NUI can reach that state without knowing about drawable/prop IDs itself.
 
-Copy into your `um_clothing/` install:
+Copy into your `dpclothing/` install:
 
 ```
-patches/um_clothing/Client/Clothing.lua
+patches/dpclothing/Client/Clothing.lua
 ```
 
 This is the full file, not a hand-edit snippet, since the only change is
@@ -576,18 +579,18 @@ vice_hud hook.
 
 No `fxmanifest.lua` edit needed.
 
-## um_smallresources (Stamina)
+## qbx_smallresources (Stamina)
 
-Not a theme patch — a **functional conflict fix**. `um_smallresources`
+Not a theme patch — a **functional conflict fix**. [Qbox-project/qbx_smallresources](https://github.com/Qbox-project/qbx_smallresources)
 bundles a `Stamina` script that calls `ResetPlayerStamina()` every 500ms to
 give infinite stamina. That pins `GetPlayerSprintStaminaRemaining()` at full
 faster than it can ever drain, so vice_hud's stamina bar reads "full"
 forever and looks broken — it isn't; there's just nothing for it to read.
 
-If you run `um_smallresources` alongside vice_hud, replace:
+If you run `qbx_smallresources` alongside vice_hud, replace:
 
 ```
-patches/um_smallresources/Stamina/client.lua
+patches/qbx_smallresources/Stamina/client.lua
 ```
 
 The original — the infinite-stamina version — sits beside it as

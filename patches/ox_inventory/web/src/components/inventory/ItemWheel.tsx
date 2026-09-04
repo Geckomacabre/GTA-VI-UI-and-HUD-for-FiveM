@@ -12,7 +12,7 @@ import { ClothingRole, ClothingState, fetchClothingState, onToggleClothing } fro
  * Reuses WEAPON_CELLS' exact geometry (same eight measured positions, same
  * gta6-wheel-slot chrome). Five cells are still plain 'free' inventory slots
  * for ordinary carried items, same as before. Three are fixed clothing
- * toggles (bandana/mask, hat, eyewear) wired to um_clothing, which owns
+ * toggles (bandana/mask, hat, eyewear) wired to dpclothing, which owns
  * worn-prop state as ped components, not inventory items — so, like
  * WeaponWheel's 'fist' cell, these aren't backed by a real inventory slot at
  * all. The remaining cell (~4-5 o'clock) is a static hanger icon reserved
@@ -73,7 +73,7 @@ const ItemWheel: React.FC<Props> = ({ inventory }) => {
 
   const [hovered, setHovered] = useState<number | null>(null);
 
-  // Lives in um_clothing (ped props/components), not in inventory.items, so
+  // Lives in dpclothing (ped props/components), not in inventory.items, so
   // it can't be derived from `inventory` like every other cell here — it has
   // to be fetched and kept in local state instead.
   const [clothing, setClothing] = useState<ClothingState>({});

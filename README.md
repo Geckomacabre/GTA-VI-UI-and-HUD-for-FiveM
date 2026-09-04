@@ -58,7 +58,7 @@ GTA VI Resources/
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
 │                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
-│                  zseatbelt, um_smallresources, um_clothing, qbx_core), plus
+│                  zseatbelt, qbx_smallresources, dpclothing, qbx_core), plus
 │                  a standalone lb-phone Wallet app rebrand that doesn't touch
 │                  vice_hud at all. See docs/PATCHES.md for exact install
 │                  steps per resource.
@@ -144,7 +144,7 @@ Overlays for resources you install separately:
   quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
   installed) a hard 17-slot pocket cap that lifts while a bag is carried. The
   items wheel also carries three fixed clothing toggles (bandana/mask,
-  eyewear, hat) that call into the `um_clothing` patch below, plus a hanger
+  eyewear, hat) that call into the `dpclothing` patch below, plus a hanger
   icon cell held in reserve. See the
   [weapon wheel](docs/screenshots/weapon-wheel.png) and
   [items wheel](docs/screenshots/item-wheel.png) screenshots. Not part of
@@ -152,9 +152,9 @@ Overlays for resources you install separately:
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
-- **`um_smallresources`**: not theming, a functional fix for a stamina
+- **`qbx_smallresources`**: not theming, a functional fix for a stamina
   script in this pack that conflicts with vice_hud's stamina bar.
-- **`um_clothing`**: two exports appended to the end of the file so
+- **`dpclothing`**: two exports appended to the end of the file so
   ox_inventory's items wheel can toggle a worn mask/hat/glasses on and off
   and read whether each is currently on. Needed for the ox_inventory patch's
   clothing cells above to do anything.
@@ -212,7 +212,7 @@ once it's installed.
 These are not resources, so do not `ensure` a `patches/` folder. Follow
 [`docs/PATCHES.md`](docs/PATCHES.md), which walks through each of `ox_lib`,
 `ox_target`, `ox_inventory`, `qb-menu`, `qb-input`, `speedlimits`,
-`zseatbelt`, `um_smallresources`, `um_clothing`, `qbx_core`, and `lb-phone`
+`zseatbelt`, `qbx_smallresources`, `dpclothing`, `qbx_core`, and `lb-phone`
 individually: which files to copy in, and the exact manifest/HTML edits
 (where one is needed). Every one of these needs an existing install of the
 resource it patches; none of them work standing alone.
@@ -294,7 +294,7 @@ upstream license:
 | `ox_inventory` | GPL-3.0 |
 | `qb-menu`, `qb-input` | GPL-3.0 |
 | `speedlimits`, `zseatbelt` | MIT |
-| `um_smallresources` | GPL-3.0 |
+| `qbx_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
 | `qbx_core` | GPL-3.0 |
 | ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
