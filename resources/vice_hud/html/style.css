@@ -176,6 +176,25 @@
     --shadow-sm: 0 0.12cqh 0.34cqh rgba(0, 0, 0, 0.40);
     --shadow-md: 0 0.25cqh 0.70cqh rgba(0, 0, 0, 0.46);
 
+    /* The edge every panel surface carries.
+       MATCHED TO #map-frame, deliberately: the minimap's border is the one
+       edge in this HUD that always read correctly, so it is the reference the
+       rest copy -- same near-white, same 0.30 alpha, same 0.085cqw width. An
+       earlier pass used rgba(255,255,255,0.10) at 0.055cqw (roughly a third
+       the opacity, and thinner), which is why panels next to the map looked
+       edgeless by comparison.
+
+       Drawn as an INSET ring rather than a border so it costs no layout width
+       -- a panel gains an edge without changing size or shifting its
+       neighbours. #map-frame itself keeps a real border, because it frames the
+       game's own minimap render rather than a background of its own.
+
+       It is a variable rather than a repeated literal because the ring used to
+       be written out inside .plate only: every surface that wasn't .plate
+       quietly went without one, and #nav-turn -- which IS .plate -- lost it
+       again by setting its own box-shadow over the top. */
+    --hairline: inset 0 0 0 0.085cqw rgba(236, 236, 240, 0.30);
+
     --text:      #f4f4f2;
     --text-dim:  #c2c2c6;
     --ink-shadow: 0 0.10cqh 0.22cqh rgba(0, 0, 0, 0.88);
@@ -293,7 +312,7 @@
         var(--plate);
     box-shadow:
         var(--shadow-md),
-        inset 0 0 0 0.055cqw rgba(255, 255, 255, 0.10),
+        var(--hairline),
         inset 0 0.09cqh 0 rgba(255, 255, 255, 0.055);
 }
 /* Same reason as .glass's: the sheen is a background layer here rather than a
@@ -407,12 +426,12 @@ html, body {
 .sic.has-badge { background: none; border: none; }
 .sic.has-badge img { width: 100%; height: 100%; border-radius: 50%; display: block; }
 
-/* O2 badge: a flat dark disc with a mint "O2" glyph -- no light ring, unlike
-   the icon badges above, matching the reference crop exactly. font-size
-   inherits .sic's, sub just needs to not go full-size or "O2" reads as "O 2". */
+/* O2 badge: text glyph, but otherwise .sic's OWN disc-plus-ring (not
+   overridden away like a prior version of this did) -- that ring is what
+   makes it read as the same badge FAMILY as the has-badge icons above
+   rather than a flatter, different-looking disc next to them. Only the
+   glyph colour/weight are this badge's own. */
 .o2-badge {
-    background: rgba(45, 46, 48, 0.92);
-    border: none;
     color: #a3c6c4;
     font-weight: 700;
 }
@@ -652,23 +671,9 @@ html, body {
     flex-shrink: 0;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
-.tell svg {
-    width: 74%;
-    height: 74%;
-    display: block;
-    fill: none;
-    stroke: #fff;
-    stroke-width: 1.9;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-/* The microphone capsule and the wheels read better filled than outlined. */
-.tell svg rect,
-.tell svg circle { fill: #fff; stroke: none; }
-/* camera/weapon/person/people/vehicle are cropped straight out of the actual
-   reference screenshots (see TELL_IMG in app.js), not inline SVG --
-   object-fit: contain since their source crops aren't square like hanger's
-   (the one remaining hand-drawn icon) 24x24 viewBox. */
+/* All six are cropped straight out of the actual reference screenshots (see
+   TELL_IMG in app.js) -- object-fit: contain since their source crops aren't
+   square. */
 .tell img {
     width: 74%;
     height: 74%;
@@ -821,7 +826,7 @@ html, body {
        cleaner reference shots it is not there, and it was the second thing
        (after the warm --plate fill) making these panels look like a different
        component from the nav bar they stack with. */
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), var(--hairline);
 }
 /* BOTH nav elements are .slot ONLY so they inherit the fade behaviour. Neither
    is a panel: #nav-popup is a transparent flex wrapper whose child #nav-turn
@@ -1383,7 +1388,7 @@ html, body {
     width: 23cqw;
     background: var(--plate-soft);
     border-radius: calc((var(--r-md)) * var(--rad-wanted, 1));
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm), var(--hairline);
     padding: 1.5cqh 1.1cqw 1.35cqh;
     display: flex;
     flex-direction: column;
@@ -1416,7 +1421,7 @@ html, body {
     position: absolute;
     right: 0.25cqw;
     bottom: 5.24cqh;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), var(--hairline);
     display: flex;
     flex-direction: row-reverse;
     align-items: flex-end;
@@ -1424,6 +1429,16 @@ html, body {
     padding: 0.9cqh 0.5cqw 0.9cqh 1.3cqw;
     background: rgba(18, 18, 22, 0.82);
     border-radius: calc((0.4cqw) * var(--rad-honor, 1));
+}
+/* Config.Honor.showValue = false: no copy column at all, so the row gap and
+   the copy-side padding both have to go -- otherwise the box keeps the width
+   the text used to occupy and the portrait sits off to one side of it. The
+   class is toggled in onHonor() (app.js) off whether either line has text,
+   not off showValue directly, so a caller that sends a value but no reason
+   still gets the right box. */
+#honor.bare {
+    gap: 0;
+    padding: 0.9cqh 0.5cqw;
 }
 #honor-copy {
     align-items: flex-end;
@@ -1443,28 +1458,47 @@ html, body {
     flex-shrink: 0;
 }
 #honor-mug img { width: 100%; height: 100%; object-fit: cover; border-radius: calc((0.3cqw) * var(--rad-honor, 1)); display: block; }
-#honor-badge {
+/* 1.0 * --w, not the 1.35 a font-size multiplier would suggest -- this is a
+   raw <img>, and an emoji glyph at that font-size carries its own internal
+   margin that a bare image doesn't, so reusing the old emoji constant here
+   drew the badge oversized and spilling out of the mug frame. */
+#honor-badge-wrap {
     position: absolute;
     left: 50%;
     bottom: -1.1cqh;
     transform: translateX(-50%);
-    font-size: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
-    line-height: 1;
+    width: calc((calc(1.0 * var(--w))) * var(--fs-honor, 1));
+    height: calc((calc(1.0 * var(--w))) * var(--fs-honor, 1));
+}
+#honor-badge {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
-/* Unrepairable floor (qbx_honor's honorBroken): the badge desaturates and a
-   crack overlay draws on top, permanently -- see onHonor() in app.js. Stacks
-   with, not instead of, the drop-shadow above. */
+/* Unrepairable floor: desaturated on top of the crack overlay below, same
+   "spent, not merely low" treatment ox_inventory's/qbx_relog's own honor
+   chips use (their .broken/.honor-broken rules) -- see onHonor() in app.js
+   for the class toggle. Combined into one filter list, not two separate
+   `filter` declarations, since the second would just replace the first. */
 #honor-badge.broken {
-    filter: grayscale(1) brightness(0.72) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    filter: grayscale(1) brightness(0.75) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
+/* Unrepairable floor (qbx_honor's honorBroken): the badge swaps to the
+   terrible-deed face and a crack overlay draws on top, permanently -- see
+   onHonor() in app.js. 65% of the badge, centred ON IT (not independently
+   anchored to the mug like the old flat 100%-size version was) -- at full
+   size the crack read as a solid patch blotting out the face rather than a
+   scratch across it. Same idea as #honor-pop-crack's 0.72 ratio below. */
 #honor-crack {
     position: absolute;
     left: 50%;
-    bottom: -1.1cqh;
-    transform: translateX(-50%);
-    width: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
-    height: calc((calc(1.35 * var(--w))) * var(--fs-honor, 1));
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 65%;
+    height: 65%;
     pointer-events: none;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
@@ -1482,7 +1516,7 @@ html, body {
     position: absolute;
     left: 0.25cqw;
     bottom: 5.24cqh;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), var(--hairline);
     display: flex;
     flex-direction: row;
     align-items: flex-end;
@@ -1504,10 +1538,17 @@ html, body {
 /* -----------------------------------------------------------------------------
    Contextual action prompts (bottom-right)
    -------------------------------------------------------------------------- */
+/* Sized/positioned in --w (the aspect-independent reference unit, see its
+   definition above), NOT raw cqw. This block used cqw for the inset, the
+   row gap and the whole glyph while the LABEL was already on --w -- so on
+   anything wider than 16:9 the glyph and the inset grew while the text
+   didn't, throwing off both where the row sat and how it was proportioned.
+   Everything here scales off one unit now, so it reads identically at 16:9
+   and on ultrawide. */
 #prompts {
     position: absolute;
-    right: 2cqw;
-    bottom: 7cqh;
+    right: calc(2 * var(--w));
+    bottom: 4cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -1516,21 +1557,33 @@ html, body {
 .prompt {
     display: flex;
     align-items: center;
-    gap: 0.75cqw;
+    gap: calc(0.58 * var(--w));
     font-size: calc((calc(1.1 * var(--w))) * var(--fs-prompts, 1));
-    font-weight: var(--fw-prompts, 700);
-    letter-spacing: var(--ls-prompts, 0.08em);
-    color: #f0f0ee;
-    text-transform: uppercase;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    font-weight: var(--fw-prompts, 600);
+    letter-spacing: var(--ls-prompts, 0);
+    color: #f4f0e8;
+    /* A hard 1px black outline, not just a soft drop shadow -- an
+       interaction prompt has to stay readable against a white wall and a
+       night street alike, and a blurred shadow alone disappears on light
+       backgrounds. Same treatment the reference textui uses. */
+    text-shadow:
+        -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+        0 0 0.1cqh rgba(0, 0, 0, 0.95), 0 2px 0.35cqh rgba(0, 0, 0, 0.65);
 }
+/* A rounded-SQUARE keycap, not a circle: a circle reads as a gamepad face
+   button, which is wrong for a keyboard key and forced the wide-label case
+   below into being a separate shape. One shape for both now, just wider
+   when the label needs it. */
 .glyph {
-    min-width: calc((1.7cqw) * var(--ic-prompts, 1));
-    height: calc((1.7cqw) * var(--ic-prompts, 1));
-    border-radius: 50%;
-    background: rgba(240, 240, 238, 0.95);
-    box-shadow: var(--shadow-sm);
-    color: #17181b;
+    min-width: calc((1.46 * var(--w)) * var(--ic-prompts, 1));
+    height: calc((1.46 * var(--w)) * var(--ic-prompts, 1));
+    border-radius: calc((0.26 * var(--w)) * var(--rad-prompts, 1));
+    background: #f4f0e8;
+    box-shadow:
+        0 0 1px rgba(0, 0, 0, 0.95),
+        0 0 2px rgba(0, 0, 0, 0.9),
+        0 2px 3px rgba(0, 0, 0, 0.45);
+    color: #212529;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1538,17 +1591,63 @@ html, body {
     font-weight: var(--fw-prompts, 700);
     line-height: 1;
 }
-/* A multi-character label needs a keycap, not a circle, or it overflows. */
+/* A multi-character label ("SPACE", "MOUSE1") just needs room to breathe --
+   same keycap shape as above, only wider. */
 .glyph.wide {
     width: auto;
-    border-radius: calc((0.28cqw) * var(--rad-prompts, 1));
-    padding: 0 0.45cqw;
+    padding: 0 calc(0.35 * var(--w));
     font-size: calc((calc(0.72 * var(--w))) * var(--fs-prompts, 1));
+}
+/* Mouse buttons are drawn as the button itself (see MOUSE_GLYPHS in app.js).
+   The cap keeps its size and shape -- only the contents change from a letter
+   to a picture -- so a mouse prompt still lines up with the key caps above and
+   below it in a multi-row prompt stack. 72% leaves the same optical margin the
+   lettered caps get from their font metrics; filling the cap edge to edge
+   makes the mouse read noticeably larger than a letter beside it. */
+.glyph.mouse img {
+    width: 72%;
+    height: 72%;
+    object-fit: contain;
+    display: block;
 }
 .glyph.pad-a { background: #6ec06e; color: #10240f; }
 .glyph.pad-b { background: #d9585c; color: #2a0d0e; }
 .glyph.pad-x { background: #6fa8dc; color: #0b1a26; }
 .glyph.pad-y { background: #e8c95a; color: #2a2208; }
+
+/* Hold-to-confirm prompts (client.lua's ShowActionPrompt opts.hold) get a
+   ring that fills clockwise AROUND the glyph as the key is held -- matches
+   the real RDR2/GTA VI-trailer hold-prompt look (a circle closing around
+   the button icon), not a bar under the label. --prompt-frac is written
+   directly per promptProgress push -- see app.js's onPromptProgress for why
+   that's a direct style write rather than a renderPrompts() rebuild. */
+.prompt-glyph-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.prompt-glyph-wrap.holdable {
+    padding: calc((0.16 * var(--w)) * var(--ic-prompts, 1));
+    border-radius: calc((0.38 * var(--w)) * var(--rad-prompts, 1));
+}
+.prompt-glyph-wrap.holdable::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Slightly rounder than the keycap it wraps, so the fill reads as a
+       track AROUND the key rather than a second key behind it -- matching
+       the keycap's own switch from a circle to a rounded square. */
+    border-radius: calc((0.38 * var(--w)) * var(--rad-prompts, 1));
+    background: conic-gradient(
+        var(--nav-accent, var(--nav-accent-gender-default, #47aba7)) calc(var(--prompt-frac, 0) * 360deg),
+        rgba(240, 240, 238, 0.28) 0deg
+    );
+    /* No transition -- client.lua's poll thread already pushes a frac every
+       tick while a key is held, a CSS transition on top of that would just
+       add lag between the real hold progress and what's drawn. */
+}
+.prompt-glyph-wrap .glyph { position: relative; z-index: 1; }
 
 /* -----------------------------------------------------------------------------
    Aim crosshair
@@ -1666,6 +1765,43 @@ html, body {
 #cross-kill.kill-white {
     background-image: url('icons/hitmark_white.png');
     filter: drop-shadow(0 0 0.3cqh rgba(242, 242, 239, 0.6));
+}
+
+/* -----------------------------------------------------------------------------
+   Third eye — 2+-option interact reticle
+   -----------------------------------------------------------------------------
+   Screen centre like #crosshair above, but a SEPARATE element -- that one is
+   gated to an armed weapon actually being aimed (see its own header
+   comment), and this has to show while unarmed too, since opening a
+   vehicle's interact menu is usually not done with a gun out. The actual
+   eye glyph (index.html's #third-eye-svg) is ox_target's own pre-vice_hud
+   icon restored, not an invented shape -- styled here to match the same
+   cream fill + hard dark outline every other prompt in this file uses, so
+   it reads as part of the same system rather than a different one. Fed by
+   exports.vice_hud:SetThirdEyeActive(bool), which ox_target only calls
+   while its own eye keybind (Left Alt by default) is actually held -- see
+   that resource's eyeKeyHeld.
+   -------------------------------------------------------------------------- */
+#third-eye {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+#third-eye.hidden { display: none !important; }
+#third-eye-svg {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(1.6 * var(--w));
+    height: calc(1.6 * var(--w));
+    transform: translate(-50%, -50%);
+    fill: #f4f0e8;
+    filter:
+        drop-shadow(0 0 0.1cqh rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0.1cqh 0.3cqh rgba(0, 0, 0, 0.6));
 }
 
 /* -----------------------------------------------------------------------------
@@ -1964,7 +2100,7 @@ html, body {
     border-radius: calc(0.55 * var(--w) * var(--rad-navpopup, 1));
     /* Clips the full-bleed tile to the bar's rounded corner. */
     overflow: hidden;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md), var(--hairline);
 }
 #nav-turn-copy {
     display: flex;
@@ -2797,8 +2933,9 @@ html, body {
    Honor change indicator
    -------------------------------------------------------------------------- */
 /* The reference shows an honor change as a sign and a face in the middle of the
-   screen — "-😈" or "+😇" — not as a titled panel. The corner mugshot is a
-   separate, PERSISTENT readout of where your honor currently stands. */
+   screen — "-" bad-deed art or "+" good-deed art — not as a titled panel. The
+   corner mugshot is a separate, PERSISTENT readout of where your honor
+   currently stands. */
 #honor-pop {
     position: absolute;
     left: 50%;
@@ -2824,19 +2961,28 @@ html, body {
 #honor-pop.up   #honor-pop-sign { color: #bfe3c8; }
 #honor-pop.down #honor-pop-sign { color: #e3a9bf; }
 
-/* Unrepairable floor: no sign (see index.html's comment), face desaturated
-   with a crack overlaid, same treatment as the corner badge's #honor-badge/
-   #honor-crack. em-sized so it tracks #honor-pop's own font-size without
-   repeating that calc(). */
+/* Unrepairable floor: no sign (see index.html's comment), face swapped for
+   the terrible-deed art with a crack overlaid, same treatment as the corner
+   badge's #honor-badge/#honor-crack (see onHonorPop() in app.js). em-sized so
+   it tracks #honor-pop's own font-size without repeating that calc(). */
+/* 0.75em, not the 1em a font-size box would suggest for a text glyph -- this
+   is a raw <img>, and an emoji glyph carries its own internal margin that a
+   bare image doesn't, so 1em here drew the face oversized next to the sign.
+   #honor-pop-crack keeps the same 0.72 ratio to the face it overlays. */
 #honor-pop-face-wrap { position: relative; display: inline-flex; }
-#honor-pop-face.broken { filter: grayscale(1) brightness(0.72); }
+#honor-pop-face {
+    width: 0.75em;
+    height: 0.75em;
+    object-fit: contain;
+    display: block;
+}
 #honor-pop-crack {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 0.72em;
-    height: 0.72em;
+    width: 0.54em;
+    height: 0.54em;
     pointer-events: none;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
 }
@@ -3325,6 +3471,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 
 #lap-cp-plate {
     background: rgba(20, 20, 22, 0.55);
+    box-shadow: var(--hairline);
     border-radius: calc(0.3 * var(--w));
     padding: 0.55cqh calc(0.7 * var(--w));
     display: flex;
@@ -3456,6 +3603,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 .interact-badge {
     width: calc(0.85 * var(--w));
     height: calc(0.85 * var(--w));
+    box-shadow: var(--hairline);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -3473,8 +3621,13 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 /* -----------------------------------------------------------------------------
    World action prompt
    -----------------------------------------------------------------------------
-   Fixed screen position, not truly world-anchored — see the comment on
-   #world-actions in index.html for why. First pass, not pixel-measured.
+   left/top below are the FALLBACK position (a caller that never passes
+   coords to ShowWorldActions, e.g. qbx_vehiclekeys's Slim Jim/Smash Window
+   today, stays on this fixed spot exactly as before). A caller that DOES
+   pass coords gets those overridden every frame by inline styles from
+   onWorldActionsPos in app.js (client_overlays.lua's world-anchoring
+   thread) -- inline style always wins over the rule below, so no extra
+   specificity/!important is needed to switch between the two.
    -------------------------------------------------------------------------- */
 #world-actions {
     position: absolute;
@@ -3486,6 +3639,18 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     pointer-events: none;
 }
 #world-actions.hidden { display: none !important; }
+/* GetScreenCoordFromWorldCoord reported the anchored point is behind the
+   camera this frame -- hide without touching the row list itself, since
+   it'll likely be back on-screen again within a frame or two as the camera
+   turns. Separate from .hidden, which is the caller explicitly closing it. */
+#world-actions.wa-offscreen { display: none !important; }
+
+/* Icon-only at range, full label once close enough to actually interact --
+   see WA_COMPACT_DISTANCE in client_overlays.lua for the threshold this is
+   driven by. The circle badge (.wa-btn) stays either way; only the text
+   label disappears, so approaching a prop reads as the same marker growing
+   a label rather than two different things swapping. */
+#world-actions.wa-compact .wa-label { display: none; }
 
 .wa-row {
     display: flex;
@@ -3506,6 +3671,12 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     background: rgba(0, 0, 0, 0.35);
 }
 .wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* Mouse button (see MOUSE_GLYPHS in app.js). INVERTED, unlike the same image
+   in the prompt stack: the art is black line work, which reads correctly on
+   the prompt's light key cap but would vanish into this button's dark fill.
+   60% matches the pad shapes above so a mouse and a face button are the same
+   size in the same circle. */
+.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; filter: invert(1); }
 /* Keyboard (or an unmapped pad button, e.g. a shoulder/trigger/D-pad bind):
    the resolved key text sits plainly in the same circle rather than a
    guessed shape -- see WA_PAD_SHAPE in app.js for which pad letters get a
@@ -3592,6 +3763,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     transform: translate(-50%, -50%);
     width: calc(1.6 * var(--w));
     height: calc(1.6 * var(--w));
+    box-shadow: var(--hairline);
     border-radius: 50%;
     background: rgba(20, 20, 22, 0.75);
     border: 1.5px solid rgba(255, 255, 255, 0.5);

@@ -383,8 +383,13 @@ console.log('\n-- one glass, shared --');
   // each is the one that would quietly turn it back into a grey box.
   ok(/\.plate \{[\s\S]*?linear-gradient\(118deg/.test(css),
      '.plate carries the diagonal sheen from #vehicle::after');
-  ok(/\.plate \{[\s\S]*?inset 0 0 0 0\.055cqw/.test(css),
+  // The ring itself now lives in the --hairline token (every panel surface
+  // carries it, not just .plate), so accept either the token or the literal --
+  // what matters is that .plate still has an inset ring, not how it spells it.
+  ok(/\.plate \{[\s\S]*?(var\(--hairline\)|inset 0 0 0 0\.055cqw)/.test(css),
      'and the hairline INSET ring, which costs no layout width unlike a border');
+  ok(/--hairline:\s*inset 0 0 0 0\.085cqw rgba\(236, 236, 240, 0\.30\)/.test(css),
+     'and --hairline is #map-frame\'s edge exactly -- that border is the reference');
   ok(!/\.plate::before/.test(css),
      'and NO specular cap: that is what separates the plate from the glass');
 
@@ -784,7 +789,11 @@ ok(/0\.88/.test(plate), 'the plate is dense enough to carry the panel on its own
 // The plate's edge, not the glass's. It is an INSET ring rather than a border
 // so it costs no layout width -- which is what lets the panel keep an exact
 // dragged width while still having a visible edge.
-ok(/inset 0 0 0 0\.055cqw/.test(cs.boxShadow), 'plate hairline inset ring present', JSON.stringify(cs.boxShadow));
+// jsdom does not resolve var() inside a shorthand, so match either the token
+// reference or the literal it expands to; the token's own value is asserted
+// against the stylesheet text above.
+ok(/inset 0 0 0 0\.055cqw|var\(--hairline\)/.test(cs.boxShadow),
+   'plate hairline inset ring present', JSON.stringify(cs.boxShadow));
 ok(cs.borderRadius === 'calc(1.5 * var(--w))', 'large radius, in the height-relative unit', cs.borderRadius);
 
 console.log('\n' + (fails ? fails + ' FAILING' : 'all checks passed'));

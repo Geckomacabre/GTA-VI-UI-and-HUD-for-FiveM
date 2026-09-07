@@ -31,10 +31,13 @@
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
         </div>
         <!-- Its own row, not a stamina-bar reskin -- see onStatus() in app.js
-             and readOxygen() in client.lua for when this shows. Badge is text
-             ("O2"), not an image: the reference badge is a plain dark disc
-             with a coloured glyph, same shape family as the others but no
-             icon art exists for it. -->
+             and readOxygen() in client.lua for when this shows. Badge is
+             text ("O2"), not an image: no PNG icon art exists for oxygen in
+             the reference set the other three badges (heart/stamina/eye)
+             come from. Uses .sic's OWN disc-plus-ring (not the flat,
+             ring-less disc a prior version of this had) so it actually
+             matches those three's size/depth instead of reading as a
+             different, flatter badge next to them. -->
         <div class="srow hidden" id="s-oxygen">
             <div class="sic o2-badge" aria-hidden="true">O<sub>2</sub></div>
             <div class="strack"><div class="sfill" style="width:100%"></div></div>
@@ -294,12 +297,12 @@
 
          Once qbx_honor's unrepairable floor has been hit, this still fires on
          every change (see onHonorPop() in app.js) but with NO sign -- broken
-         isn't a direction -- and the face rendered grey/cracked like the
-         corner badge, via the same .broken class + crack overlay. -->
+         isn't a direction -- and the face swapped for the terrible-deed art,
+         same as the corner badge, with the crack overlay on top. -->
     <div id="honor-pop" class="hidden" aria-hidden="true">
         <span id="honor-pop-sign"></span>
         <span id="honor-pop-face-wrap">
-            <span id="honor-pop-face"></span>
+            <img id="honor-pop-face" alt="" class="hidden">
             <svg id="honor-pop-crack" class="hidden" viewBox="0 0 40 40" aria-hidden="true">
                 <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
                       fill="none" stroke="#0a0a0a" stroke-width="2.6"
@@ -315,19 +318,28 @@
     <div id="honor" class="hidden">
         <div id="honor-mug">
             <img id="honor-img" alt="">
-            <span id="honor-badge"></span>
-            <!-- Shown only once qbx_honor reports the unrepairable floor has
-                 been hit (see onHonor() in app.js) -- overlaid on top of
-                 whatever tier badge is drawing, which is also greyscaled by
-                 the same flag. Never removed once shown for this session. -->
-            <svg id="honor-crack" class="hidden" viewBox="0 0 40 40" aria-hidden="true">
-                <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
-                      fill="none" stroke="#0a0a0a" stroke-width="2.6"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
-                      fill="none" stroke="#dcdcdc" stroke-width="1.1"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <!-- Badge + crack share this wrapper so the crack can be centred
+                 ON THE BADGE ITSELF (top/left 50%, see style.css) regardless
+                 of the badge's own size, instead of both independently
+                 anchoring to the mug and needing to stay in lockstep. -->
+            <div id="honor-badge-wrap">
+                <img id="honor-badge" alt="" class="hidden">
+                <!-- Shown only once qbx_honor reports the unrepairable floor
+                     has been hit (see onHonor() in app.js) -- overlaid on top
+                     of the badge, which is swapped to the terrible-deed face
+                     by the same flag. Never removed once shown for this
+                     session. Sized smaller than the badge (see style.css) --
+                     full-size read as a solid patch blotting out the face
+                     rather than a crack across it. -->
+                <svg id="honor-crack" class="hidden" viewBox="0 0 40 40" aria-hidden="true">
+                    <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                          fill="none" stroke="#0a0a0a" stroke-width="2.6"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                          fill="none" stroke="#dcdcdc" stroke-width="1.1"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
         </div>
         <div id="honor-copy">
             <span id="honor-title"></span>
@@ -441,6 +453,28 @@
         <div id="cross-kill" aria-hidden="true"></div>
     </div>
 
+    <!-- Third eye — the 2+-option interact reticle ----------------------------
+         Screen centre, like #crosshair above, but a SEPARATE element: that
+         one only shows while an armed weapon is being aimed (see its own
+         comment), and this has to show while unarmed too — opening a
+         vehicle's interact menu is usually not done with a gun out. Fed by
+         exports.vice_hud:SetThirdEyeActive(bool), driven from
+         ox_target/client/main.lua's driveUi -- ONLY while the player is
+         actually holding the third-eye keybind (Left Alt by default, see
+         that file's eyeKeyHeld) AND 2+ options have resolved from an actual
+         aim hit (never proximity alone -- see probeOptionCount). Neither
+         condition alone shows it.
+
+         The eye glyph itself is the exact SVG ox_target's OWN pre-vice_hud
+         web/index.html shipped (Google's Material Icons "visibility" glyph,
+         Apache-2.0) -- restored here rather than invented fresh, for visual
+         continuity with the eye this replaces. -->
+    <div id="third-eye" class="hidden" aria-hidden="true">
+        <svg id="third-eye-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 4C7 4 2.73 7.11 1 11.5 2.73 15.89 7 19 12 19s9.27-3.11 11-7.5C21.27 7.11 17 4 12 4zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+        </svg>
+    </div>
+
     <!-- Race lap / checkpoint HUD --------------------------------------------
          Fed entirely by whatever race resource is running -- sk_streetkings
          today, via exports.vice_hud:SetLapTimer -- the same "this resource
@@ -513,13 +547,13 @@
      rather than forcing this through that one: this is 1-3 big, immediate
      choices at a glance, not a list to browse.
 
-     Simplification worth flagging: this sits at a FIXED screen position
-     rather than being projected onto the world point it's about (the door
-     you're actually looking at). True world-anchoring needs
-     GetScreenCoordFromWorldCoord recomputed every frame as the camera
-     moves, which isn't something that can be verified without a live game
-     to check the projection math against — see the project notes. Fed by
-     exports.vice_hud:ShowWorldActions / HideWorldActions. -->
+     World-anchored when the caller passes coords to ShowWorldActions:
+     client_overlays.lua's own per-frame thread recomputes
+     GetScreenCoordFromWorldCoord and app.js's onWorldActionsPos applies it
+     as inline left/top, overriding the CSS fixed position below (see both
+     files' own comments). A caller that omits coords (qbx_vehiclekeys's
+     Slim Jim/Smash Window today) still gets that original fixed position,
+     unchanged. Fed by exports.vice_hud:ShowWorldActions / HideWorldActions. -->
 <div id="world-actions" class="hidden" aria-hidden="true"></div>
 
 <!-- Lockpick check ----------------------------------------------------------

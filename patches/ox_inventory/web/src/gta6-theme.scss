@@ -523,40 +523,102 @@ $gta6-qs-h: ph(12.46);
 }
 
 // ---------------------------------------------------------------------------
-// Honor standing (bottom-right) — mirrors the quickslot footer's proportions,
-// just a standalone badge rather than a slot footer.
+// Stock amount input, hidden.
+//
+// InventoryControl.tsx is ox_inventory's DEFAULT UI: a number field plus
+// Use/Give/Close buttons. This reskin never styled it, so it rendered as a
+// stray unstyled "0" pill in the bottom-right corner -- the exact spot the
+// honor chip below occupies. The wheel drives everything through drag/drop and
+// keybinds, so the field has nothing to do here.
+//
+// Consequence worth knowing: that field set the split-stack amount, and with
+// it gone the amount stays 0, which ox_inventory reads as "move the whole
+// stack". Drag a stack and it all moves.
+// ---------------------------------------------------------------------------
+.inventory-control {
+  display: none;
+}
+
+// ---------------------------------------------------------------------------
+// Honor standing (bottom-right) — a pill (emoji + value), not a plain value
+// box. Recipe mirrors qbx_relog's own honor chip (html/style.css's `.honor`
+// block): both are qbx_honor's standing rendered as a small chip built from
+// the surrounding UI's own translucent surface rather than a new fill, so it
+// reads as part of the HUD instead of a tooltip stuck on top of it. This is
+// that same chip's single-character case, since the wheel only ever shows
+// whoever you're currently playing.
 // ---------------------------------------------------------------------------
 .gta6-honor {
   position: absolute;
   right: 1.75%;
-  top: 88.6%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: ph(3.2);
-  min-width: pw(4);
-  padding: 0 pw(1.2);
-  border-radius: 3px;
-  background: var(--gta6-footer-bg);
-  border: 1px solid var(--gta6-slot-border);
+  top: 84.5%;
   pointer-events: none;
 }
 
-.gta6-honor-value {
-  font-size: pw(1.1);
-  font-weight: 700;
-  color: var(--gta6-text);
-  line-height: 1;
+// Mirrors vice_hud's #honor-mug: a PORTRAIT rectangle, not a square, with the
+// same warm gradient behind an absent mugshot and the same hairline edge. The
+// proportions there are 4.25% of width by 7.74% of height; pw()/ph() are this
+// resource's equivalents of those two axes.
+.gta6-honor-mug {
+  position: relative;
+  width: pw(4.25);
+  height: ph(7.74);
+  border-radius: pw(0.3);
+  background: linear-gradient(155deg, #8d7f74, #4a423c);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  overflow: visible;
 }
 
-// Tint the badge toward the reached tier, same colours qbx_honor already uses
-// for its own toast (see GetBadgeTier in qbx_honor/client/main.lua).
-.gta6-honor-angel .gta6-honor-value {
-  color: #ffe9a8;
+.gta6-honor-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: pw(0.3);
+  display: block;
 }
 
-.gta6-honor-devil .gta6-honor-value {
-  color: #ff6b6b;
+// The face hangs off the bottom edge, centred, exactly as #honor-badge does --
+// which is why the mug above is overflow: visible. pw(1) is the same unit
+// vice_hud sizes it in: its --w is "one reference cqw" (1.7778cqh), and pw()
+// is this resource's identical width%-to-vh conversion, so pw(1) and
+// `1.0 * var(--w)` are the same number of pixels at any resolution.
+.gta6-honor-badge-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: -#{ph(1.1)};
+  transform: translateX(-50%);
+  width: pw(1);
+  height: pw(1);
+}
+
+.gta6-honor-badge {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+// 65% of the badge and centred on it, matching vice_hud's #honor-crack: at
+// full size the crack reads as a solid patch blotting the face out rather
+// than a scratch across it.
+.gta6-honor-crack {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 65%;
+  height: 65%;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+// honorBroken latches at qbx_honor's unrepairable floor and never clears.
+// vice_hud greys its badge from then on; same treatment here, so a spent
+// standing reads as spent in both places rather than merely low.
+.gta6-honor-badge.gta6-honor-broken {
+  filter: grayscale(1) brightness(0.75) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
 // ---------------------------------------------------------------------------

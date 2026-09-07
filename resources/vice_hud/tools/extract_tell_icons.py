@@ -1,12 +1,12 @@
 """Crop the weapon/person/people/vehicle tell icons out of screenshots of the
-"GRAND THEFT AUTO VI: HUD DEFINITIONS" reference sheet, instead of hand,
+"GRAND THEFT AUTO VI: HUD DEFINITIONS" reference sheet, instead of hand-
 tracing SVG paths by eye (which is how the earlier drafts drifted off the
-reference, see BUCKME_HANDOFF.md sections 2a/2b).
+reference -- see BUCKME_HANDOFF.md sections 2a/2b).
 
 Each source screenshot is one red-plate badge (icon + circular red plate +
 whatever screenshot chrome is around it). This isolates the white glyph on a
 transparent background by treating pixel luminance as an interpolation
-between the plate red and pure white: plate-red pixels become fully
+between the plate red and pure white -- plate-red pixels become fully
 transparent, white glyph pixels stay opaque, and anti-aliased edge pixels
 get a proportional alpha, so the result blends into `.tell`'s own red plate
 with no fringing as long as `.tell`'s background is set to the same red
@@ -21,15 +21,15 @@ from PIL import Image
 import numpy as np
 
 SOURCES = {
-    "weapon": "path/to/weapon-reference-screenshot.png",
-    "vehicle": "path/to/vehicle-reference-screenshot.png",
-    "people": "path/to/people-reference-screenshot.png",
-    "person": "path/to/person-reference-screenshot.png",
-    "camera": "path/to/camera-reference-screenshot.png",
+    "weapon": r"C:\Users\gecko\OneDrive\Pictures\Screenshots\Screenshot 2026-09-02 013656.png",
+    "vehicle": r"C:\Users\gecko\OneDrive\Pictures\Screenshots\Screenshot 2026-09-02 013741.png",
+    "people": r"C:\Users\gecko\OneDrive\Pictures\Screenshots\Screenshot 2026-09-02 013759.png",
+    "person": r"C:\Users\gecko\OneDrive\Pictures\Screenshots\Screenshot 2026-09-02 013809.png",
+    "camera": r"C:\Users\gecko\OneDrive\Pictures\Screenshots\Screenshot 2026-09-02 013209.png",
 }
 
 # Measured off the source screenshots (median of pixels classified as
-# plate-red across all four), keep this in sync with style.css's
+# plate-red across all four) -- keep this in sync with style.css's
 # `.tell { background: #8d161c; }`.
 PLATE_RED = np.array([141.0, 22.0, 28.0])
 WHITE_L = 253.0

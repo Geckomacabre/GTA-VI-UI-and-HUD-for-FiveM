@@ -678,19 +678,51 @@ Config.DefaultLayout = {
     notify        = { x = 1.1, y = 1.9, sx = 1, sy = 1, anchor = 'center-left' },
 }
 
+-- =============================================================================
+-- Interact menu placement
+-- =============================================================================
+-- The interact menu (ox_target's option list) is a ScaleformUI menu, NOT part
+-- of this resource's NUI page -- so /movehud cannot move it and it has no row
+-- in Config.DefaultLayout above. Its position lives here instead.
+--
+-- Units are ScaleformUI's own 1280x720 coordinate space, NOT pixels and not
+-- percentages: the vendored UIMenu converts them with `x / 1280 * screenWidth`
+-- (see ConvertScaleformCoordsToResolutionCoords in
+-- vendor/ScaleformUI_Lua/src/utils/Utils.lua), so 720 is the bottom of the
+-- screen at any resolution and the placement holds on ultrawide.
+--
+-- offsetY = 0 pins the menu to the very top of the screen, which put it
+-- directly under the money readout. Raise it to move the menu DOWN.
+Config.InteractMenu = {
+    offsetX = 0,
+    offsetY = 220,
+}
+
 -- Honor badge thresholds. Mirrors qbx_honor's config so the toast agrees with
 -- whatever that resource decided.
 Config.Honor = {
     angelAt = 40,
     devilAt = -40,
-    angel   = '😇',
-    devil   = '😈',
-    neutral = '',
+    -- Reference "HUD DEFINITIONS" face art (see the vice_hud README credit),
+    -- replacing the earlier emoji placeholders. `terrible` is NOT a third
+    -- numeric threshold -- the corner badge (STANDING) only ever picks
+    -- between angel/devil/neutral off angelAt/devilAt above. `terrible` shows
+    -- on the centre popup (the CHANGE) in two unrelated cases, see
+    -- onHonor()/onHonorPop() in html/app.js:
+    --   1. qbx_honor tags the hook that fired with severity = 'terrible'
+    --      (Config.Hooks in qbx_honor/config.lua) -- a single bad deed.
+    --   2. honor has permanently latched at qbx_honor's unrepairable floor
+    --      (metadata.honorBroken) -- from then on EVERY popup is this face,
+    --      with the crack overlay, regardless of what severity says.
+    angel    = 'icons/honor_good.png',
+    devil    = 'icons/honor_bad.png',
+    terrible = 'icons/honor_terrible.png',
+    neutral  = '',
 
     -- Write the numeric standing next to the mugshot, and the reason for the
-    -- change underneath it. Set false for the reference treatment, where the
-    -- panel is the mugshot and its face and nothing else.
-    showValue = true,
+    -- change underneath it. false is the reference treatment -- the panel is
+    -- just the mugshot and its face, nothing else.
+    showValue = false,
     valueLabel = 'HONOR',
 
     -- How long the corner panel stays up after honor moves, in ms. The panel is

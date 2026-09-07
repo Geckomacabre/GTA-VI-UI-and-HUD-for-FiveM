@@ -73,6 +73,12 @@ will differ.
 
 ## ox_target
 
+Two independent patches live here now: the original theme hook (below), and
+a much bigger one that replaces ox_target's own eye + option-list NUI
+outright with vice_hud's textui/menu system.
+
+### Theme (presentational only)
+
 Copy into your `ox_target/` install:
 
 ```
@@ -107,6 +113,67 @@ In `web/index.html`, right before `</head>`:
 <script src="js/vice-theme.js"></script>
 <!-- vice_hud theme -- END -->
 ```
+
+If you only want the theme (ox_target keeps its own eye + list UI, just
+recoloured to match), stop here and skip the textui migration below.
+
+### textui migration (replaces ox_target's own UI)
+
+**Not presentational, and not just a UI swap.** Two behaviour changes:
+
+1. **No more keybind.** Upstream only raycasts while holding (or, with
+   `ox_target:toggleHotkey`, after pressing) Alt. This patch removes that
+   gate entirely — targeting runs continuously, so a prompt just appears
+   when you're looking at something in range, GTA VI/RDR2 style, with
+   nothing to hold first. Still fully **aim-based**: the raycast/option-
+   resolution engine itself is untouched, this only removes the key that
+   used to have to be held before any of it ran. `ox_target:toggleHotkey`
+   is no longer read at all.
+2. **Different UI.** What happens once a target's visible options are known
+   no longer sends anything to ox_target's own web page. Instead it calls
+   straight into vice_hud:
+   - **1 visible option** → `exports.vice_hud:ShowActionPrompt`, a hold-to-
+     confirm "[key] Label" textui prompt instead of a click-to-open
+     one-item list. Hold duration is tunable via the
+     `ox_target:textUiHoldMs` convar (default 350ms).
+   - **2+ visible options** → `exports.vice_hud:OpenInteractMenu`, the same
+     ScaleformUI list `qbx_vehiclekeys`' Slim Jim menu already uses (see
+     that resource's `README.md`), instead of ox_target's own list.
+
+Because neither of those needs NUI focus, ox_target never grabs the mouse
+cursor for targeting any more either — confirming is the same `mouseButton`
+control the server already used (`ox_target:leftClick`), just held instead
+of clicked.
+
+Targeting now running continuously rather than only during a held-key
+session is a real, deliberate performance/behaviour tradeoff, not an
+oversight — see the `-- Always-on` comment in the file for the reasoning,
+and the CreateThread overlay comment for why firing/melee suppression had
+to become conditional on an actual prompt being up rather than unconditional
+for the whole scan loop (upstream's version would otherwise have
+permanently disabled combat once this always-on).
+
+**Requires vice_hud 2.1.0+** (this repo's copy already has it) — specifically
+`ShowActionPrompt`'s `opts.hold`/`opts.onHeld` and `OpenInteractMenu`'s
+`token` parameter, neither of which existed before. Running this patch
+against an older vice_hud will error the first time a target resolves.
+
+Replace, don't copy alongside:
+
+```
+patches/ox_target/client/main.lua
+patches/ox_target/client/main.lua.pre-vice_hud   (restore point -- the un-patched original)
+```
+
+No `fxmanifest.lua` edit needed — same filename, same file list. The theme
+patch above still applies on top of this one; they don't conflict.
+
+If your `ox_target` version differs from 1.18.0, diff `main.lua.pre-vice_hud`
+against your own `client/main.lua` first — this patch touches option
+dispatch, menu/submenu bookkeeping, and the `startTargeting` control loop
+directly (not just an appended block), so a shape change upstream needs a
+hand-merge rather than a drop-in copy. See the `-- vice_hud textui
+migration` comments inside the file for exactly what moved and why.
 
 ## qb-menu
 
@@ -304,12 +371,34 @@ There's also a bottom-right honor badge (`gta6-honor`), fed by `qbx_honor`.
 **This is wired up in `ox_inventory/client.lua` itself**, not in
 `qbx_honor` — FiveM only lets a resource `SendNUIMessage` its own page, so
 `qbx_honor` can't push to ox_inventory's NUI directly. Instead
-`ox_inventory/client.lua` listens for the same `qbx_honor:client:syncHonor`
-event `qbx_honor` fires for `vice_hud`'s toast, reads
-`exports.qbx_honor:GetHonor()` / `GetBadgeTier()`, and relays a `setHonor`
-NUI message — guarded so a server without `qbx_honor` just never shows the
-badge. Seeded on the NUI's `uiLoaded` callback, not just on change, so it
-has a value the moment the page opens. See `client.lua` below.
+`ox_inventory/client.lua` listens for `qbx_honor`'s own client events, reads
+`exports.qbx_honor:GetBadgeTier()` / `IsHonorBroken()`, and relays a
+`setHonor` NUI message — guarded so a server without `qbx_honor` just never
+shows the badge. See `client.lua` below.
+
+The badge is deliberately **the same object as vice_hud's honor panel**: the
+character's mugshot with the tier face hanging off its bottom edge, and no
+number. It is the same standing, so it is the same picture — an earlier
+version drew a value pill instead, which read as a different feature that
+happened to share a number. The face is vice_hud's own PNG, loaded over
+`nui://vice_hud/html/icons/`, so the two can't drift apart; the geometry in
+`gta6-theme.scss` mirrors that resource's `#honor-mug` / `#honor-badge`, down
+to the crack overlay drawn once honor has latched at the unrepairable floor.
+
+`MugShotBase64` is an optional extra dependency for this badge specifically —
+without it the mugshot is simply absent and the frame draws empty. The badge
+also needs `vice_hud` installed for the face art, since that is where the PNGs
+are served from.
+
+**One stock control is hidden.** `gta6-theme.scss` sets `.inventory-control`
+to `display: none`. That is ox_inventory's default amount field plus its
+Use/Give/Close buttons, which this reskin never styled — it rendered as a
+stray unstyled "0" pill in the bottom-right corner, in the same spot the honor
+badge occupies. Worth knowing before you apply the patch: that field set the
+split-stack amount, and with it hidden the amount stays `0`, which
+ox_inventory reads as "move the whole stack" — so dragging a stack moves all
+of it. The wheel drives everything else through drag/drop and keybinds. Delete
+that one rule if you would rather keep typed split amounts.
 
 Source files (for reference / future edits — editing these does nothing on
 their own, ox_inventory's web UI is a Vite/React build):
@@ -383,19 +472,82 @@ end)
 --
 -- qbx_honor owns the value; this resource only relays it. Guarded so a server
 -- without qbx_honor installed just never shows the badge instead of erroring.
+-- The badge is vice_hud's own face art, served straight out of that resource
+-- (its fxmanifest exposes html/icons/*.png), so the wheel shows the exact
+-- image the HUD's honor panel shows rather than a lookalike emoji. Mirrored
+-- from vice_hud/config.lua's Config.Honor by hand -- a client can't read
+-- another resource's Lua config table. Keep the two in sync.
+local HONOR_ICON = {
+	angel    = 'nui://vice_hud/html/icons/honor_good.png',
+	devil    = 'nui://vice_hud/html/icons/honor_bad.png',
+	terrible = 'nui://vice_hud/html/icons/honor_terrible.png',
+}
+
+---A fresh mugshot, or nil. Only taken when the badge is about to be pushed,
+---never polled, so it can't become a per-tick screenshot cost.
+local function getHonorMugshot()
+	local ok, mugshot = pcall(function()
+		return exports['MugShotBase64']:GetMugShotBase64(PlayerPedId(), true)
+	end)
+
+	return ok and mugshot or nil
+end
+
+local function pushHonorValue(value, broken)
+	local _, tier = pcall(exports.qbx_honor.GetBadgeTier, exports.qbx_honor, value)
+
+	-- Broken overrides the tier face with the terrible one, exactly as
+	-- vice_hud's own panel does.
+	local icon = broken and HONOR_ICON.terrible or HONOR_ICON[tier]
+
+	SendNUIMessage({
+		action = 'setHonor',
+		data = {
+			value = value,
+			tier = tier,
+			icon = icon,
+			mugshot = getHonorMugshot(),
+			broken = broken == true,
+		},
+	})
+end
+
 local function pushHonor()
 	if GetResourceState('qbx_honor') ~= 'started' then return end
 
 	local ok, value = pcall(exports.qbx_honor.GetHonor, exports.qbx_honor)
 	if not ok or type(value) ~= 'number' then return end
 
-	local _, tier = pcall(exports.qbx_honor.GetBadgeTier, exports.qbx_honor, value)
-
-	SendNUIMessage({ action = 'setHonor', data = { value = value, tier = tier } })
+	local _, broken = pcall(exports.qbx_honor.IsHonorBroken, exports.qbx_honor)
+	pushHonorValue(value, broken == true)
 end
 
-AddEventHandler('qbx_honor:client:syncHonor', pushHonor)
+-- RegisterNetEvent, NOT AddEventHandler. Event names are whitelisted for
+-- network delivery PER RESOURCE: qbx_honor calling RegisterNetEvent on its own
+-- side only makes it net-safe over there. A bare AddEventHandler here is never
+-- invoked -- the client log just prints "event qbx_honor:client:syncHonor was
+-- not safe for net" and drops it.
+RegisterNetEvent('qbx_honor:client:syncHonor', pushHonor)
+
+-- syncHonor only fires at login/resource-start, so on its own the badge would
+-- never move again for the rest of the session. honorUpdated fires on every
+-- real change and carries the new value and broken flag in its own arguments,
+-- so this reads those directly rather than re-querying exports.
+RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHonor, reason, broken)
+	if type(newHonor) ~= 'number' then return end
+	pushHonorValue(newHonor, broken == true)
+end)
+
+-- Not `local`: openInventory calls it on every open.
+refreshHonorBadge = pushHonor
 ```
+
+`openInventory` also calls `refreshHonorBadge()` immediately before its
+`SendNUIMessage({ action = 'setupInventory', ... })`. The mugshot has to be
+current (the player may have changed clothes or put a mask on since honor last
+moved), and a character who hasn't done anything yet would otherwise have no
+badge at all — `honorUpdated` only fires on a change and the `syncHonor` seed
+lands once.
 
 Clothing toggle cells (mask/hat/eyewear, see the ITEMS wheel section above)
 need two new NUI callbacks. Add these near the existing `disarmWeapon`

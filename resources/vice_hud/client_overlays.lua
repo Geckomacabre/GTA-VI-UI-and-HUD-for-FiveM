@@ -129,8 +129,29 @@ AddEventHandler('gameEventTriggered', function(name, args)
 end)
 
 -- =============================================================================
--- /hudcrosshair, /hudkillmark — preview without needing a real fight
+-- Third eye — the 2+-option interact reticle
 -- =============================================================================
+-- A SEPARATE element from #crosshair above, not a new mode on it: that one
+-- is gated to an armed weapon actually being aimed (see its own header
+-- comment), and this has to show while unarmed too -- opening a vehicle's
+-- interact menu is usually not done with a gun out. Purely a display, same
+-- as ShowWorldActions: ox_target/client/main.lua's driveUi is what decides
+-- when 2+ options have resolved from an actual aim hit (never proximity
+-- alone -- see that file's probeOptionCount), this just shows/hides the
+-- marker on command.
+exports('SetThirdEyeActive', function(active)
+    ui('thirdEye', { active = active and true or false })
+end)
+
+-- =============================================================================
+-- /hudcrosshair, /hudkillmark, /hudthirdeye — preview without needing a real fight
+-- =============================================================================
+RegisterCommand('hudthirdeye', function()
+    exports.vice_hud:SetThirdEyeActive(true)
+    print('^3[vice_hud]^7 /hudthirdeye — /hudthirdeyeoff to clear.')
+end, false)
+RegisterCommand('hudthirdeyeoff', function() exports.vice_hud:SetThirdEyeActive(false) end, false)
+
 RegisterCommand('hudcrosshair', function(_, args)
     local mode = (args[1] == 'vehicle') and 'vehicle' or 'foot'
     ui('crosshair', { active = true, mode = mode })
@@ -189,9 +210,9 @@ RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show
 -- Jim = Triangle, Smash Window = Circle) rather than a highlight-and-
 -- confirm list — so the caller is expected to poll its own keybind per
 -- option (lib.addKeybind, same as qbx_vehiclekeys already does elsewhere)
--- and just tell this what to show. Simplification: fixed screen position,
--- not truly world-anchored — see the comment on #world-actions in
--- index.html for why.
+-- and just tell this what to show. World-anchored when the caller passes
+-- coords (see waCoords, below) — a caller that omits it (qbx_vehiclekeys
+-- today) still gets the original fixed screen position.
 --
 -- FIXED 2026-08-28: this used to take a hand-picked `button` STRING
 -- ('triangle'/'circle') with nothing tying it to what the caller's keybind
@@ -216,6 +237,12 @@ RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show
 -- comment in client.lua's Action Prompts section, which this mirrors.
 local function waSafeLabel(str)
     if not str or str == '' then return nil end
+
+    -- Multi-digit = a raw internal icon index, not a key label; see the
+    -- identical guard in client.lua's safeLabel for the full reasoning.
+    -- Single digits are kept, because 1-9 are real keys.
+    if #str > 1 and str:match('^%d+$') then return nil end
+
     for i = 1, #str do
         local b = str:byte(i)
         if b < 0x20 or b > 0x7E then return '•' end
@@ -223,15 +250,32 @@ local function waSafeLabel(str)
     return str
 end
 
+-- IS_USING_KEYBOARD_AND_MOUSE rather than IsInputDisabled(2) -- see the
+-- identical usingPad() in client.lua for why that check was not reliable.
+local function waUsingPad()
+    local ok, kbm = pcall(IsUsingKeyboardAndMouse, 2)
+    if ok and kbm ~= nil then return not kbm end
+
+    return not IsInputDisabled(2)
+end
+
+-- Mirrors client.lua's resolveKey exactly -- see its comments. mouseButton
+-- (ox_target/client/main.lua) is passed in here too, as ShowWorldActions' own
+-- `key` for a prop's world prompt, so this path had the same "100" bug.
+local WA_MOUSE_BUTTON_LABELS = { [24] = 'LMB', [25] = 'RMB' }
+
 local function waResolveKey(key)
     if type(key) == 'string' then return key end
     if type(key) ~= 'number' then return nil end
+
+    if not waUsingPad() and WA_MOUSE_BUTTON_LABELS[key] then
+        return WA_MOUSE_BUTTON_LABELS[key]
+    end
+
     local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
     if not ok or not raw then return nil end
     return waSafeLabel(raw:sub(3))
 end
-
-local function waUsingPad() return not IsInputDisabled(2) end
 
 local waOptions = nil     -- the last { label, key } list shown, for the refresh thread
 local waDevice = nil
@@ -247,17 +291,48 @@ local function waResolveAll()
     return resolved, device
 end
 
+-- World-anchoring -- closes the gap #world-actions in index.html and the
+-- comment above `#world-actions` in style.css both flag: this used to be a
+-- fixed screen position with no connection to the world point it's about.
+--
+-- `coords` (optional, a vector3) is the third piece: when given, a
+-- per-frame thread below projects it every tick via
+-- GetScreenCoordFromWorldCoord and pushes the result as its own lightweight
+-- message (worldActionsPos) rather than folding it into ShowWorldActions's
+-- own ui('worldActions', ...) push -- that message rebuilds the whole
+-- options list DOM (see onWorldActions in app.js), which running it every
+-- frame would do for nothing; same reasoning as onPromptProgress writing
+-- the action-prompt hold ring as its own direct style update instead of a
+-- full renderPrompts() every tick. A caller that omits `coords`
+-- (qbx_vehiclekeys today) gets nothing from that thread at all --
+-- #world-actions just stays on its own CSS fixed position, unchanged from
+-- before this existed.
+local waCoords = nil
+
+-- Also drives the icon-only-at-range / full-label-up-close split ("both" of
+-- the two prop-prompt options considered): computed locally here each frame
+-- against the live player position rather than requiring ox_target to keep
+-- re-pushing its own distance, since this thread already has to run every
+-- tick anyway to track the projection. Roughly ox_target's own default
+-- interact range (see ox_target:proximityRadius); not pixel/gameplay tuned.
+local WA_COMPACT_DISTANCE = 1.5
+
 --- options: array of { label, key } -- key is a native GTA control ID
 --- (see PAD::IS_CONTROL_PRESSED's `action` param) or an ox_lib keybind's
 --- own `.hash` field, exactly as ShowActionPrompt's `key` already works.
-exports('ShowWorldActions', function(options)
+--- coords (optional): vector3 world point to anchor the prompt to -- see
+--- the world-anchoring comment above. Omit it for the old fixed-position
+--- behaviour.
+exports('ShowWorldActions', function(options, coords)
     waOptions = options or {}
+    waCoords = coords
     local resolved, device = waResolveAll()
     waDevice = device
     ui('worldActions', { show = true, options = resolved })
 end)
 exports('HideWorldActions', function()
     waOptions = nil
+    waCoords = nil
     ui('worldActions', { show = false })
 end)
 
@@ -274,6 +349,29 @@ CreateThread(function()
                 local resolved = waResolveAll()
                 ui('worldActions', { show = true, options = resolved })
             end
+        end
+    end
+end)
+
+-- The world-anchoring thread itself -- see waCoords's own comment above for
+-- why this is a separate push from ShowWorldActions/the refresh thread.
+-- Idles at Wait(200) while nothing is world-anchored (still cheap enough to
+-- just poll rather than restructure around an event) and only runs every
+-- frame while waCoords is actually set.
+CreateThread(function()
+    while true do
+        if waCoords then
+            local playerCoords = GetEntityCoords(cache.ped or PlayerPedId())
+            local onScreen, sX, sY = GetScreenCoordFromWorldCoord(waCoords.x, waCoords.y, waCoords.z)
+            ui('worldActionsPos', {
+                show = onScreen,
+                x = sX,
+                y = sY,
+                compact = #(playerCoords - waCoords) > WA_COMPACT_DISTANCE,
+            })
+            Wait(0)
+        else
+            Wait(200)
         end
     end
 end)
@@ -413,6 +511,18 @@ local interactMenu = nil -- rebuilt fresh on every OpenInteractMenu call
 -- OnMenuClose below fires for every close path so it needs to tell them apart.
 local suppressCloseEvent = false
 
+-- Opaque value the current menu's OPENER passed to OpenInteractMenu, echoed
+-- back on both events. Two callers (qbx_vehiclekeys and, as of the ox_target
+-- migration, ox_target itself) can now both have a menu open across
+-- different moments; without a token, a caller has no way to tell "was that
+-- interactSelect/interactClose meant for MY menu" and a force-close-by-a-
+-- new-opener used to look identical to nothing having happened at all --
+-- the previous caller's own state (e.g. ox_target's uiMode) would go stale,
+-- silently misattributing the NEXT select it saw to the wrong option. A
+-- caller that doesn't pass a token gets nil back, same as before this
+-- existed, so this is backward compatible with any caller ignoring it.
+local currentToken = nil
+
 -- ScaleformUI has no exact 'stamina'/'focus' badge -- these are the closest
 -- built-in BadgeStyle icons (see vendor/ScaleformUI_Lua/src/Elements/Badge.lua)
 -- until real custom icons are worth the runtime-texture-dict setup.
@@ -420,6 +530,57 @@ local BADGE_MAP = {
     stamina = BadgeStyle.HEALTH_HEART,
     focus   = BadgeStyle.STAR,
 }
+
+--[[ ---------------------------------------------------------------------------
+     mz_textui-style reskin  --  BEGIN  (added by vice_hud; safe to delete, see
+     git history for the pre-patch OpenInteractMenu)
+     ---------------------------------------------------------------------------
+     ScaleformUI's UIMenu is a compiled native scaleform, not an NUI page --
+     there is no CSS here, so this can only push it AS CLOSE as its documented
+     Lua API allows toward the naked-text, hard-outline look #prompts already
+     uses for the single-option case (see this file's header comment and
+     html/style.css's `.prompt`/`.glyph`, both of which credit the same
+     reference textui by name). The banner image and the item list's own
+     background panel are baked into the scaleform itself -- SetBannerColor
+     only tints the banner, it does not remove it, and nothing in the
+     documented API removes the list panel at all. What IS reachable:
+       - HasInstructionalButtons(false): drops the bottom control-glyph bar,
+         which is native GTA menu chrome mz_textui has none of.
+       - MenuAlignment(RIGHT): anchors to the same side of the screen the
+         single-option prompt and mz_textui itself both sit on, rather than
+         the engine's left-aligned default -- so a player doesn't see the
+         prompt jump from one corner to a completely different one depending
+         on whether one option or several are on offer. True bottom-anchoring
+         is not exposed by the API; the vertical position stays wherever
+         ScaleformUI itself places a right-aligned menu.
+       - Per-item HighlightColor: recoloured to the same live accent every
+         other popup on this server already themes from (see resolveAccentColor
+         below), so the one row a player is about to confirm reads as the
+         same "accent means selected" language, not GTA's default blue
+         highlight. There is no HighlightedTextColor (or even TextColor) in
+         THIS Lua port despite both being documented -- only MainColor and
+         HighlightColor exist on vendor/ScaleformUI_Lua's own UIMenuItem (see
+         Items/_UIMenuItem.lua) -- so the text-on-highlight contrast is
+         whatever ScaleformUI's compiled scaleform already does natively,
+         same as every other UIMenu on this server.
+     ]] --
+
+--- Reads the same 'vice_hud:theme' state bag ox_lib/resource/client.lua and
+--- (formerly) ox_target/client/vice_theme.lua already read -- personal
+--- choice winning over the server-wide default, same convention as this
+--- file's own theme.lua. Falls back to theme.lua's own DEFAULT.preset
+--- ('earned') accent for the one tick before theme.lua's startup thread has
+--- published anything yet.
+local ACCENT_FALLBACK = '#5fd8c8'
+
+local function resolveAccentColor()
+    local ok, personal = pcall(function() return LocalPlayer.state['vice_hud:theme'] end)
+    local t = (ok and type(personal) == 'table') and personal or GlobalState['vice_hud:theme']
+    local hex = (type(t) == 'table' and type(t.accent) == 'string') and t.accent or ACCENT_FALLBACK
+    return SColor.FromHex('#FF' .. hex:gsub('#', ''))
+end
+-- vice_hud: mz_textui-style reskin -- END (see below for the three more call
+-- sites inside OpenInteractMenu itself) ---------------------------------
 
 local function closeInteractMenuSilently()
     if interactMenu and interactMenu:Visible() then
@@ -432,9 +593,27 @@ end
 --- options: array of { label, badges: {'stamina'|'focus', ...}, selected }
 --- selected (top-level, optional, 0-based): which row starts highlighted;
 --- defaults to whichever option has selected=true, or the first one.
-exports('OpenInteractMenu', function(options, selected)
+--- token (optional): opaque value echoed back on interactSelect/interactClose
+--- so a caller can tell those events apart from another caller's menu (see
+--- currentToken's comment above). Omit it and behaviour is exactly as before.
+exports('OpenInteractMenu', function(options, selected, token)
     options = options or {}
-    closeInteractMenuSilently() -- in case a caller opens over an already-open menu
+
+    -- A caller opening over an already-open menu force-closes the PREVIOUS
+    -- one -- that owner needs a real (non-suppressed) interactClose with ITS
+    -- token so it resets instead of going stale, unlike the other
+    -- closeInteractMenuSilently() call sites below (select/CloseInteractMenu/
+    -- releaseFocus/onResourceStop), which are the current owner closing its
+    -- own menu and already fire their own event or intentionally don't.
+    if interactMenu and interactMenu:Visible() then
+        local previousToken = currentToken
+        suppressCloseEvent = true
+        interactMenu:Visible(false)
+        suppressCloseEvent = false
+        TriggerEvent('vice_hud:interactClose', previousToken)
+    end
+
+    currentToken = token
 
     local startIndex = tonumber(selected)
     if startIndex == nil then
@@ -447,11 +626,22 @@ exports('OpenInteractMenu', function(options, selected)
     -- Rebuilt on every open rather than reused: ScaleformUI menus are cheap
     -- to throw away, and a fresh menu means a caller changing `options`
     -- between calls can never see a stale item left over from the last one.
-    interactMenu = UIMenu.New('', '', 0, 0, false, '', '', false)
+    -- Offset comes from Config.InteractMenu (ScaleformUI's 1280x720 space, see
+    -- that block's comment). Read defensively so a config predating it still
+    -- loads -- falling back to the old 0,0 top-of-screen placement rather than
+    -- erroring on a nil index.
+    local menuCfg = Config.InteractMenu or {}
+    interactMenu = UIMenu.New('', '', menuCfg.offsetX or 0, menuCfg.offsetY or 0, false, '', '', false)
     interactMenu:CanPlayerCloseMenu(true)
+    -- mz_textui-style reskin -- see this function's header comment above.
+    interactMenu:MenuAlignment(MenuAlignment.RIGHT)
+    interactMenu:HasInstructionalButtons(false)
+
+    local accent = resolveAccentColor()
 
     for _, opt in ipairs(options) do
         local item = UIMenuItem.New(tostring(opt.label or ''), '')
+        item:HighlightColor(accent)
         for _, badge in ipairs(opt.badges or {}) do
             local style = BADGE_MAP[badge]
             if style then item:LeftBadge(style) end
@@ -465,19 +655,33 @@ exports('OpenInteractMenu', function(options, selected)
         closeInteractMenuSilently()
         -- ScaleformUI indices are 1-based; the public event contract here
         -- has always been 0-based (qbx_vehiclekeys already depends on it).
-        TriggerEvent('vice_hud:interactSelect', index - 1)
+        TriggerEvent('vice_hud:interactSelect', index - 1, token)
     end
     interactMenu.OnMenuClose = function()
         -- Fires for EVERY close (Cancel/Back included) -- suppressCloseEvent
         -- is what keeps this matching the old contract of "only a Cancel
         -- fires interactClose".
         if not suppressCloseEvent then
-            TriggerEvent('vice_hud:interactClose')
+            TriggerEvent('vice_hud:interactClose', token)
         end
     end
 
     interactMenu:Visible(true)
     interactMenu:CurrentSelection(startIndex + 1)
+
+    -- Light rumble on open, matching ShowActionPrompt's own appear pulse
+    -- (client.lua) so both textui pieces give the same "something just
+    -- appeared" feedback. No sound here on purpose -- ScaleformUI's own
+    -- menu-open cue already plays natively; adding vice_hud's would double up.
+    --
+    -- Invoked by hash, not the generated `SetControlShake` global -- see
+    -- client.lua's promptRumble for why (confirmed nil live in-game despite
+    -- being a real, long-standing native). This particular call site errored
+    -- AFTER Visible(true) above had already run, so the menu was opened and
+    -- then immediately torn down when the error propagated up through
+    -- ox_target's driveUi and its pcall'd supervisor closed it again --
+    -- looked like the menu never appeared at all.
+    Citizen.InvokeNative(0x48B3886C1358D0D5, 0, 80, 15)
 end)
 
 exports('CloseInteractMenu', function()

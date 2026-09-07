@@ -173,7 +173,8 @@ end
 ---@param honor number
 ---@param reason string? the hook label behind the change
 ---@param delta number? how far honor just moved, for the fallback notification
-function pushToHud(honor, reason, delta)
+---@param severity 'good' | 'bad' | 'terrible' | nil which popup face vice_hud shows for this deed
+function pushToHud(honor, reason, delta, severity)
     if type(honor) ~= 'number' then return end
 
     local drew = false
@@ -183,9 +184,10 @@ function pushToHud(honor, reason, delta)
         -- own thresholds, and the direction face for the indicator separately.
         -- currentHonorBroken IS passed explicitly -- unlike the tier, that is
         -- not something vice_hud can derive from the honor number alone (see
-        -- Config's "Unrepairable floor" section).
+        -- Config's "Unrepairable floor" section). severity is the same idea:
+        -- it names WHICH deed this was, which vice_hud can't infer either.
         local ok, err = pcall(function()
-            exports['vice_hud']:ShowHonorToast(getMugshot(), honor, nil, reason, currentHonorBroken)
+            exports['vice_hud']:ShowHonorToast(getMugshot(), honor, nil, reason, currentHonorBroken, severity)
         end)
 
         drew = ok
@@ -203,6 +205,28 @@ function pushToHud(honor, reason, delta)
     trace('pushToHud done (hud drew: %s)', tostring(drew))
 end
 
+---Fires ONLY vice_hud's centre +/- indicator - the "that counted" feedback
+---every hook gets, whether or not it moved the standing badge. No mugshot is
+---taken for this path: the indicator never draws one, so a deed costs no
+---MugShotBase64 round trip.
+---@param delta number? 0 is legitimate once honor is clamped at the floor/ceiling
+---@param severity 'good' | 'bad' | 'terrible' | nil carries the direction when delta can't
+---@return boolean drew
+local function pushDeedToHud(delta, severity)
+    if GetResourceState('vice_hud') ~= 'started' then
+        trace('^3vice_hud is not started (%s)^7', GetResourceState('vice_hud'))
+        return false
+    end
+
+    local ok, err = pcall(function()
+        exports['vice_hud']:ShowHonorDeed(delta, severity, currentHonorBroken)
+    end)
+
+    if not ok then trace('^1vice_hud ShowHonorDeed failed: %s^7', tostring(err)) end
+
+    return ok
+end
+
 ---Tells vice_hud where honor stands without drawing anything, so the next real
 ---change reports a correct delta. Assigns the forward-declared local above.
 ---@param honor number
@@ -216,14 +240,15 @@ function seedHud(honor, broken)
     end)
 end
 
-RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHonor, reason, broken)
-    trace('honorUpdated received: %s -> %s (%s)', tostring(previousHonor), tostring(newHonor), tostring(reason))
+RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHonor, reason, broken, severity)
+    trace('honorUpdated received: %s -> %s (%s, %s)', tostring(previousHonor), tostring(newHonor), tostring(reason), tostring(severity))
 
     if type(newHonor) ~= 'number' then
         trace('^1ignored: newHonor is not a number^7')
         return
     end
 
+    local wasBroken = currentHonorBroken
     currentHonor = newHonor
     if broken == true then
         if not currentHonorBroken then trace('honor just hit the floor - permanently broken from here') end
@@ -235,7 +260,50 @@ RegisterNetEvent('qbx_honor:client:honorUpdated', function(newHonor, previousHon
     -- centre +/- indicator, since there is genuinely no delta to show.
     local delta = type(previousHonor) == 'number' and (newHonor - previousHonor) or 0
 
-    pushToHud(newHonor, reason, delta)
+    -- The two halves of the world HUD answer two different questions and are
+    -- therefore raised on two different rules. Neither gates the honor VALUE,
+    -- which is always written above -- GetHonor()/IsHonorBroken() and the
+    -- persistent displays that read them (ox_inventory's wheel badge,
+    -- qbx_relog's switcher) never lag behind a hook.
+    --
+    --   * The centre +/- indicator answers "did that count?" -- true of EVERY
+    --     hook, so it fires every time, including the small ones that move
+    --     honor a point or two well inside the current tier.
+    --   * The corner panel answers "what am I now?" -- so it only earns
+    --     screen time when that answer actually changes: the standing tier
+    --     crossed (angel/neutral/devil), or honor just latched at the
+    --     unrepairable floor for the first time. That second case matters on
+    --     its own because -45 -> -100 crosses no threshold, yet going
+    --     permanently broken is not a "nothing changed" event.
+    --
+    -- Severity deliberately does NOT raise the panel any more. A terrible deed
+    -- gets the terrible FACE on the indicator; it doesn't get to reprint a
+    -- standing that hasn't moved -- that is what buried the indicator under a
+    -- panel repeating itself on every kill.
+    --
+    -- A previousHonor that isn't a number (shouldn't happen - the server
+    -- always sends one) fails open and shows the panel.
+    local previousTier = type(previousHonor) == 'number' and getBadgeTier(previousHonor) or nil
+    local newTier = getBadgeTier(newHonor)
+    local justBroke = broken == true and not wasBroken
+    local tierChanged = type(previousHonor) ~= 'number' or previousTier ~= newTier
+
+    if tierChanged or justBroke then
+        trace('standing changed (%s -> %s%s) - drawing the panel',
+            tostring(previousTier), tostring(newTier), justBroke and ', JUST BROKE' or '')
+        pushToHud(newHonor, reason, delta, severity)
+        return
+    end
+
+    trace('standing unchanged (%s) - centre indicator only', tostring(newTier))
+
+    local drew = pushDeedToHud(delta, severity)
+
+    -- Same "never silent" rule pushToHud follows: if the HUD could not be
+    -- reached at all, say so through the notification path instead.
+    if Config.NotifyOnChange or not drew then
+        notifyChange(newHonor, reason, delta)
+    end
 end)
 
 -- vice_hud restarting forgets the standing it was measuring deltas against, so
@@ -264,10 +332,17 @@ CreateThread(function()
     while true do
         Wait(1000)
         local level = GetPlayerWantedLevel(PlayerId())
-        if level > lastWanted then
-            trace('wanted level rose %d -> %d, reporting', lastWanted, level)
-            TriggerServerEvent('qbx_honor:server:wantedIncreased', level, lastWanted)
+
+        -- Reports drops as well as rises. Only a rise costs honor (the server
+        -- decides that), but the server also caches the CURRENT level for
+        -- Config.Escalation.whenWanted -- so if it only ever heard about
+        -- increases, a player would read as permanently wanted for the rest
+        -- of the session and every later robbery would escalate off it.
+        if level ~= lastWanted then
+            trace('wanted level %d -> %d, reporting', lastWanted, level)
+            TriggerServerEvent('qbx_honor:server:wantedChanged', level, lastWanted)
         end
+
         lastWanted = level
     end
 end)

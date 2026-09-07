@@ -139,6 +139,34 @@ function worldToImagePixel(wx, wy) {
     return { x: fracX * mapConfig.pixelWidth, y: fracY * mapConfig.pixelHeight };
 }
 
+// Inverse of worldToImagePixel -- lets a click on empty map space (not a
+// blip) resolve to a world coordinate, per html/images/README.md's
+// calibration (accurate to ~1% of the map's span, so fine for routing
+// somewhere, not pinpoint).
+function imageToWorld(px, py) {
+    const fracX = px / mapConfig.pixelWidth;
+    const fracY = py / mapConfig.pixelHeight;
+    return {
+        x: mapConfig.worldMinX + fracX * (mapConfig.worldMaxX - mapConfig.worldMinX),
+        y: mapConfig.worldMinY + (1 - fracY) * (mapConfig.worldMaxY - mapConfig.worldMinY),
+    };
+}
+
+// Screen (clientX/clientY) -> world, via the same center/scale renderMap
+// itself positions #map-layer with. Mirrors the player marker's own
+// screen-position math (renderMap, below) in reverse.
+function screenToWorld(clientX, clientY) {
+    const center = manualCenterImg || (lastPlayerPos && worldToImagePixel(lastPlayerPos.x, lastPlayerPos.y));
+    if (!center) return null;
+    const rect = mapViewport.getBoundingClientRect();
+    const cssScale = mapCssScale();
+    const viewportCenterX = mapViewport.clientWidth / 2;
+    const viewportCenterY = mapViewport.clientHeight / 2;
+    const px = center.x + (clientX - rect.left - viewportCenterX) / cssScale;
+    const py = center.y + (clientY - rect.top - viewportCenterY) / cssScale;
+    return imageToWorld(px, py);
+}
+
 function mapCssScale() {
     return (mapZoom / mapConfig.metersPerPixelAtZoom1)
         / (mapConfig.pixelWidth / (mapConfig.worldMaxX - mapConfig.worldMinX));
@@ -286,12 +314,14 @@ function renderMapBlips() {
         dot.addEventListener('mouseleave', () => {
             if (hoveredBlipDot === dot) hideBlipTooltip();
         });
-        dot.addEventListener('click', () => {
+        dot.addEventListener('click', e => {
             if (mapDragMoved) return; // this click is the tail end of a drag, not a real click
+            e.stopPropagation(); // don't also fall through to the empty-map click-to-waypoint handler below
             centerMapOn(blip.coords.x, blip.coords.y);
             selectLocationRow(blip);
         });
-        dot.addEventListener('dblclick', () => {
+        dot.addEventListener('dblclick', e => {
+            e.stopPropagation(); // ditto -- this blip's own exact coords, not the map-wide handler's clicked-pixel estimate
             post('setWaypoint', { x: blip.coords.x, y: blip.coords.y });
         });
         mapBlips.appendChild(dot);
@@ -375,6 +405,15 @@ let mapDragStartCenterImg = null;
 
 mapViewport.addEventListener('pointerdown', e => {
     if (!mapConfig) return;
+    // A pointerdown that started ON a blip dot must NOT capture the pointer
+    // here. setPointerCapture retargets the matching pointerup (and the
+    // click/dblclick the browser synthesizes from it) to mapViewport instead
+    // of the dot underneath the cursor, which silently ate the dot's own
+    // click/dblclick handlers -- clicking a blip looked like it did nothing,
+    // and double-clicking one to set a waypoint just didn't. Bailing out
+    // here lets the dot resolve its own click/dblclick normally; dragging
+    // still works fine starting from anywhere else on the map.
+    if (e.target.closest && e.target.closest('.map-blip-dot, .map-blip-icon')) return;
     mapDragging = true;
     mapDragMoved = false;
     mapDragStartScreen = { x: e.clientX, y: e.clientY };
@@ -417,6 +456,18 @@ function endMapDrag(e) {
 }
 mapViewport.addEventListener('pointerup', endMapDrag);
 mapViewport.addEventListener('pointercancel', endMapDrag);
+
+// Double-click anywhere on the map that ISN'T a blip (those stop propagation
+// in their own dblclick handler above) sets a waypoint at that point, same
+// "double-click to commit" convention as a blip or Locations row. Matches
+// the vanilla pause map letting you route anywhere, not just to a known
+// blip -- the one thing the custom map couldn't do before this.
+mapViewport.addEventListener('dblclick', e => {
+    if (!mapConfig || mapDragMoved) return;
+    const world = screenToWorld(e.clientX, e.clientY);
+    if (!world) return;
+    post('setWaypoint', { x: world.x, y: world.y });
+});
 
 function showPanel(name) {
     for (const [key, el] of Object.entries(panels)) {

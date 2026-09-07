@@ -171,8 +171,22 @@ Config.DisableWhileOpen = { 200, 199, 202 } -- INPUT_FRONTEND_PAUSE, INPUT_FRONT
 ]]
 Config.Map = {
     image = 'images/map.jpg',
-    pixelWidth = 6144,
-    pixelHeight = 9216,
+
+    -- NOT the raw dimensions of map.jpg. The file itself is 6144x9216; these
+    -- are deliberately a little smaller, and both numbers are verified
+    -- in-game -- blips and the player marker land on their real positions with
+    -- these and drift with the file's own size.
+    --
+    -- They are the extent the WORLD BOUNDS below project onto, which is only
+    -- the same thing as the file size if the drawn map fills the canvas edge
+    -- to edge. It doesn't quite, so the projection is ~1.3% narrower and ~0.4%
+    -- shorter than the image.
+    --
+    -- If you are here because you checked the image properties and these look
+    -- wrong: they aren't. Re-deriving them from the file size puts every blip
+    -- back off its mark.
+    pixelWidth = 6065,
+    pixelHeight = 9176,
 
     -- World-space bounds (GetEntityCoords units) the image's top-left and
     -- bottom-right corners correspond to. X = east(+)/west(-),

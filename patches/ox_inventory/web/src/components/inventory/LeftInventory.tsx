@@ -22,7 +22,7 @@ const LeftInventory: React.FC = () => {
   // wheel, F2 opens the grid. See store/activeTab.ts.
   const activeTab = useActiveTab();
   const glyphs = usePromptGlyphs();
-  const { honor, tier } = useHonor();
+  const { honor, icon, mugshot, broken } = useHonor();
 
   const onWeapons = activeTab === 'weapons';
 
@@ -109,10 +109,51 @@ const LeftInventory: React.FC = () => {
         Honor standing (bottom-right), fed by qbx_honor via client.lua's
         'setHonor' NUI message — see store/honor.ts. Renders nothing until
         qbx_honor actually reports a value, rather than showing a fake 0.
+
+        Deliberately the SAME OBJECT as vice_hud's honor panel: the character's
+        mugshot with the tier face hanging off the bottom edge, and no number.
+        It is the same standing, so it should be the same picture — an earlier
+        version drew a value pill instead and read as a different feature that
+        happened to share a number. The face art is vice_hud's own file, and
+        the geometry in gta6-theme.scss mirrors its #honor-mug/#honor-badge.
       */}
       {honor !== null && (
-        <div className={'gta6-honor' + (tier ? ` gta6-honor-${tier}` : '')}>
-          <span className="gta6-honor-value">{honor}</span>
+        <div className="gta6-honor">
+          <div className="gta6-honor-mug">
+            {mugshot && <img className="gta6-honor-img" src={mugshot} alt="" />}
+            {icon && (
+              <div className="gta6-honor-badge-wrap">
+                <img
+                  className={'gta6-honor-badge' + (broken ? ' gta6-honor-broken' : '')}
+                  src={icon}
+                  alt=""
+                />
+                {/* The same crack vice_hud lays over its badge once honor has
+                    latched at the unrepairable floor — same path, same 65% of
+                    the badge, so the two read as one object. */}
+                {broken && (
+                  <svg className="gta6-honor-crack" viewBox="0 0 40 40" aria-hidden="true">
+                    <path
+                      d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                      fill="none"
+                      stroke="#0a0a0a"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M20 2 L17 13 L23 16 L14 25 L19 29 L12 38"
+                      fill="none"
+                      stroke="#dcdcdc"
+                      strokeWidth="1.1"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

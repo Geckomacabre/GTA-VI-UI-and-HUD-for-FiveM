@@ -21,6 +21,12 @@
         el.classList.toggle('hidden', !visible);
     }
 
+    // The two glyphs drawn as pictures rather than letters. Keyed by the
+    // sentinel resolveKey (client.lua) returns for INPUT_ATTACK / INPUT_AIM --
+    // GetControlInstructionalButton has no text glyph for a mouse button, so
+    // there is nothing to letter even if we wanted to.
+    var MOUSE_GLYPHS = { LMB: 'icons/LMB.png', RMB: 'icons/RMB.png' };
+
     function setFill(rowId, value) {
         var row = $(rowId);
         if (!row) return;
@@ -167,23 +173,18 @@
                    any group rather than hardcoded to a pair
          hanger  — clothing identified (fenix-police's `outfit` signal)
          vehicle — the vehicle used in the crime is identified */
-    var TELL_SVG = {
-        hanger:
-            '<svg viewBox="0 0 24 24"><path d="M12 3.2a1.9 1.9 0 1 0 1.35 3.24c.2.5.06.9-.4 1.2' +
-            'L3.4 14.1a1.35 1.35 0 0 0 .78 2.45h15.64a1.35 1.35 0 0 0 .78-2.45l-8.2-5.3"/></svg>'
-    };
-    /* camera/weapon/person/people/vehicle are cropped straight out of the
-       actual HUD DEFINITIONS reference screenshots (not hand-traced) -- see
+    /* All six are cropped straight out of the actual HUD DEFINITIONS
+       reference screenshots (not hand-traced) -- see
        tools/extract_tell_icons.py. .tell's plate colour is matched to the
        plate red baked into these PNGs (#8d161c) so the transparent edges
-       blend with no fringing. hanger is the only one left hand-drawn --
-       no reference screenshot for it yet. */
+       blend with no fringing. */
     var TELL_IMG = {
         camera: 'icons/tells/tell_camera.png',
         weapon: 'icons/tells/tell_weapon.png',
         person: 'icons/tells/tell_person.png',
         people: 'icons/tells/tell_people.png',
-        vehicle: 'icons/tells/tell_vehicle.png'
+        vehicle: 'icons/tells/tell_vehicle.png',
+        hanger: 'icons/tells/tell_hanger.png'
     };
 
     /* Four star states, matching the reference frames exactly, all literal
@@ -229,8 +230,6 @@
                 img.src = TELL_IMG[t];
                 img.alt = t;
                 d.appendChild(img);
-            } else {
-                d.innerHTML = TELL_SVG[t] || '';
             }
             container.appendChild(d);
         });
@@ -361,6 +360,13 @@
         if (!d || !d.active) { show(box, false); return; }
         box.dataset.mode = d.mode === 'vehicle' ? 'vehicle' : 'foot';
         show(box, true);
+    }
+
+    // 2+-option interact reticle -- a separate element from #crosshair
+    // (see #third-eye's own comment in index.html/style.css for why), so
+    // this is a plain on/off, no mode switch needed.
+    function onThirdEye(d) {
+        show($('third-eye'), !!(d && d.active));
     }
 
     var crossFireTimer = null;
@@ -634,6 +640,17 @@
                 // the SVG right back out, since it replaces all children.
                 btn.innerHTML = WA_BTN_SVG[shape];
                 btn.classList.remove('wa-btn-text');
+            } else if (MOUSE_GLYPHS[glyph]) {
+                // A mouse button, drawn as the button itself for the same
+                // reason the prompt stack does it (see MOUSE_GLYPHS): there is
+                // no key cap to letter. Same innerHTML-then-append rule as the
+                // pad shape above -- textContent would wipe the image out.
+                btn.innerHTML = '';
+                var mimg = document.createElement('img');
+                mimg.src = MOUSE_GLYPHS[glyph];
+                mimg.alt = glyph;
+                btn.appendChild(mimg);
+                btn.classList.remove('wa-btn-text');
             } else {
                 // Keyboard, or a pad button with no shape mapping (shoulders,
                 // triggers, D-pad) -- show the resolved key/label as plain
@@ -652,6 +669,28 @@
             box.appendChild(row);
         });
         show(box, true);
+    }
+
+    // World-anchoring: pushed every frame by client_overlays.lua's own
+    // world-anchoring thread while a coords-bearing ShowWorldActions is
+    // active (see that thread's comment) -- a SEPARATE, lightweight message
+    // from onWorldActions above so a caller that never passes coords
+    // (qbx_vehiclekeys today) never triggers this at all, and so tracking
+    // the projection every tick doesn't also rebuild the whole row list
+    // every tick. d.show === false means GetScreenCoordFromWorldCoord
+    // reported the point is behind the camera, not that the prompt itself
+    // should close -- that's still onWorldActions/HideWorldActions's job.
+    function onWorldActionsPos(d) {
+        var box = $('world-actions');
+        if (!box) return;
+        if (!d || d.show === false) {
+            box.classList.add('wa-offscreen');
+            return;
+        }
+        box.classList.remove('wa-offscreen');
+        box.classList.toggle('wa-compact', !!d.compact);
+        box.style.left = (d.x * 100) + 'cqw';
+        box.style.top = (d.y * 100) + 'cqh';
     }
 
     /* --- lockpick check -------------------------------------------------
@@ -1497,26 +1536,34 @@
     var honorPopTimer = null;
     var honorHideTimer = null;
 
-    function onHonorPop(delta, emoji, broken) {
+    function onHonorPop(delta, icon, broken, up) {
         var el = $('honor-pop');
-        if (!el || !delta) return;
+        if (!el) return;
         var sign = $('honor-pop-sign');
         var face = $('honor-pop-face');
         var crack = $('honor-pop-crack');
 
         if (broken) {
-            // Broken isn't a direction -- no sign, and the face reads the
-            // same grey/cracked way the corner badge does.
+            // Broken isn't a direction -- no sign. The face is the terrible-
+            // deed art itself now (see honorEmoji() in client.lua), not a
+            // greyed-out copy of the standing badge.
             el.className = 'broken';
             if (sign) sign.textContent = '';
-            if (face) { face.textContent = emoji || '😈'; face.classList.add('broken'); }
             show(crack, true);
         } else {
-            var up = delta > 0;
+            // `up` is passed explicitly by onHonor now rather than always
+            // being derived from delta's sign -- once honor is clamped at
+            // Config.MinHonor/MaxHonor, further hooks still fire (and still
+            // deserve a popup) but move the NUMBER by zero, so delta alone
+            // can no longer say which way the deed pointed. Falls back to
+            // delta's sign for any older/direct caller that doesn't pass it.
+            if (up === undefined) up = delta > 0;
             el.className = up ? 'up' : 'down';
             if (sign) sign.textContent = up ? '+' : '−';
-            if (face) { face.textContent = emoji || (up ? '😇' : '😈'); face.classList.remove('broken'); }
             show(crack, false);
+        }
+        if (face) {
+            if (icon) { face.src = icon; show(face, true); } else { show(face, false); }
         }
 
         show(el, true);
@@ -1526,13 +1573,27 @@
 
     function onHonor(d) {
         // A change fires the centre indicator; the corner panel then just
-        // reflects the current standing and stays put. Same trigger as
-        // always (a real delta) -- broken only changes HOW it renders once
-        // it fires (see onHonorPop): no sign, cracked face instead of a
-        // coloured direction arrow.
-        if (d.delta) {
-            onHonorPop(d.delta, d.delta > 0 ? d.angelEmoji : d.devilEmoji, d.broken);
+        // reflects the current standing and stays put. Gated on delta OR
+        // severity/broken, NOT delta alone -- once honor is clamped at
+        // Config.MinHonor/MaxHonor, qbx_honor's own gate (client/main.lua)
+        // can still push a notable deed through (a kill is still 'terrible',
+        // a floor-hit is still worth showing) with the NUMBER unchanged, so
+        // gating strictly on a non-zero delta would silently swallow every
+        // one of those once you're maxed out. severity supplies the
+        // direction delta can no longer show in that case.
+        if (d.delta || d.severity || d.broken) {
+            var up = d.delta ? d.delta > 0 : d.severity === 'good';
+            var dirIcon = d.broken ? d.terribleEmoji
+                : d.severity === 'terrible' ? d.terribleEmoji
+                : (up ? d.angelEmoji : d.devilEmoji);
+            onHonorPop(d.delta, dirIcon, d.broken, up);
         }
+
+        // A DEED push (exports.vice_hud:ShowHonorDeed) is the centre indicator
+        // and nothing else -- it must not touch, show, or re-time the corner
+        // panel. The panel is the STANDING readout and only qbx_honor's
+        // tier-change path (ShowHonorToast) is allowed to raise it.
+        if (d.popOnly) return;
 
         var el = $('honor');
         if (!el) return;
@@ -1541,17 +1602,26 @@
             if (d.mugshot) { img.src = d.mugshot; img.style.display = 'block'; }
             else { img.removeAttribute('src'); img.style.display = 'none'; }
         }
-        // The badge is the face for the CURRENT honor level, not for the change.
+        // The badge is the face for the CURRENT honor level, not for the
+        // change -- except once broken, which overrides it with the
+        // terrible-deed face regardless of tier (see qbx_honor's
+        // unrepairable-floor comment below). Also desaturated once broken --
+        // same "spent, not merely low" treatment ox_inventory's and
+        // qbx_relog's own honor chips use (see their .broken/.honor-broken
+        // rules) -- so all three honor displays read the same way.
         var badge = $('honor-badge');
-        if (badge) badge.textContent = d.emoji || '';
+        var badgeIcon = d.broken ? (d.terribleEmoji || d.emoji) : d.emoji;
+        if (badge) {
+            if (badgeIcon) { badge.src = badgeIcon; show(badge, true); } else { show(badge, false); }
+            badge.classList.toggle('broken', !!d.broken);
+        }
 
         // qbx_honor's unrepairable floor: once broken, always broken for this
-        // session -- classList.toggle only ever turns this ON here because
+        // session -- this only ever turns the crack overlay ON here because
         // the caller (ShowHonorToast/SetHonorStanding in client.lua) already
         // enforces the same one-way latch, so `d.broken` is never sent false
         // after having been sent true.
         if (d.broken) {
-            if (badge) badge.classList.add('broken');
             show($('honor-crack'), true);
         }
 
@@ -1559,15 +1629,27 @@
         // is the mugshot and its face, nothing else. With it on the panel also
         // reads out the standing, which is the only place the exact number is
         // visible in game.
+        var titleText = (d.showValue && typeof d.honor === 'number')
+            ? ((d.valueLabel || 'HONOR') + ' ' + d.honor)
+            : '';
+        var subText = (d.showValue && d.reason) ? d.reason : '';
+
         var title = $('honor-title');
-        if (title) {
-            title.textContent = (d.showValue && typeof d.honor === 'number')
-                ? ((d.valueLabel || 'HONOR') + ' ' + d.honor)
-                : '';
-        }
+        if (title) title.textContent = titleText;
 
         var sub = $('honor-sub');
-        if (sub) sub.textContent = (d.showValue && d.reason) ? d.reason : '';
+        if (sub) sub.textContent = subText;
+
+        // With both lines empty (Config.Honor.showValue = false -- the
+        // reference treatment, where the panel is just the mugshot and its
+        // face) the copy column has to come OUT of the flex row, not merely
+        // go blank. A zero-width child still takes the row's 0.8cqw gap, and
+        // #honor's padding is deliberately asymmetric -- 1.3cqw on the copy
+        // side against 0.5cqw on the mug side -- so leaving an empty column
+        // in place draws a lopsided box with dead space where the text was.
+        var hasCopy = !!(titleText || subText);
+        show($('honor-copy'), hasCopy);
+        el.classList.toggle('bare', !hasCopy);
 
         if (honorHideTimer) { clearTimeout(honorHideTimer); honorHideTimer = null; }
 
@@ -1652,28 +1734,62 @@
 
     var PAD_TONE = { A: 'pad-a', B: 'pad-b', X: 'pad-x', Y: 'pad-y' };
     var prompts = {};
+    // id -> the .prompt-glyph-wrap element for whichever rows are currently
+    // hold-enabled, so a promptProgress tick can write --prompt-frac onto
+    // just that one wrapper instead of tearing down and rebuilding every
+    // prompt row every frame a hold is in progress (renderPrompts only runs
+    // on show/hide/glyph-refresh, not per-tick).
+    var promptGlyphWraps = {};
 
     function renderPrompts() {
         var box = $('prompts');
         if (!box) return;
         box.innerHTML = '';
+        promptGlyphWraps = {};
         Object.keys(prompts).forEach(function (id) {
             var p = prompts[id];
             var row = document.createElement('div');
             row.className = 'prompt';
 
             var label = document.createElement('span');
+            label.className = 'prompt-label';
             label.textContent = p.label || '';
 
             var g = document.createElement('span');
             var text = p.glyph == null ? '' : String(p.glyph);
-            g.className = 'glyph'
-                + (text.length > 1 ? ' wide' : '')
-                + (p.device === 'pad' && PAD_TONE[text] ? ' ' + PAD_TONE[text] : '');
-            g.textContent = text;
+
+            // A mouse button is drawn as the button ITSELF, not as the letters
+            // "LMB" -- there is no key cap to letter, and the reference sheet
+            // shows the mouse. resolveKey (client.lua) hands these two down as
+            // sentinels precisely so the page can make that swap; every other
+            // glyph stays text in a key cap.
+            var mouse = MOUSE_GLYPHS[text];
+            if (mouse) {
+                g.className = 'glyph mouse';
+                var img = document.createElement('img');
+                img.src = mouse;
+                img.alt = text;
+                g.appendChild(img);
+            } else {
+                g.className = 'glyph'
+                    + (text.length > 1 ? ' wide' : '')
+                    + (p.device === 'pad' && PAD_TONE[text] ? ' ' + PAD_TONE[text] : '');
+                g.textContent = text;
+            }
 
             row.appendChild(label);
-            row.appendChild(g);
+
+            if (p.hold) {
+                var wrap = document.createElement('span');
+                wrap.className = 'prompt-glyph-wrap holdable';
+                wrap.style.setProperty('--prompt-frac', 0);
+                wrap.appendChild(g);
+                row.appendChild(wrap);
+                promptGlyphWraps[id] = wrap;
+            } else {
+                row.appendChild(g);
+            }
+
             box.appendChild(row);
         });
     }
@@ -1681,8 +1797,18 @@
     function onPrompt(d) {
         if (!d.id) return;
         if (d.show === false) delete prompts[d.id];
-        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device };
+        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device, hold: !!d.hold };
         renderPrompts();
+    }
+
+    // Fired every tick client.lua's hold-poll thread sees a frac change for
+    // a held prompt -- NOT routed through renderPrompts/onPrompt, both of
+    // which rebuild the whole #prompts box; a hold can fire many times a
+    // second and rebuilding every row that often would be needless churn.
+    function onPromptProgress(d) {
+        var wrap = d && d.id && promptGlyphWraps[d.id];
+        if (!wrap) return;
+        wrap.style.setProperty('--prompt-frac', Math.max(0, Math.min(1, d.frac || 0)));
     }
 
     function onPromptGlyphs(d) {
@@ -2537,7 +2663,7 @@
         var up = false;
         var beat = function () {
             up = !up;
-            onHonorPop(up ? 12 : -12, up ? '\uD83D\uDE07' : '\uD83D\uDE08');
+            onHonorPop(up ? 12 : -12, up ? 'icons/honor_good.png' : 'icons/honor_bad.png');
         };
         beat();
         editorPopTimer = setInterval(beat, 1600);
@@ -3027,7 +3153,8 @@
             onVehicle({ show: true, make: 'Nagasaki', model: 'Chimera',
                         fuel: 18, engineOn: true, engineHealth: 420,
                         trackerState: 'spotted' });
-            onHonor({ emoji: '😈', honor: -50, showValue: true,
+            onHonor({ emoji: 'icons/honor_bad.png', terribleEmoji: 'icons/honor_terrible.png',
+                      honor: -50, showValue: true,
                       reason: 'Killed a bystander', duration: 9e6, broken: true });
             onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
                             showValue: true, reason: 'Robbed an armoured truck',
@@ -3438,11 +3565,13 @@
         chips: onChips,
         weapon: onWeapon,
         crosshair: onCrosshair,
+        thirdEye: onThirdEye,
         crossFire: onCrossFire,
         crossKill: onKillMark,
         lapHud: onLapHud,
         interact: onInteract,
         worldActions: onWorldActions,
+        worldActionsPos: onWorldActionsPos,
         lockpick: onLockpick,
         lockpickProgress: onLockpickProgress,
         lockpickResult: onLockpickResult,
@@ -3457,6 +3586,7 @@
         honor: onHonor,
         reputation: onReputation,
         prompt: onPrompt,
+        promptProgress: onPromptProgress,
         promptGlyphs: onPromptGlyphs,
         police: onPolice,
         policeEditor: onPoliceEditor,
@@ -3542,7 +3672,8 @@
                 instruction: 'Turn Left', dir: 'left', distance: '130 ft' });
         onVehicle({ show: true, make: 'Pegassi', model: 'Bati 801', fuel: 72,
                     engineOn: true, engineHealth: 900, trackerState: 'searching' });
-        onHonor({ emoji: '😈', honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999, broken: true });
+        onHonor({ emoji: 'icons/honor_bad.png', terribleEmoji: 'icons/honor_terrible.png',
+                  honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999, broken: true });
         onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,
                         showValue: true, reason: 'Robbed an armoured truck', holdMs: 999999 });
         // Nothing wires an action prompt today — the export exists for other

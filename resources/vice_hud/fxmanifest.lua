@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'vice_hud'
 description 'GTA6-style HUD for Qbox: status bars, minimap slot (zone + vehicle), turn-by-turn navigation, wanted stars, weapon/ammo, money, honor, skills, action prompts, directional police glow and exhaustion effects. The interact menu renders through ScaleformUI instead of NUI. Requires ox_lib and the sibling ScaleformUI_Assets resource; qbx_core optional.'
-version '2.0.0'
+version '2.2.0'
 
 shared_scripts {
     '@ox_lib/init.lua',

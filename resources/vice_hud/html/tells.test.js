@@ -3,9 +3,9 @@
  *   node html/tells.test.js
  *
  * Not shipped to clients -- not in fxmanifest's files{}. Run it after
- * touching TELL_SVG in app.js or #tells/.tell in style.css. Exists mainly to
+ * touching TELL_IMG in app.js or #tells/.tell in style.css. Exists mainly to
  * catch a typo'd key rendering an empty badge -- renderTells() silently draws
- * nothing for a key TELL_SVG doesn't have, which editor.test.js's broader
+ * nothing for a key TELL_IMG doesn't have, which editor.test.js's broader
  * onWanted exercise wouldn't notice. */
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
@@ -37,9 +37,8 @@ msg({ action: 'wanted', active: true, stars: 3, maxStars: 6,
       tells: ['camera', 'weapon', 'person', 'people', 'hanger', 'vehicle'] });
 const tells = [...d.querySelectorAll('#tells .tell')];
 ok(tells.length === 6, '6 tell badges rendered', tells.length);
-// hanger is still hand-drawn inline SVG; camera/weapon/person/people/vehicle
-// are now cropped PNGs (TELL_IMG in app.js) -- see BUCKME_HANDOFF.md 2a/2b on
-// why hand-traced SVG was dropped for those five.
+// all six are now cropped PNGs (TELL_IMG in app.js) -- see BUCKME_HANDOFF.md
+// 2a/2b on why hand-traced SVG was dropped.
 tells.forEach(function (t) {
   const svg = t.querySelector('svg');
   const img = t.querySelector('img');

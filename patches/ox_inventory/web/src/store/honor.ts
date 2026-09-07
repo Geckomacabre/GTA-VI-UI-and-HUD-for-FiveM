@@ -15,12 +15,26 @@ import { useSyncExternalStore } from 'react';
  * the badge renders nothing rather than a fabricated 0.
  */
 
-type HonorSnapshot = { honor: number | null; tier: 'angel' | 'devil' | null };
+type HonorSnapshot = {
+  honor: number | null;
+  tier: 'angel' | 'devil' | null;
+  // vice_hud's own face art, served from that resource (nui://vice_hud/...),
+  // so the wheel shows the same image its honor panel does rather than a
+  // lookalike. null for a neutral standing, which has no face in vice_hud
+  // either.
+  icon: string | null;
+  // Base64 mugshot, refreshed each time the wheel opens.
+  mugshot: string | null;
+  // Latches true at qbx_honor's unrepairable floor and never clears -- see
+  // metadata.honorBroken in qbx_honor/config.lua's "Unrepairable floor"
+  // section. The badge renders this as permanently spent, not merely low.
+  broken: boolean;
+};
 
 // Cached rather than built fresh in getSnapshot(): useSyncExternalStore compares
 // snapshots with Object.is, so a new object literal on every call would look
 // like a change on every render and defeat the point of the store.
-let snapshot: HonorSnapshot = { honor: null, tier: null };
+let snapshot: HonorSnapshot = { honor: null, tier: null, icon: null, mugshot: null, broken: false };
 
 const listeners = new Set<() => void>();
 
@@ -33,10 +47,21 @@ window.addEventListener('message', (event: MessageEvent<any>) => {
   const data = payload.data ?? {};
   const value = typeof data.value === 'number' ? data.value : null;
   const nextTier = data.tier === 'angel' || data.tier === 'devil' ? data.tier : null;
+  const nextIcon = typeof data.icon === 'string' && data.icon ? data.icon : null;
+  const nextMugshot = typeof data.mugshot === 'string' && data.mugshot ? data.mugshot : null;
+  const nextBroken = data.broken === true;
 
-  if (value === snapshot.honor && nextTier === snapshot.tier) return;
+  if (
+    value === snapshot.honor &&
+    nextTier === snapshot.tier &&
+    nextIcon === snapshot.icon &&
+    nextMugshot === snapshot.mugshot &&
+    nextBroken === snapshot.broken
+  ) {
+    return;
+  }
 
-  snapshot = { honor: value, tier: nextTier };
+  snapshot = { honor: value, tier: nextTier, icon: nextIcon, mugshot: nextMugshot, broken: nextBroken };
   emit();
 });
 

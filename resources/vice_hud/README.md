@@ -8,10 +8,10 @@ Status bars, wanted stars, weapon and ammo, money, zone bar, a vehicle panel
 with real manufacturer badges, honor standing, action prompts, directional
 police glow and exhaustion effects — with a full in-game layout editor.
 
-![version](https://img.shields.io/badge/version-2.0.0-2f81f7?style=flat-square)
+![version](https://img.shields.io/badge/version-2.2.0-2f81f7?style=flat-square)
 ![framework](https://img.shields.io/badge/framework-Qbox-8957e5?style=flat-square)
 ![dependency](https://img.shields.io/badge/requires-ox__lib-3fb950?style=flat-square)
-![licence](https://img.shields.io/badge/licence-GPL--3.0*-fa7970?style=flat-square)
+![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-fa7970?style=flat-square)
 ![build](https://img.shields.io/badge/build-none-6e7681?style=flat-square)
 ![tests](https://img.shields.io/badge/tests-624%20passing-3fb950?style=flat-square)
 
@@ -178,12 +178,35 @@ Happy with it? `/hudpublish` makes your layout the server default for everyone
 ## API
 
 ```lua
-exports.vice_hud:ShowActionPrompt(id, label, key)  -- key: a string, or a control id
+exports.vice_hud:ShowActionPrompt(id, label, key, opts)
+-- key: a string (decorative glyph only) or a control id (number, required for hold)
+-- opts (optional): { hold = durationMs, onHeld = function() ... end }
 exports.vice_hud:HideActionPrompt(id)
 
-exports.vice_hud:ShowHonorToast(mugshot, honor, emoji, reason)
-exports.vice_hud:ShowHonorChange(delta, mugshot)
-exports.vice_hud:SetHonorStanding(honor)           -- seeds the value, draws nothing
+exports.vice_hud:OpenInteractMenu(options, selected, token)
+-- options: array of { label, badges: {'stamina'|'focus', ...}, selected }
+-- selected (optional, 0-based): starting row; token (optional): opaque
+-- value echoed back on the events below, so a caller can tell its own menu's
+-- events apart from another caller's -- see client_overlays.lua's comment.
+-- Fires vice_hud:interactSelect(index, token) / vice_hud:interactClose(token)
+exports.vice_hud:CloseInteractMenu()
+
+exports.vice_hud:ShowHonorToast(mugshot, honor, emoji, reason, broken, severity)
+exports.vice_hud:ShowHonorDeed(delta, severity, broken)  -- centre +/- indicator only
+exports.vice_hud:ShowHonorChange(delta, mugshot, severity)
+exports.vice_hud:SetHonorStanding(honor, broken)   -- seeds the value, draws nothing
+
+exports.vice_hud:ReportWantedTellSighting(id, source)
+-- Something of yours has SEEN the player. One shot, nothing to turn off: the
+-- tell stays lit until the police lose them. See "The camera tell" below.
+exports.vice_hud:SetWantedTellOverride(id, on, source)
+-- The continuous version, for a source that can genuinely track visibility.
+-- The tell is lit while ANY source claims it, so a speed camera and a CCTV
+-- network can both watch you without either switching the other off.
+exports.vice_hud:ClearWantedTellOverrides(source)
+-- Drop every claim and sighting a source holds, for a resource going down
+-- while still holding one; otherwise the tell stays lit with nobody left to
+-- clear it.
 
 exports.vice_hud:SetHudVisible(visible)
 exports.vice_hud:SetHudOffsetX(pixels)
@@ -198,6 +221,42 @@ exports.vice_hud:SetVehicleTracker(state)          -- 'clear' | 'searching' | 's
 Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen — give ids the
 `yourresource:something` form for that to work.
+
+### The camera tell
+
+Five of the six wanted tells are worked out here. The sixth, `camera`, cannot
+be: nothing in this resource knows whether something is filming you, so it
+waits to be told. Any resource with cameras in the world can light it, and
+more than one can do so at once.
+
+```lua
+exports.vice_hud:ReportWantedTellSighting('camera', 'your_resource')
+```
+
+That is the whole integration. A sighting **latches**, so you do not report
+when the player leaves the camera's view: the police do not forget the photo
+when someone drives out of a junction, so the tell stays up until the wanted
+level drops back to zero. Report it once, when your camera sees them.
+
+Two details worth knowing:
+
+- A sighting taken while the player is **not** wanted is discarded on the next
+  poll. Driving past a camera legally should not light a tell on an unrelated
+  crime an hour later.
+- Add `exports.vice_hud:ClearWantedTellOverrides('your_resource')` to your
+  `onResourceStop`. Otherwise a sighting outlives the resource that reported
+  it and burns for the rest of the pursuit with nobody left to clear it.
+
+Use `SetWantedTellOverride` instead if your cameras can genuinely track
+continuous visibility, so you can turn the claim back off when they lose
+sight. Both compose: the tell is lit while any source claims it, so a speed
+camera network and a CCTV script never switch each other off.
+
+The speed cameras in
+[streetkings](https://github.com/streetkings-fivem/streetkings) are wired this
+way on the server this was built for. That resource is not bundled here, so
+the camera side is a single call in its own speed camera module rather than
+anything shipped in this repo.
 
 ---
 
@@ -354,18 +413,18 @@ only the code.
 
 ## Licence
 
-[GPL-3.0](LICENSE) for this resource's own code. You may use, modify and
-redistribute that under the same licence, including on a paid server.
+[CC BY-NC-SA 4.0](LICENSE) — **non-commercial**. You may use, modify and
+redistribute this resource, including on a server of your own, but not sell it
+or bundle it into anything paid, and a modified version has to carry the same
+licence. This matches the repository's own licence and every other resource in
+it.
 
-**With one exception:** `vendor/ScaleformUI_Lua` (vendored into this
-resource) and the sibling `ScaleformUI_Assets` resource are
-[ScaleformUI](https://github.com/manups4e/ScaleformUI), licensed
-CC BY-NC-SA 4.0, non-commercial only. That licence, not GPL-3.0, governs
-those two pieces, and it means the interact menu feature (and any server
-running it) cannot be used commercially while depending on them. If that
-matters for your server, either keep the menu on the old NUI implementation
-or replace `vendor/ScaleformUI_Lua` with something under a licence that
-allows commercial use.
+`vendor/ScaleformUI_Lua` (vendored into this resource) and the sibling
+`ScaleformUI_Assets` resource are
+[ScaleformUI](https://github.com/manups4e/ScaleformUI), which is under that
+same CC BY-NC-SA 4.0 licence — so there is no licence seam between this
+resource and what it vendors, and the non-commercial term covers the interact
+menu along with everything else.
 
 > [!NOTE]
 > The copyright line in `LICENSE`'s *How to Apply* section is left for you to
@@ -389,7 +448,8 @@ these related repositories:
 - [natives](https://github.com/QuadrupleTurbo/natives)
 - [NativeUI-scaleform_flash](https://github.com/QuadrupleTurbo/NativeUI-scaleform_flash)
 
-The health/stamina/focus badges (`html/icons/badge_*.png`), the vehicle
+The cash icon and its ring (`html/icons/cash.png`, `html/icons/fill_green.png`),
+the health/stamina/focus badges (`html/icons/badge_*.png`), the vehicle
 panel's tracker/engine/fuel pip glyphs (traced/masked from the same set's
 badge art), and the wanted-tell icon set are from the
 [Enhanced OIV GTA 6 Inspired HUD](https://www.gta5-mods.com/misc/enhanced-oiv-gta-6-inspired-hud)

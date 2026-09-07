@@ -113,6 +113,18 @@ measured pixel position in THAT image.
    that's still off by a large margin is a bad ground-truth pick (see step
    1's "compact" requirement), not necessarily a bad fit.
 
+## Known limitation (beta)
+
+Only 3 landmarks are fit against right now, so a blip far from Humane Labs,
+Maze Bank Arena, and Elysian Island's docks can drift noticeably further
+than the ~1% figure above suggests -- the ~1% is the residual AT the fitted
+landmarks, not a guaranteed ceiling everywhere on the map. Reported by a
+server admin: some of their own job/business blips looked visibly
+"off point" on the Map tab. Confirmed as expected behaviour of a 3-point
+affine fit, not a bug. Fix is to add landmarks near whatever region is
+reported as off and re-run the Procedure above; needs real examples of
+which blips looked wrong before that's worth doing.
+
 ## Current numbers
 
 `worldMinX = -4083.8, worldMaxX = 4674.4, worldMinY = -5019.5, worldMaxY = 8344.6`

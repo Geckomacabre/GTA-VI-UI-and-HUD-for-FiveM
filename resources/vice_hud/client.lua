@@ -6,7 +6,7 @@
      data, so a change to the look never requires touching this file.
 
      Public API (see README.md for detail):
-         exports.vice_hud:ShowActionPrompt(id, label, key)
+         exports.vice_hud:ShowActionPrompt(id, label, key, opts)  -- opts: { hold, onHeld }
          exports.vice_hud:HideActionPrompt(id)
          exports.vice_hud:ShowHonorToast(mugshot, honor, emoji, reason)
          exports.vice_hud:ShowHonorChange(delta, mugshot)
@@ -1225,18 +1225,23 @@ RegisterCommand('hudtest', function()
     -- A non-zero `delta` is what fires the centre-screen +/- indicator; without
     -- it /hudtest only ever showed the corner standing panel, so the one piece
     -- of the honor UI most worth eyeballing was the piece it never drew.
+    -- reason/severity mirror Config.Hooks.kill_civilian in qbx_honor -- this is
+    -- the 'terrible' tier, so the centre indicator should show the terrible
+    -- face, not the plain devil face a mere 'bad' deed would get.
     ui('honor', {
         emoji  = Config.Honor.devil,
         reason = 'Killed a bystander',
         honor  = -50,
         delta  = -10,
-        angelEmoji = Config.Honor.angel,
-        devilEmoji = Config.Honor.devil,
+        severity = 'terrible',
+        angelEmoji    = Config.Honor.angel,
+        devilEmoji    = Config.Honor.devil,
+        terribleEmoji = Config.Honor.terrible,
         showValue  = Config.Honor.showValue,
         valueLabel = Config.Honor.valueLabel,
         holdMs     = Config.Honor.holdMs,
     })
-    print(('  honor: the corner panel (for %sms) AND the centre +/- indicator should both show.')
+    print(('  honor: the corner panel (for %sms) AND the centre +/- indicator (terrible face) should both show.')
         :format(Config.Honor.holdMs or 0))
 
     ui('reputation', {
@@ -1400,6 +1405,19 @@ end)
 -- ASCII is replaced with a neutral marker rather than rendering as tofu.
 local function safeLabel(str)
     if not str or str == '' then return nil end
+
+    -- A MULTI-DIGIT number is never a key label. When a control has no text
+    -- glyph, GetControlInstructionalButton hands back a raw internal icon
+    -- index instead, and those are plain ASCII digits -- so the printable
+    -- filter below waves them straight through and the prompt draws "100"
+    -- where the key should be. Rejecting them here (nil = draw the label with
+    -- no key) is the backstop for every control, not just the mouse buttons
+    -- named below.
+    -- Single digits are KEPT: 1-9 are real keyboard keys and a legitimate
+    -- label. That is the whole reason this tests length rather than
+    -- "is it a number".
+    if #str > 1 and str:match('^%d+$') then return nil end
+
     for i = 1, #str do
         local b = str:byte(i)
         if b < 0x20 or b > 0x7E then return '•' end
@@ -1407,24 +1425,59 @@ local function safeLabel(str)
     return str
 end
 
+-- IS_USING_KEYBOARD_AND_MOUSE, not IsInputDisabled(2).
+--
+-- The old check read "control group 2 is disabled => keyboard+mouse", which is
+-- the convention other resources here use, but it does not hold on every
+-- setup: with a controller merely PLUGGED IN (not in use) it reported a pad,
+-- which sent mouse-button prompts down the pad branch. That is what left a
+-- raw control icon index on screen, and then an empty glyph box once the
+-- index was rejected. This native answers the question directly.
+local function usingPad()
+    local ok, kbm = pcall(IsUsingKeyboardAndMouse, 2)
+    if ok and kbm ~= nil then return not kbm end
+
+    return not IsInputDisabled(2) -- pre-2372 builds without the native
+end
+
+-- INPUT_ATTACK (24) / INPUT_AIM (25) are the two control IDs ox_target ever
+-- passes as a prompt's `key` (see mouseButton in ox_target/client/main.lua)
+-- -- both always mouse-bound on keyboard+mouse. GetControlInstructionalButton
+-- has no text glyph for a mouse button the way it does a real keyboard key,
+-- so it answers with a raw icon index instead. Named here rather than trusted
+-- from the native.
+local MOUSE_BUTTON_LABELS = { [24] = 'LMB', [25] = 'RMB' }
+
 local function resolveKey(key)
     if type(key) == 'string' then return key end
     if type(key) ~= 'number' then return nil end
+
+    -- Keyboard+mouse: answer for the mouse buttons ourselves. Conditioned on
+    -- NOT being on a pad rather than on IsInputDisabled(2) being true -- the
+    -- two are meant to be the same question, but written the second way a
+    -- device state that satisfies neither branch (which is what left "100" on
+    -- screen) falls through to the native and gets believed. Asking "are we on
+    -- a pad" leaves no such gap: everything that is not a pad is kb+m.
+    if not usingPad() and MOUSE_BUTTON_LABELS[key] then
+        return MOUSE_BUTTON_LABELS[key]
+    end
+
     local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
     if not ok or not raw then return nil end
-    return safeLabel(raw:sub(3))
-end
 
-local function usingPad()
-    return not IsInputDisabled(2)
+    -- safeLabel is the backstop: a pad ligature becomes a neutral marker and a
+    -- multi-digit icon index becomes nil (label only, no key) rather than
+    -- being drawn as a number.
+    return safeLabel(raw:sub(3))
 end
 
 -- =============================================================================
 -- Action prompts
 -- =============================================================================
 
-local prompts = {}          -- id -> { label, key }
+local prompts = {}          -- id -> { label, key, holdMs, onHeld, heldSince, lastFrac, fired }
 local promptCount = 0
+local holdPromptCount = 0   -- how many entries in `prompts` have holdMs set -- gates the poll thread below
 local lastDevice = nil
 
 -- Forward declaration: HideActionPrompt is referenced by the resource-stop
@@ -1437,18 +1490,66 @@ local function pushPrompt(id)
     ui('prompt', {
         id = id, show = true, label = p.label,
         glyph = resolveKey(p.key), device = usingPad() and 'pad' or 'kbm',
+        hold = p.holdMs ~= nil,
     })
 end
 
-ShowActionPrompt = function(id, label, key)
+-- A short pad rumble -- local player only (PAD::SET_CONTROL_SHAKE's first
+-- arg is the pad index, not a control id despite the name; 0 is the local
+-- player's own pad, the near-universal community convention for this
+-- native since FiveM ships no doc page for it). Deliberately light: this
+-- fires on every prompt appearing, so anything stronger would get old fast.
+--
+-- Invoked by hash, not the generated `SetControlShake` global: confirmed
+-- live in-game (client log, 2026-09-03) that global is nil in this build
+-- despite the native itself being real and long-standing (R* build 323,
+-- see _tools/nativedb) -- FiveM's Lua wrapper generation appears to skip
+-- it here for whatever reason. This crashed BOTH callers of promptRumble
+-- (below) and client_overlays.lua's OpenInteractMenu, in both cases right
+-- after their own appear cue had already fired -- the sound/vibe played,
+-- then the whole calling function (ShowActionPrompt / OpenInteractMenu)
+-- died before reaching the code that actually renders anything, which is
+-- why prompts and interact menus were invisible even though they'd
+-- audibly/haptically "appeared". Citizen.InvokeNative sidesteps whatever
+-- the generation gap is, using the same hash nativedb confirms.
+local function promptRumble(durationMs, frequency)
+    Citizen.InvokeNative(0x48B3886C1358D0D5, 0, durationMs, frequency)
+end
+
+--- opts (optional): { hold = durationMs, onHeld = function() ... end }.
+--- `key` must be a real control id (a number), not a decorative string,
+--- for hold to do anything -- there is no input to poll otherwise. onHeld
+--- fires once per hold (release and re-hold fires it again); the caller
+--- decides what happens next (HideActionPrompt, trigger a selection, ...),
+--- this only tracks and renders progress.
+ShowActionPrompt = function(id, label, key, opts)
     if not id then return end
-    if not prompts[id] then promptCount = promptCount + 1 end
-    prompts[id] = { label = label or '', key = key }
+    local existing = prompts[id]
+    if not existing then
+        promptCount = promptCount + 1
+        promptRumble(80, 15) -- light -- see promptRumble's comment
+    end
+
+    opts = opts or {}
+    local holdMs = tonumber(opts.hold)
+    if type(key) ~= 'number' then holdMs = nil end -- can't poll a control that isn't a real control id
+
+    local hadHold = existing and existing.holdMs ~= nil
+    if holdMs and not hadHold then holdPromptCount = holdPromptCount + 1
+    elseif not holdMs and hadHold then holdPromptCount = holdPromptCount - 1 end
+
+    prompts[id] = {
+        label = label or '', key = key,
+        holdMs = holdMs, onHeld = opts.onHeld,
+        heldSince = nil, lastFrac = 0, fired = false,
+    }
     pushPrompt(id)
 end
 
 HideActionPrompt = function(id)
-    if not id or not prompts[id] then return end
+    local p = id and prompts[id]
+    if not p then return end
+    if p.holdMs then holdPromptCount = holdPromptCount - 1 end
     prompts[id] = nil
     promptCount = promptCount - 1
     ui('prompt', { id = id, show = false })
@@ -1456,6 +1557,21 @@ end
 
 exports('ShowActionPrompt', ShowActionPrompt)
 exports('HideActionPrompt', HideActionPrompt)
+
+RegisterCommand('hudprompt', function()
+    ShowActionPrompt('_debug:hudprompt', 'Hold to test', 38, { -- 38 = E
+        hold = 1000,
+        onHeld = function()
+            print('^3[vice_hud]^7 /hudprompt — held to completion')
+            HideActionPrompt('_debug:hudprompt')
+        end,
+    })
+    print('^3[vice_hud]^7 /hudprompt — sample hold-to-confirm prompt. Hold E for 1s. /hudprompthide to cancel.')
+end, false)
+
+RegisterCommand('hudprompthide', function()
+    HideActionPrompt('_debug:hudprompt')
+end, false)
 
 -- Clean up prompts belonging to a resource that stops, so a crashed script can
 -- never leave a prompt stuck on screen.
@@ -1477,6 +1593,52 @@ CreateThread(function()
                 for id, p in pairs(prompts) do glyphs[id] = resolveKey(p.key) end
                 ui('promptGlyphs', { device = device, glyphs = glyphs })
             end
+        end
+    end
+end)
+
+-- Polls held-control progress for whichever prompts asked for it. Separate
+-- from the glyph-refresh loop above (Wait(400), fine for a device check) --
+-- a hold bar needs a much tighter tick to read as smooth, so this thread
+-- only spins at Wait(0) while holdPromptCount > 0 and idles otherwise, per
+-- the same "don't burn frame budget for nothing" rule the rest of this file
+-- follows.
+CreateThread(function()
+    while true do
+        if holdPromptCount > 0 then
+            local now = GetGameTimer()
+            for id, p in pairs(prompts) do
+                if p.holdMs then
+                    -- The "Disabled" variant, not IsControlPressed: a caller
+                    -- that also calls DisableControlAction on this same
+                    -- control this frame (e.g. ox_target suppressing its
+                    -- default action while repurposing it for a hold) would
+                    -- otherwise see IsControlPressed report false for a
+                    -- control it just disabled -- IsDisabledControlPressed
+                    -- reads the raw press regardless, and is identical to
+                    -- IsControlPressed for any control nobody disabled.
+                    local pressed = IsDisabledControlPressed(0, p.key)
+                    if pressed then
+                        p.heldSince = p.heldSince or now
+                        local frac = math.min(1, (now - p.heldSince) / p.holdMs)
+                        if frac ~= p.lastFrac then
+                            p.lastFrac = frac
+                            ui('promptProgress', { id = id, frac = frac })
+                        end
+                        if frac >= 1 and not p.fired then
+                            p.fired = true
+                            promptRumble(150, 40) -- stronger than the appear pulse -- this one means "it happened"
+                            if p.onHeld then p.onHeld() end
+                        end
+                    elseif p.heldSince then
+                        p.heldSince, p.fired, p.lastFrac = nil, false, 0
+                        ui('promptProgress', { id = id, frac = 0 })
+                    end
+                end
+            end
+            Wait(0)
+        else
+            Wait(250)
         end
     end
 end)
@@ -1505,7 +1667,7 @@ local function honorEmoji(honor)
     return Config.Honor.neutral
 end
 
-local function ShowHonorToast(mugshot, honor, emoji, reason, broken)
+local function ShowHonorToast(mugshot, honor, emoji, reason, broken, severity)
     local value = tonumber(honor)
 
     -- The face in the corner reflects where honor STANDS.
@@ -1529,10 +1691,18 @@ local function ShowHonorToast(mugshot, honor, emoji, reason, broken)
         honor   = value,
         delta   = delta,
         broken  = lastHonorBroken,
+        -- Which of the three faces (good/bad/terrible) the centre indicator
+        -- shows for THIS deed -- separate from `broken`, which is the
+        -- permanent unrepairable-floor override (see onHonor() in app.js).
+        -- Not sticky like lastHonor/lastHonorBroken: severity describes one
+        -- event, not an accumulating state, so a caller that omits it just
+        -- falls back to plain up/down in app.js.
+        severity = severity,
         -- The centre indicator shows the face for the DIRECTION of the change,
         -- which is not necessarily the face for the current standing.
-        angelEmoji = Config.Honor.angel,
-        devilEmoji = Config.Honor.devil,
+        angelEmoji    = Config.Honor.angel,
+        devilEmoji    = Config.Honor.devil,
+        terribleEmoji = Config.Honor.terrible,
         showValue  = Config.Honor.showValue,
         valueLabel = Config.Honor.valueLabel,
         holdMs     = Config.Honor.holdMs,
@@ -1553,16 +1723,48 @@ exports('SetHonorStanding', function(honor, broken)
     if broken == true then lastHonorBroken = true end
 end)
 
+--- A DEED happened: fire the centre +/- indicator and nothing else.
+---
+--- The corner panel is a STANDING readout -- it answers "what tier am I now",
+--- so it only earns screen time when that answer changes (qbx_honor's
+--- client/main.lua decides that and calls ShowHonorToast instead). The centre
+--- indicator is the EVENT -- it answers "that thing you just did counted",
+--- which is true of every hook, including the ones that move honor a point or
+--- two inside the same tier. Firing both for every deed is what buried the
+--- indicator under a panel that kept saying the same thing.
+---
+--- No mugshot argument on purpose: the indicator never draws one, so the
+--- caller is spared a MugShotBase64 round trip per deed.
+---@param delta number? how far honor moved; 0 is legitimate once clamped at
+--- Config.MinHonor/MaxHonor, which is why severity carries the direction
+---@param severity 'good' | 'bad' | 'terrible' | nil
+---@param broken boolean?
+exports('ShowHonorDeed', function(delta, severity, broken)
+    if broken == true then lastHonorBroken = true end
+
+    ui('honor', {
+        popOnly = true,
+        delta   = tonumber(delta) or 0,
+        severity = severity,
+        broken  = lastHonorBroken,
+        angelEmoji    = Config.Honor.angel,
+        devilEmoji    = Config.Honor.devil,
+        terribleEmoji = Config.Honor.terrible,
+    })
+end)
+
 --- Force the centre indicator, for callers that know the direction but not the
 --- value (and for /hudtest).
-exports('ShowHonorChange', function(delta, mugshot)
+exports('ShowHonorChange', function(delta, mugshot, severity)
     ui('honor', {
         mugshot = mugshot,
         emoji   = honorEmoji(lastHonor or 0),
         honor   = lastHonor,
         delta   = tonumber(delta) or 0,
-        angelEmoji = Config.Honor.angel,
-        devilEmoji = Config.Honor.devil,
+        severity = severity,
+        angelEmoji    = Config.Honor.angel,
+        devilEmoji    = Config.Honor.devil,
+        terribleEmoji = Config.Honor.terrible,
         showValue  = Config.Honor.showValue,
         valueLabel = Config.Honor.valueLabel,
         holdMs     = Config.Honor.holdMs,
@@ -2184,17 +2386,84 @@ local NAV_ACCENT_HEX = {
 --- html/app.js's TELL_SVG keys (array membership is the signal — see
 --- renderTells()).
 ---
--- Override for the one tell nothing in this codebase can detect on its own
--- — see exports.vice_hud:SetWantedTellOverride. Defaults off: there's no
--- CCTV/witness system installed on this server to ask about `camera`.
--- Wiring one up for real is future work; this just gives some other
--- resource a place to push the answer once it exists.
+-- Override for the tells nothing in this codebase can detect on its own
+-- — see exports.vice_hud:SetWantedTellOverride. Defaults off: this resource
+-- has no way to know whether a camera is looking at you, so it waits to be
+-- told. sk_streetkings' speed cameras push `camera` today; a CCTV resource
+-- can push the same tell alongside them without either having to know the
+-- other exists.
 -- Not `local` — same reasoning as HEAD_BONE above.
 tellOverrides = { camera = false }
 
-exports('SetWantedTellOverride', function(id, on)
-    if tellOverrides[id] == nil then return end -- unknown id — ignore rather than create a tell nothing draws
-    tellOverrides[id] = not not on
+--- Who is currently claiming each tell: [tellId][source] = true.
+---
+--- Source-keyed rather than one shared boolean, because more than one system
+--- can legitimately see you at once (a speed camera AND a CCTV network) and
+--- with a single flag whichever spoke last would win — the one that stopped
+--- seeing you would switch the tell off while the other was still watching.
+--- The tell is on while ANY source claims it.
+local tellOverrideSources = { camera = {} }
+
+--- Who has SEEN the player: [tellId][source] = true.
+---
+--- Separate from the claims above because being seen is an EVENT, not a state.
+--- A speed camera is only in frame for the second or two it takes to drive past
+--- it, but the police do not forget the photo when you leave the junction --
+--- the tell has to outlive the sighting. So a sighting LATCHES, and is cleared
+--- in getWantedTells() below when the wanted level reaches zero: the police
+--- losing you is the thing that ends it, not the camera losing sight of you.
+---
+--- A sighting recorded while NOT wanted clears on the very next poll, which is
+--- what stops a camera you drove past this morning from lighting the tell on an
+--- unrelated crime tonight.
+local tellSightings = { camera = {} }
+
+--- Report whether something of yours can see the player.
+---@param id string a key of tellOverrides ('camera')
+---@param on boolean
+---@param source? string your resource name. Omit only if you are the sole
+--- claimant of that tell; two resources sharing the default key will fight.
+exports('SetWantedTellOverride', function(id, on, source)
+    local sources = tellOverrideSources[id]
+    if not sources then return end -- unknown id — ignore rather than create a tell nothing draws
+
+    source = (type(source) == 'string' and source ~= '') and source or 'default'
+    sources[source] = on and true or nil
+
+    tellOverrides[id] = next(sources) ~= nil
+end)
+
+--- Report that something of yours has SEEN the player -- a camera they drove
+--- past, a witness who got a look at them. One shot: unlike
+--- SetWantedTellOverride there is nothing to turn back off, because the tell
+--- stays lit until the police lose the player rather than until you stop
+--- looking at them. Safe to call repeatedly.
+---@param id string a key of tellOverrides ('camera')
+---@param source? string your resource name
+exports('ReportWantedTellSighting', function(id, source)
+    local seen = tellSightings[id]
+    if not seen then return end
+
+    seen[(type(source) == 'string' and source ~= '') and source or 'default'] = true
+end)
+
+--- Drop every claim and sighting a source holds, for a resource going down
+--- while it still has one -- otherwise the tell stays lit with nobody left to
+--- clear it.
+---@param source string
+exports('ClearWantedTellOverrides', function(source)
+    if type(source) ~= 'string' or source == '' then return end
+
+    for id, sources in pairs(tellOverrideSources) do
+        if sources[source] then
+            sources[source] = nil
+            tellOverrides[id] = next(sources) ~= nil
+        end
+    end
+
+    for _, seen in pairs(tellSightings) do
+        seen[source] = nil
+    end
 end)
 
 --- Six tells, matching the "GRAND THEFT AUTO VI: HUD DEFINITIONS" reference
@@ -2236,10 +2505,22 @@ local function countNearbyPlayers(ped)
 end
 
 local function getWantedTells(wanted)
-    if wanted <= 0 then return {} end
+    if wanted <= 0 then
+        -- The police have lost you: every sighting is spent. This is the ONLY
+        -- thing that clears a latched sighting -- see tellSightings above for
+        -- why driving back out of a camera's view is deliberately not enough.
+        -- Replacing the table rather than table.clear(): that is a LuaJIT/ox_lib
+        -- extension, not base Lua, and this file must not depend on one for a
+        -- two-key table. Assigning to an existing key while iterating with
+        -- pairs is defined behaviour; adding one would not be.
+        for id, seen in pairs(tellSightings) do
+            if next(seen) then tellSightings[id] = {} end
+        end
+        return {}
+    end
 
     local out = {}
-    if tellOverrides.camera then out[#out + 1] = 'camera' end
+    if tellOverrides.camera or next(tellSightings.camera) then out[#out + 1] = 'camera' end
 
     local ped = cache.ped or PlayerPedId()
     local _, wep = GetCurrentPedWeapon(ped, true)

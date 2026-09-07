@@ -94,13 +94,18 @@ included here.
   `ox_lib`, `ox_target`, `qbx_core`, `lb-phone`.
 
 - **`qbx_honor`**: An RDR2-style persistent honor stat, purpose-built to
-  draw its devil/angel toast and centre-screen indicator on vice_hud's NUI
-  (see its own `README.md`'s "vice_hud" section). Hitting the honor floor
-  permanently latches an unrepairable flag (see its README's "Unrepairable
-  floor" section), so the devil badge renders grey and cracked from then on,
-  independent of whatever the honor number does afterward. Small and
-  self-contained enough to ship whole rather than as a patch. Depends on `qbx_core`,
-  `ox_target`.
+  draw its standing panel and centre-screen indicator on vice_hud's NUI
+  (see its own `README.md`'s "vice_hud" section). Every deed is tagged
+  `good` / `bad` / `terrible`, and the two halves of the HUD answer different
+  questions: the centre indicator fires for *every* deed, while the corner
+  panel only appears when your standing actually changes tier. Robbery counts
+  as `bad` on its own but escalates to `terrible` if you were already wanted
+  or had killed someone in the last few minutes — so the same job scores
+  differently depending on how it went. Hitting the honor floor permanently
+  latches an unrepairable flag (see its README's "Unrepairable floor"
+  section), so the badge renders grey and cracked from then on, independent of
+  whatever the honor number does afterward. Small and self-contained enough to
+  ship whole rather than as a patch. Depends on `qbx_core`, `ox_target`.
 
 - **`qbx_vehiclekeys`**: Qbox's own vehicle keys, carjacking and hotwire
   resource, with a Slim Jim and Smash Window addition on top. Third-eye a
@@ -120,6 +125,14 @@ included here.
   its gender-based accent colour when it's running, otherwise looks the same
   either way. Depends on `ox_lib`.
 
+  > [!NOTE]
+  > **The Map tab is beta.** Blip positions on the custom-stitched map image
+  > are only affine-calibrated to ~1% accuracy (see
+  > `html/images/README.md`), so a blip far from the landmarks used for that
+  > fit can visibly drift from where it actually is. Double-clicking a blip
+  > or an empty spot on the map to set a waypoint works, but expect some
+  > imprecision until the calibration gets more landmarks.
+
 - **`qbx_relog`**: Singleplayer-style character switching. `/relog` still
   works as before (confirmation, anti-combat-log wait, back to the
   multicharacter picker), and holding a key now opens a row of portrait cards
@@ -136,8 +149,19 @@ Overlays for resources you install separately:
 
 - **`ox_lib`**: the popup/notification glass theme (`lib.notify`, context
   menus, dialogs, progress bars).
-- **`ox_target`**, **`qb-menu`**, **`qb-input`**: each has its own
-  `ui_page`, so each needed its own small copy of the same theme hook.
+- **`ox_target`**: the same small theme hook as below, plus a second,
+  bigger patch that replaces its own eye + option-list NUI outright with
+  vice_hud's textui system: a hold-to-confirm "[key] Label" prompt for a
+  single option (RDR2/GTA VI style), the same ScaleformUI menu
+  `qbx_vehiclekeys` already uses for 2+. Also drops the hold/toggle-Alt
+  keybind entirely — targeting runs continuously now, so the prompt just
+  appears when you're looking at something in range, no key to press
+  first. Still fully aim-based; only the activation gate and what renders
+  changed, raycasting and option resolution are untouched. See
+  `docs/PATCHES.md`'s ox_target section for the two patches separately;
+  the textui one needs vice_hud 2.1.0+.
+- **`qb-menu`**, **`qb-input`**: each has its own `ui_page`, so each
+  needed its own small copy of the same theme hook as ox_target's above.
 - **`ox_inventory`**: a separate, unrelated GTA6-inspired reskin of the F2
   inventory screen and the in-world hotbar: an 8-cell role-based weapon wheel
   (free/melee/handheld/fist) plus a matching items wheel, medical-only
@@ -238,6 +262,12 @@ Not bundled here, these are separate projects you install yourself:
   than copied in here. Drag-and-drop per its own README; `vice_hud`'s rounded
   minimap mask and wanted-search overlay sit on top of whatever map style is
   loaded, so the two work together with no extra configuration.
+- **[streetkings](https://github.com/streetkings-fivem/streetkings)**: a street
+  racing resource whose speed cameras can light `vice_hud`'s wanted camera
+  tell. One call in its speed camera module is enough, and the same call works
+  from any CCTV or camera resource you already run, including your own. See
+  "The camera tell" in `resources/vice_hud/README.md`. Not bundled here since
+  it's a separate gameplay system rather than part of this repo's UI scope.
 - **[wasabi_backpack](https://github.com/wasabirobby/wasabi_backpack)** by
   wasabirobby: an ox_inventory bag item with its own per-bag stash. Same
   licensing reasoning as LS Map Lite above, linked, not embedded.
@@ -282,10 +312,12 @@ which is GPL-3.0. That's Qbox-project's own license on their own code, not
 something this repository can change, so it keeps its own `LICENSE` file
 and stays GPL-3.0 regardless of the license above.
 
-Nothing else under `resources/` or `patches/` ships its own `LICENSE` here,
-since `patches/` is only a handful of individual files extracted from each
-project, not a full copy, but the original projects remain under their own
-upstream license:
+`resources/vice_hud` and `resources/qbx_honor` each carry their own copy of
+that same CC BY-NC-SA 4.0 licence, so they stay correctly licensed if someone
+takes one of those folders on its own. Nothing under `patches/` ships a
+`LICENSE`, since each of those is only a handful of individual files extracted
+from a project rather than a full copy, and the original projects remain under
+their own upstream license:
 
 | Project | License |
 | --- | --- |

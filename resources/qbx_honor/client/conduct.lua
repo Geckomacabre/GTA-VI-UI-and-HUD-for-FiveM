@@ -61,17 +61,44 @@ end
 
 ---Classifies a ped the local player just killed.
 ---@param ped number
----@return 'kill_civilian' | 'kill_animal' | nil nil when the kill costs nothing
+---@return 'kill_civilian' | 'kill_animal' | 'kill_cop' | 'kill_player' | nil nil when the kill costs nothing
 local function classifyKill(ped)
     if not DoesEntityExist(ped) then return end
-    if not IsEntityAPed(ped) or IsPedAPlayer(ped) then return end
+    if not IsEntityAPed(ped) then return end
+
+    -- Another player. (Never the local one - the damage handler returns before
+    -- this whenever the victim is us.) Self-defence is honoured exactly as it
+    -- is for a bystander, but getIsArmed deliberately is NOT consulted: in a
+    -- firefight practically everyone is holding a weapon, so that heuristic
+    -- would wave through essentially every PvP kill. See Config.Hooks.kill_player.
+    if IsPedAPlayer(ped) then
+        if not watcher.penalisePlayerKills then return end
+        if getIsAggressor(ped) then return end
+        return 'kill_player'
+    end
 
     local pedType = GetPedType(ped)
 
     if watcher.animalPedTypes[pedType] then
+        -- A ped a hunting resource spawned and tagged as legitimate game
+        -- (state bag `legitGame`, set by the spawner - um_hunting) is fair to
+        -- take: hunting is a sanctioned profession there, not poaching a
+        -- bystander's pet or wildlife. Checked before the aggressor check
+        -- below, since a fleeing/passive game animal is never "an aggressor"
+        -- and would otherwise still cost honor.
+        if Entity(ped).state.legitGame then return nil end
+
         -- A cougar mid-lunge is not an innocent animal.
         return not getIsAggressor(ped) and 'kill_animal' or nil
     end
+
+    -- Checked BEFORE the civilian branch and its exemptions on purpose: a cop
+    -- who shot at you first (getIsAggressor) or died holding a weapon
+    -- (getIsArmed) is exactly what you'd expect of an officer doing their job
+    -- against a wanted suspect, not an innocent victim. Those exemptions exist
+    -- to stop honor punishing you for surviving a mugging you didn't start -
+    -- they don't apply to a fight you started by breaking the law.
+    if watcher.copPedTypes[pedType] then return 'kill_cop' end
 
     if not watcher.civilianPedTypes[pedType] then return end -- gangs, criminals: free
     if getIsAggressor(ped) or getIsArmed(ped) then return end
@@ -405,6 +432,32 @@ CreateThread(function()
         ::continue::
     end
 end)
+
+-- ============================================================================
+-- Carjacking
+-- IS_PED_JACKING is true only for the animation where the player drags an
+-- occupant OUT of a vehicle -- taking an empty parked car never trips it (that
+-- is qbx_vehiclekeys' window_smash instead). So this is specifically "theft
+-- with a victim standing there", which is what Config.Hooks.carjack prices.
+--
+-- The jack animation runs for well over a second, so the poll would report the
+-- same jack several times; the long Wait after a report is what makes it one
+-- report per jack. Config.Hooks.carjack's cooldown is still the real anti-farm.
+-- ============================================================================
+
+if watcher.penaliseCarjacking then
+    CreateThread(function()
+        while true do
+            Wait(500)
+
+            if IsPedJacking(PlayerPedId()) then
+                trace('carjacking detected')
+                report('carjack')
+                Wait(8000)
+            end
+        end
+    end)
+end
 
 -- ============================================================================
 -- Aiming at civilians (opt-in)

@@ -26,6 +26,34 @@ end
 local honorCache = {}   -- [src] = last known honor value (avoids redundant GetPlayer calls on read-heavy callers)
 local brokenCache = {}  -- [src] = last known metadata.honorBroken (same reasoning)
 local hookState = {}    -- [src][hookName] = {last = GetGameTimer(), moved = total absolute honor moved this session}
+local wantedCache = {}  -- [src] = wanted level last reported by that player's client watcher
+local lastViolence = {} -- [src] = GetGameTimer() of the last Config.Escalation.violentHooks hook they set off
+
+---Whether a hook should swap to its `escalate` values right now. See
+---Config.Escalation for what counts and why the check lives server-side.
+---@param src number
+---@param hook HonorHook
+---@return boolean escalated
+---@return string? why for the trace line
+local function shouldEscalate(src, hook)
+    if not hook.escalate then return false end
+
+    local rules = Config.Escalation
+    if not rules then return false end
+
+    if rules.whenWanted and (wantedCache[src] or 0) > 0 then
+        return true, ('wanted level %d'):format(wantedCache[src])
+    end
+
+    if rules.whenRecentKill then
+        local at = lastViolence[src]
+        if at and (GetGameTimer() - at) < (rules.recentKillWindowMs or 0) then
+            return true, 'killed someone recently'
+        end
+    end
+
+    return false
+end
 
 local function clamp(value)
     if value < Config.MinHonor then return Config.MinHonor end
@@ -54,11 +82,17 @@ exports('GetBadgeTier', getBadgeTier)
 ---@param src number the player's server id
 ---@param delta number amount to add (may be negative)
 ---@param reason? string short human-readable cause, forwarded to the HUD
+---@param severity? 'good' | 'bad' | 'terrible' which vice_hud popup face this deed
+---shows. Defaults by delta's sign when a caller doesn't have a hook to supply
+---one (AddHonor/RemoveHonor/AdjustHonor called directly) -- 'terrible' is only
+---ever reached via a hook that explicitly asks for it.
 ---@return number|nil newHonor the honor value after the adjustment, or nil if the player wasn't found
-local function AdjustHonor(src, delta, reason)
+local function AdjustHonor(src, delta, reason, severity)
     src = tonumber(src)
     delta = tonumber(delta)
     if not src or not delta or delta == 0 then return nil end
+
+    severity = severity or (delta > 0 and 'good' or 'bad')
 
     local ok, player = pcall(function() return exports.qbx_core:GetPlayer(src) end)
     if not ok or not player then
@@ -110,7 +144,7 @@ local function AdjustHonor(src, delta, reason)
     -- unchanged (e.g. already at the floor/ceiling) - the player still did the
     -- thing, and staying silent about that is what made "honor already at -100"
     -- indistinguishable from "the hook never fired" in the first place.
-    TriggerClientEvent('qbx_honor:client:honorUpdated', src, newValue, current, reason, nowBroken)
+    TriggerClientEvent('qbx_honor:client:honorUpdated', src, newValue, current, reason, nowBroken, severity)
 
     return newValue
 end
@@ -178,7 +212,20 @@ local function ApplyHook(src, hookName)
         return nil
     end
 
+    -- Escalation swaps the AMOUNT, the REASON and the SEVERITY, but not the
+    -- throttles: cooldown/sessionCap bookkeeping stays keyed to the base hook
+    -- name, so a robbery can't be farmed by alternating escalated and calm
+    -- versions of itself.
     local delta = hook.delta
+    local label, severity = hook.label, hook.severity
+
+    local escalated, why = shouldEscalate(src, hook)
+    if escalated then
+        delta = hook.escalate.delta or delta
+        label = hook.escalate.label or label
+        severity = hook.escalate.severity or 'terrible'
+        trace(src, 'hook "%s" ESCALATED (%s) -> %s / %s', hookName, tostring(why), tostring(delta), tostring(severity))
+    end
 
     if hook.sessionCap then
         local remaining = hook.sessionCap - entry.moved
@@ -193,11 +240,18 @@ local function ApplyHook(src, hookName)
         end
     end
 
-    local newValue = AdjustHonor(src, delta, hook.label)
+    local newValue = AdjustHonor(src, delta, label, severity)
     if newValue == nil then return nil end
 
     entry.last = now
     entry.moved = entry.moved + math.abs(delta)
+
+    -- Mark the player as recently violent so a robbery that pays out in the
+    -- next few minutes escalates off it (Config.Escalation.whenRecentKill).
+    if Config.Escalation and Config.Escalation.violentHooks
+        and Config.Escalation.violentHooks[hookName] then
+        lastViolence[src] = now
+    end
 
     -- Server-side only (both resources run server-side) - lets qbx_reputation
     -- and anything else piggyback on these 18 call sites without touching
@@ -245,7 +299,7 @@ exports('IsHonorBroken', IsHonorBroken)
 -- qbx_core's own player.lua does not know about `honor`, so this resource is
 -- responsible for seeding the default the first time a character is loaded
 -- (mirrors the pattern other addon resources in this codebase use for their
--- own custom metadata fields, e.g. an addiction script / qbx_smallresources).
+-- own custom metadata fields, e.g. um_addiction / um_smallresources).
 -- ============================================================================
 
 AddEventHandler('QBCore:Server:PlayerLoaded', function(player)
@@ -290,6 +344,8 @@ AddEventHandler('playerDropped', function()
     honorCache[source] = nil
     brokenCache[source] = nil
     hookState[source] = nil
+    wantedCache[source] = nil
+    lastViolence[source] = nil
 end)
 
 -- ============================================================================
@@ -299,12 +355,19 @@ end)
 -- this handler decides whether it's plausible and applies the penalty.
 -- ============================================================================
 
-RegisterNetEvent('qbx_honor:server:wantedIncreased', function(newLevel, oldLevel)
+-- Reports EVERY change, not just increases: the current level is also what
+-- Config.Escalation.whenWanted reads to decide whether a robbery paying out
+-- right now counts as an armed one, so the server has to know when the stars
+-- drop again too, not only when they rise.
+RegisterNetEvent('qbx_honor:server:wantedChanged', function(newLevel, oldLevel)
     local src = source
-    if type(newLevel) ~= 'number' or type(oldLevel) ~= 'number' then return end
-    trace(src, 'wantedIncreased: %s -> %s', tostring(oldLevel), tostring(newLevel))
+    if type(newLevel) ~= 'number' or newLevel < 0 or newLevel > 5 then return end
 
-    if newLevel <= oldLevel or newLevel < 1 then return end -- guard against a spoofed/non-increase report
+    wantedCache[src] = newLevel
+    trace(src, 'wantedChanged: %s -> %s', tostring(oldLevel), tostring(newLevel))
+
+    if type(oldLevel) ~= 'number' then return end
+    if newLevel <= oldLevel or newLevel < 1 then return end -- only a real increase costs honor
 
     -- The anti-farm cooldown lives in Config.Hooks.wanted_level, so rapid star
     -- flicker right at a threshold can't be ground into repeated honor loss.
@@ -327,9 +390,16 @@ end)
 local reportableHooks = {
     kill_civilian = true,
     kill_animal = true,
+    kill_cop = true,
+    kill_player = true,
     aim_at_civilian = true,
+    carjack = true,
     greet_npc = true,
     antagonize_npc = true,
+    -- tk_drugs reports these from its own client editable file; a clean sale
+    -- is deliberately not reportable at all (see Config.Hooks).
+    drug_deal_rejected = true,
+    drug_deal_caught = true,
 }
 
 RegisterNetEvent('qbx_honor:server:reportConduct', function(hookName)
@@ -341,6 +411,8 @@ RegisterNetEvent('qbx_honor:server:reportConduct', function(hookName)
         return
     end
     if hookName == 'aim_at_civilian' and not Config.ConductWatcher.penaliseAiming then return end
+    if hookName == 'carjack' and not Config.ConductWatcher.penaliseCarjacking then return end
+    if hookName == 'kill_player' and not Config.ConductWatcher.penalisePlayerKills then return end
 
     ApplyHook(src, hookName)
 end)
