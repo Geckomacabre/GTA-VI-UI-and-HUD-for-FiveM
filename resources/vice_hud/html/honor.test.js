@@ -126,7 +126,9 @@ console.log('\n-- the panel hairline (--hairline, matching ox_lib\'s panel edge)
   // Pinned to #map-frame's border: that edge is the reference the other panels
   // copy, so a change to one that isn't mirrored in the other is a bug.
   const mapBorder = window.getComputedStyle($('map-frame')).border || '';
-  ok(/0\.085cqw/.test(token) && /rgba\(236, ?236, ?240, ?0?\.3\)?/.test(token),
+  // 0.085cqw -> calc(0.085 * var(--w)) as part of the --w aspect-ratio pass;
+  // accept either spelling, same as editor.test.js's matching assertion.
+  ok((/0\.085cqw/.test(token) || /calc\(0\.085\s*\*\s*var\(--w\)\)/.test(token)) && /rgba\(236, ?236, ?240, ?0?\.3\)?/.test(token),
      '--hairline matches #map-frame\'s width and colour', token + '   map: ' + mapBorder.slice(0, 40));
 
   const ringed = ['honor', 'reputation', 'wanted'];

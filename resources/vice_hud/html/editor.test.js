@@ -388,7 +388,11 @@ console.log('\n-- one glass, shared --');
   // what matters is that .plate still has an inset ring, not how it spells it.
   ok(/\.plate \{[\s\S]*?(var\(--hairline\)|inset 0 0 0 0\.055cqw)/.test(css),
      'and the hairline INSET ring, which costs no layout width unlike a border');
-  ok(/--hairline:\s*inset 0 0 0 0\.085cqw rgba\(236, 236, 240, 0\.30\)/.test(css),
+  // 0.085cqw -> calc(0.085 * var(--w)) as part of the --w aspect-ratio pass
+  // (every raw cqw SIZE/SHAPE value converted so it renders at a constant
+  // physical size across aspect ratios, not just at 16:9) -- accept either
+  // spelling, same reasoning as the ring check above.
+  ok(/--hairline:\s*inset 0 0 0 (0\.085cqw|calc\(0\.085 \* var\(--w\)\)) rgba\(236, 236, 240, 0\.30\)/.test(css),
      'and --hairline is #map-frame\'s edge exactly -- that border is the reference');
   ok(!/\.plate::before/.test(css),
      'and NO specular cap: that is what separates the plate from the glass');

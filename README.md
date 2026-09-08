@@ -57,9 +57,9 @@ GTA VI Resources/
 │
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
-│                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
-│                  zseatbelt, qbx_smallresources, dpclothing, qbx_core), plus
-│                  a standalone lb-phone Wallet app rebrand that doesn't touch
+│                  ox_target, qb-menu, qb-input, speedlimits, zseatbelt,
+│                  qbx_smallresources, dpclothing, qbx_core), plus a
+│                  standalone lb-phone Wallet app rebrand that doesn't touch
 │                  vice_hud at all. See docs/PATCHES.md for exact install
 │                  steps per resource.
 │
@@ -83,6 +83,25 @@ included here.
   `README.md` and `docs/INTERNALS.md` inside, so start there for anything
   HUD-specific. Depends on `ox_lib` and the sibling `ScaleformUI_Assets`
   resource.
+
+- **`ox_inventory`**: A full, pinned copy of
+  [communityox/ox_inventory](https://github.com/communityox/ox_inventory)
+  2.45.0 (GPL-3.0) with the GTA6 weapon/item wheel reskin already built in,
+  not a patch. An 8-cell role-based weapon wheel (free/melee/handheld/fist)
+  plus a matching items wheel, medical-only quickslots, a `qbx_honor`
+  standing badge, and (with `wasabi_backpack` installed) a hard 17-slot
+  pocket cap that lifts while a bag is carried. The items wheel also carries
+  three fixed clothing toggles (bandana/mask, eyewear, hat) that call into
+  the `dpclothing` patch below, plus a hanger icon cell held in reserve. See
+  the [weapon wheel](docs/screenshots/weapon-wheel.png) and
+  [items wheel](docs/screenshots/item-wheel.png) screenshots. Shipped as a
+  full resource, rather than a patch like the rest of this list, because a
+  fragment patch against stock `overextended/ox_inventory` broke the first
+  time that project restructured its own components underneath it --
+  drop-in replace your existing `ox_inventory` install with this one instead
+  of trying to patch it. Depends on `ox_lib`, `qbx_honor` (optional, for the
+  badge), `MugShotBase64` (optional, for the badge's mugshot), `dpclothing`
+  (optional, for the clothing toggle cells).
 
 - **`ScaleformUI_Assets`**: The compiled scaleform movie `vice_hud`'s
   interact menu renders through. Not a HUD feature on its own, just a
@@ -162,26 +181,15 @@ Overlays for resources you install separately:
   the textui one needs vice_hud 2.1.0+.
 - **`qb-menu`**, **`qb-input`**: each has its own `ui_page`, so each
   needed its own small copy of the same theme hook as ox_target's above.
-- **`ox_inventory`**: a separate, unrelated GTA6-inspired reskin of the F2
-  inventory screen and the in-world hotbar: an 8-cell role-based weapon wheel
-  (free/melee/handheld/fist) plus a matching items wheel, medical-only
-  quickslots, a `qbx_honor` standing badge, and (with `wasabi_backpack`
-  installed) a hard 17-slot pocket cap that lifts while a bag is carried. The
-  items wheel also carries three fixed clothing toggles (bandana/mask,
-  eyewear, hat) that call into the `dpclothing` patch below, plus a hanger
-  icon cell held in reserve. See the
-  [weapon wheel](docs/screenshots/weapon-wheel.png) and
-  [items wheel](docs/screenshots/item-wheel.png) screenshots. Not part of
-  the vice_hud glass system above.
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
 - **`qbx_smallresources`**: not theming, a functional fix for a stamina
   script in this pack that conflicts with vice_hud's stamina bar.
 - **`dpclothing`**: two exports appended to the end of the file so
-  ox_inventory's items wheel can toggle a worn mask/hat/glasses on and off
-  and read whether each is currently on. Needed for the ox_inventory patch's
-  clothing cells above to do anything.
+  `resources/ox_inventory`'s items wheel can toggle a worn mask/hat/glasses
+  on and off and read whether each is currently on. Needed for that wheel's
+  clothing cells to do anything.
 - **`qbx_core`**: two small exports and a one-line check in the multicharacter
   flow, needed by `qbx_relog` (bundled above) so a quick character switch
   doesn't fight with the normal character-select screen. Not theming, a
@@ -200,10 +208,13 @@ its own.
 
 1. Copy `resources/vice_hud`, `resources/ScaleformUI_Assets`,
    `resources/um_gigs`, `resources/qbx_honor`, `resources/qbx_vehiclekeys`,
-   `resources/gk_pausemenu`, and/or `resources/qbx_relog` into your server's
-   `resources/` folder.
+   `resources/gk_pausemenu`, `resources/qbx_relog`, and/or
+   `resources/ox_inventory` into your server's `resources/` folder.
+   `resources/ox_inventory` **replaces** an existing ox_inventory install
+   outright rather than sitting alongside one.
 2. Add them to `server.cfg`:
    ```
+   ensure ox_inventory
    ensure ScaleformUI_Assets
    ensure vice_hud
    ensure um_gigs
@@ -214,6 +225,10 @@ its own.
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
+   - `ox_inventory` needs **ox_lib**. Optional: `qbx_honor` (badge),
+     `MugShotBase64` (badge mugshot), `dpclothing` (clothing toggle cells,
+     see `patches/dpclothing` below), `wasabi_backpack` (lifts the 17-slot
+     pocket cap).
    - `vice_hud` needs **ox_lib** and **ScaleformUI_Assets** (bundled here,
      just make sure it's ensured first).
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
@@ -235,11 +250,14 @@ once it's installed.
 
 These are not resources, so do not `ensure` a `patches/` folder. Follow
 [`docs/PATCHES.md`](docs/PATCHES.md), which walks through each of `ox_lib`,
-`ox_target`, `ox_inventory`, `qb-menu`, `qb-input`, `speedlimits`,
-`zseatbelt`, `qbx_smallresources`, `dpclothing`, `qbx_core`, and `lb-phone`
-individually: which files to copy in, and the exact manifest/HTML edits
-(where one is needed). Every one of these needs an existing install of the
-resource it patches; none of them work standing alone.
+`ox_target`, `qb-menu`, `qb-input`, `speedlimits`, `zseatbelt`,
+`qbx_smallresources`, `dpclothing`, `qbx_core`, and `lb-phone` individually:
+which files to copy in, and the exact manifest/HTML edits (where one is
+needed). Every one of these needs an existing install of the resource it
+patches; none of them work standing alone. `dpclothing` is the one exception
+worth calling out here: it isn't a vice_hud theme hook at all, just the two
+exports `resources/ox_inventory`'s wheel needs to toggle clothing (see that
+resource's entry above).
 
 An update to any of those patched resources will silently wipe its patch.
 That's expected, and `PATCHES.md` says so per-resource. Re-apply after
@@ -306,11 +324,13 @@ BY-NC-SA 4.0), matching `vice_hud`, its core resource. In short: use it,
 modify it, share it, but not on a paid or commercial server, credit is
 required, and a modified version has to stay under the same license.
 
-`resources/qbx_vehiclekeys` is the exception: it's a modified copy of
-[Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys),
-which is GPL-3.0. That's Qbox-project's own license on their own code, not
-something this repository can change, so it keeps its own `LICENSE` file
-and stays GPL-3.0 regardless of the license above.
+`resources/qbx_vehiclekeys` and `resources/ox_inventory` are both exceptions:
+each is a modified copy of someone else's GPL-3.0 project
+([Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys)
+and [communityox/ox_inventory](https://github.com/communityox/ox_inventory)
+respectively), and that's their own license on their own code, not something
+this repository can change, so both keep their own `LICENSE` file and stay
+GPL-3.0 regardless of the license above.
 
 `resources/vice_hud` and `resources/qbx_honor` each carry their own copy of
 that same CC BY-NC-SA 4.0 licence, so they stay correctly licensed if someone
@@ -323,11 +343,11 @@ their own upstream license:
 | --- | --- |
 | `ox_lib` | LGPL-3.0 |
 | `ox_target` | MIT |
-| `ox_inventory` | GPL-3.0 |
 | `qb-menu`, `qb-input` | GPL-3.0 |
 | `speedlimits`, `zseatbelt` | MIT |
 | `qbx_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
+| `ox_inventory` | GPL-3.0 (see above) |
 | `qbx_core` | GPL-3.0 |
 | ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
 
