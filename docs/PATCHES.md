@@ -137,7 +137,7 @@ recoloured to match), stop here and skip the textui migration below.
      one-item list. Hold duration is tunable via the
      `ox_target:textUiHoldMs` convar (default 350ms).
    - **2+ visible options** → `exports.vice_hud:OpenInteractMenu`, the same
-     ScaleformUI list `qbx_vehiclekeys`' Slim Jim menu already uses (see
+     NUI interact menu `qbx_vehiclekeys`' Slim Jim menu already uses (see
      that resource's `README.md`), instead of ox_target's own list.
 
 Because neither of those needs NUI focus, ox_target never grabs the mouse

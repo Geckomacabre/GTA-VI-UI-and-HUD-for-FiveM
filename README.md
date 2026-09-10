@@ -76,17 +76,11 @@ included here.
 ### `resources/`
 
 - **`vice_hud`**: The core HUD: minimap, vehicle panel, zone bar, skills,
-  stamina/oxygen, notifications, a full in-game HUD editor (`/hudedit`), and
-  the theme engine (`/hudtheme`, `/themepublish`) that the `patches/` folder
-  plugs into. The interact menu renders through ScaleformUI rather than NUI;
-  see `resources/vice_hud/README.md` for what that needs. Has its own
-  `README.md` and `docs/INTERNALS.md` inside, so start there for anything
-  HUD-specific. Depends on `ox_lib` and the sibling `ScaleformUI_Assets`
-  resource.
-
-- **`ScaleformUI_Assets`**: The compiled scaleform movie `vice_hud`'s
-  interact menu renders through. Not a HUD feature on its own, just a
-  runtime dependency; ensure it before `vice_hud` in server.cfg.
+  stamina/oxygen, notifications, an NUI-based interact menu, a full in-game
+  HUD editor (`/hudedit`), and the theme engine (`/hudtheme`, `/themepublish`)
+  that the `patches/` folder plugs into. Has its own `README.md` and
+  `docs/INTERNALS.md` inside, so start there for anything HUD-specific.
+  Depends on `ox_lib`.
 
 - **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the
@@ -152,7 +146,7 @@ Overlays for resources you install separately:
 - **`ox_target`**: the same small theme hook as below, plus a second,
   bigger patch that replaces its own eye + option-list NUI outright with
   vice_hud's textui system: a hold-to-confirm "[key] Label" prompt for a
-  single option (RDR2/GTA VI style), the same ScaleformUI menu
+  single option (RDR2/GTA VI style), the same NUI interact menu
   `qbx_vehiclekeys` already uses for 2+. Also drops the hold/toggle-Alt
   keybind entirely — targeting runs continuously now, so the prompt just
   appears when you're looking at something in range, no key to press
@@ -198,13 +192,11 @@ its own.
 
 ## Installing (drag-and-drop resources)
 
-1. Copy `resources/vice_hud`, `resources/ScaleformUI_Assets`,
-   `resources/um_gigs`, `resources/qbx_honor`, `resources/qbx_vehiclekeys`,
-   `resources/gk_pausemenu`, and/or `resources/qbx_relog` into your server's
-   `resources/` folder.
+1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/qbx_honor`,
+   `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`, and/or
+   `resources/qbx_relog` into your server's `resources/` folder.
 2. Add them to `server.cfg`:
    ```
-   ensure ScaleformUI_Assets
    ensure vice_hud
    ensure um_gigs
    ensure qbx_honor
@@ -214,8 +206,7 @@ its own.
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
-   - `vice_hud` needs **ox_lib** and **ScaleformUI_Assets** (bundled here,
-     just make sure it's ensured first).
+   - `vice_hud` needs **ox_lib**.
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
    - `qbx_honor` needs **qbx_core**, **ox_target**.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
@@ -329,7 +320,6 @@ their own upstream license:
 | `qbx_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
 | `qbx_core` | GPL-3.0 |
-| ScaleformUI (`vice_hud`'s interact menu) | CC BY-NC-SA 4.0, non-commercial |
 
 `lb-phone` is different again: it's a paid, closed-source resource, not
 under any of the licenses above. Nothing of lb-phone's own code or assets is

@@ -495,12 +495,12 @@ local function startTargeting()
 
             -- Upstream granted NUI focus + cursor here on a mouseButton
             -- press so the player could click an option in its own web
-            -- page's list. Neither of vice_hud's replacements need that:
+            -- page's list. This file never needs to do that itself:
             -- ShowActionPrompt's hold is polled directly (mouseButton is
             -- still the control, see driveUi below, just read without ever
-            -- touching NUI focus) and OpenInteractMenu's ScaleformUI menu
-            -- reads keyboard/controller input on its own. See this file's
-            -- header block for the rest of this migration.
+            -- touching NUI focus) and OpenInteractMenu grants and drops its
+            -- own NUI focus internally (see vice_hud/client_overlays.lua).
+            -- See this file's header block for the rest of this migration.
 
             Wait(0)
         end
