@@ -530,11 +530,9 @@
             marker.innerHTML = i === interactSel ? INTERACT_MARKER_X : INTERACT_MARKER_DOT;
             row.appendChild(marker);
 
-            var label = document.createElement('span');
-            label.className = 'interact-label item-select-outline';
-            label.textContent = opt.label || '';
-            row.appendChild(label);
-
+            // Badges sit between the marker and the label (reference: marker,
+            // then badge chips, then text) -- appended before the label now,
+            // not after it.
             if (opt.badges && opt.badges.length) {
                 var badges = document.createElement('span');
                 badges.className = 'interact-badges';
@@ -546,6 +544,11 @@
                 });
                 row.appendChild(badges);
             }
+
+            var label = document.createElement('span');
+            label.className = 'interact-label item-select-outline';
+            label.textContent = opt.label || '';
+            row.appendChild(label);
 
             list.appendChild(row);
         });
@@ -564,7 +567,45 @@
         if (interactSel < 0) interactSel = 0;
 
         renderInteract();
+
+        // World-anchoring (added after this NUI panel's original build --
+        // see onInteractPos below for the per-frame version of this same
+        // positioning). `anchored` false/absent means this open call has no
+        // world point at all (client_overlays.lua's OpenInteractMenu without
+        // an `anchor` arg, e.g. qbx_vehiclekeys) -- clear any inline
+        // left/top a PREVIOUS anchored open left behind so this one falls
+        // back to the plain fixed CSS position instead of inheriting a
+        // stale spot from whatever was open before it.
+        if (d.anchored) {
+            box.classList.toggle('interact-offscreen', d.onScreen === false);
+            if (d.onScreen !== false) {
+                box.style.left = (d.x * 100) + 'cqw';
+                box.style.top = (d.y * 100) + 'cqh';
+            }
+        } else {
+            box.classList.remove('interact-offscreen');
+            box.style.left = '';
+            box.style.top = '';
+        }
+
         show(box, true);
+    }
+
+    // Per-frame follow-up to onInteract's own first-frame placement above --
+    // pushed by client_overlays.lua's world-anchoring thread while an
+    // anchored OpenInteractMenu is open, same split ShowWorldActions/
+    // onWorldActionsPos already uses and for the same reason: this would
+    // otherwise rebuild the whole option list every tick for nothing.
+    function onInteractPos(d) {
+        var box = $('interact');
+        if (!box) return;
+        if (!d || d.show === false) {
+            box.classList.add('interact-offscreen');
+            return;
+        }
+        box.classList.remove('interact-offscreen');
+        box.style.left = (d.x * 100) + 'cqw';
+        box.style.top = (d.y * 100) + 'cqh';
     }
 
     function moveInteractSel(delta) {
@@ -3570,6 +3611,7 @@
         crossKill: onKillMark,
         lapHud: onLapHud,
         interact: onInteract,
+        interactPos: onInteractPos,
         worldActions: onWorldActions,
         worldActionsPos: onWorldActionsPos,
         lockpick: onLockpick,

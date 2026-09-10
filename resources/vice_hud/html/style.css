@@ -3532,6 +3532,11 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     color: #f2f2ef;
 }
 #interact.hidden { display: none !important; }
+/* GetScreenCoordFromWorldCoord reported an anchored menu's world point is
+   behind the camera this frame -- hide without touching the row list itself,
+   same as #world-actions' own .wa-offscreen. Separate from .hidden, which is
+   the caller explicitly closing the menu. */
+#interact.interact-offscreen { display: none !important; }
 
 #interact-list {
     display: flex;
@@ -3608,10 +3613,12 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(20, 20, 22, 0.6);
+    /* Solid accent fill with a plain off-white icon on top -- reference has
+       filled teal/purple chips, not a dark chip with a coloured stroke icon. */
+    background: currentColor;
 }
-.interact-badge svg { width: 62%; height: 62%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.interact-badge svg circle { fill: currentColor; stroke: none; }
+.interact-badge svg { width: 62%; height: 62%; fill: none; stroke: #f2f2ef; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.interact-badge svg circle { fill: #f2f2ef; stroke: none; }
 /* Same two concepts vice_hud's own stamina/focus status rows already use --
    reused here rather than invented fresh, so an item that boosts one reads
    consistently everywhere it shows up. */
@@ -3647,10 +3654,15 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 
 /* Icon-only at range, full label once close enough to actually interact --
    see WA_COMPACT_DISTANCE in client_overlays.lua for the threshold this is
-   driven by. The circle badge (.wa-btn) stays either way; only the text
-   label disappears, so approaching a prop reads as the same marker growing
-   a label rather than two different things swapping. */
+   driven by. The badge (.wa-btn) stays either way; only the text label
+   disappears, so approaching a prop reads as the same marker growing a
+   label rather than two different things swapping. The row's own gap
+   collapses along with it -- left at its normal value, compact mode left a
+   dangling empty gap where the (now-hidden) label used to sit, which is
+   part of what made the icon-only state read as unfinished rather than a
+   deliberate compact marker. */
 #world-actions.wa-compact .wa-label { display: none; }
+#world-actions.wa-compact .wa-row { gap: 0; }
 
 .wa-row {
     display: flex;
@@ -3659,26 +3671,38 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     color: #f2f2ef;
     text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.85);
 }
+/* Same solid keycap treatment as #prompts' own .glyph (background/shadow/
+   colour/shape all copied from there, not reinvented) -- a translucent
+   ring read as a half-finished outline with nothing behind it, especially
+   with no label beside it in compact mode above. One keycap language
+   across both prompt systems now instead of two. Rounded SQUARE, not a
+   circle, for the identical reason .glyph itself is one: a circle reads as
+   a gamepad face button specifically, which is wrong once this same badge
+   is also the keyboard/mouse case -- see .glyph's own comment. */
 .wa-btn {
     flex: 0 0 auto;
     width: calc(1.6 * var(--w));
     height: calc(1.6 * var(--w));
-    border-radius: 50%;
-    border: 2px solid #f2f2ef;
+    border-radius: calc(0.28 * var(--w));
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.35);
+    background: #f4f0e8;
+    box-shadow:
+        0 0 1px rgba(0, 0, 0, 0.95),
+        0 0 2px rgba(0, 0, 0, 0.9),
+        0 2px 3px rgba(0, 0, 0, 0.45);
 }
-.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-/* Mouse button (see MOUSE_GLYPHS in app.js). INVERTED, unlike the same image
-   in the prompt stack: the art is black line work, which reads correctly on
-   the prompt's light key cap but would vanish into this button's dark fill.
-   60% matches the pad shapes above so a mouse and a face button are the same
-   size in the same circle. */
-.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; filter: invert(1); }
+.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #212529; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* Mouse button (see MOUSE_GLYPHS in app.js). NOT inverted, unlike this
+   badge's old dark-fill version: the art is black line work, and now that
+   the badge is the same light keycap the corner prompt's own mouse glyph
+   already sits on, it reads correctly with no filter at all. 60% matches
+   the pad shapes above so a mouse and a face button are the same size in
+   the same badge. */
+.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; }
 /* Keyboard (or an unmapped pad button, e.g. a shoulder/trigger/D-pad bind):
-   the resolved key text sits plainly in the same circle rather than a
+   the resolved key text sits plainly in the same badge rather than a
    guessed shape -- see WA_PAD_SHAPE in app.js for which pad letters get a
    shape instead of landing here. */
 .wa-btn-text {
@@ -3686,6 +3710,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     font-weight: 700;
     font-size: calc(0.8 * var(--w));
     line-height: 1;
+    color: #212529;
 }
 .wa-label {
     font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;

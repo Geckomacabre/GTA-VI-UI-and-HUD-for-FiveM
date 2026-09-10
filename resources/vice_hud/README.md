@@ -19,30 +19,18 @@ police glow and exhaustion effects — with a full in-game layout editor.
 
 ---
 
-## The interact menu renders through ScaleformUI
+## The interact menu is NUI-based
 
-As of 2.0.0 the interact menu (used for things like vehicle slim jim/lockpick
-choices) no longer runs through NUI. It is built with
-[ScaleformUI](https://github.com/manups4e/ScaleformUI), which draws native
-vector graphics through the game engine the same way Rockstar's own menus do,
-instead of a rasterized browser texture, so it is sharper and carries no CEF
-overhead. The
-vendored Lua library lives in `vendor/ScaleformUI_Lua`; see
-`vendor/ScaleformUI_Lua/VENDORED.md` for its exact source, commit, and
-licence.
-
-This also means the resource now requires a second resource, ScaleformUI's
-compiled scaleform movie, since that ships separately from the Lua source.
-See **Requirements** and **Installation** below.
-
-`fxmanifest.lua` loads the vendored library through one glob per source
-subfolder instead of a single recursive glob, with `ScaleformUI/mainScaleform.lua`
-listed last on purpose. That file captures globals like `MinimapOverlays`
-into a shared table as soon as it loads, and a single glob expands in
-alphabetical path order, which put `mainScaleform.lua` ahead of the files
-defining those globals and left the table entries nil. Keep any future
-additions to the vendored file list in that same order unless the vendored
-source itself changes.
+Between 2.0.0 and 2.2.0 the interact menu (used for things like vehicle slim
+jim/lockpick choices) briefly ran through
+[ScaleformUI](https://github.com/manups4e/ScaleformUI) instead of NUI, for
+sharper native vector graphics with no CEF overhead. That's been reverted:
+ScaleformUI holds several scaleform handles for the entire client lifetime,
+which caused loading contention with the rest of the HUD's own scaleforms.
+The interact menu is back on the original NUI panel (`html/index.html`'s
+`#interact`, `html/app.js`'s `onInteract`/`moveInteractSel`/`confirmInteract`/
+`closeInteract`), and the resource no longer vendors or depends on
+ScaleformUI at all.
 
 ## Why this one
 
@@ -117,7 +105,6 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
-| **Required** | `ScaleformUI_Assets` (bundled in `resources/`), the compiled scaleform movie the interact menu renders through |
 | **Optional** | `ox_inventory` — weapon icons, omitted cleanly if absent |
 | **Optional** | `qbx_core` — the money readout and skill XP persistence |
 | **Optional** | `qbx_honor` — the honor system |
@@ -129,9 +116,8 @@ the HUD simply leaves that piece out.
 ## Installation
 
 ```bash
-# 1. drop both folders into your resources/: vice_hud AND ScaleformUI_Assets
-# 2. in server.cfg, after ox_lib, ScaleformUI_Assets BEFORE vice_hud:
-ensure ScaleformUI_Assets
+# 1. drop the vice_hud folder into your resources/
+# 2. in server.cfg, after ox_lib:
 ensure vice_hud
 ```
 
@@ -419,13 +405,6 @@ or bundle it into anything paid, and a modified version has to carry the same
 licence. This matches the repository's own licence and every other resource in
 it.
 
-`vendor/ScaleformUI_Lua` (vendored into this resource) and the sibling
-`ScaleformUI_Assets` resource are
-[ScaleformUI](https://github.com/manups4e/ScaleformUI), which is under that
-same CC BY-NC-SA 4.0 licence — so there is no licence seam between this
-resource and what it vendors, and the non-commercial term covers the interact
-menu along with everything else.
-
 > [!NOTE]
 > The copyright line in `LICENSE`'s *How to Apply* section is left for you to
 > fill in with your own name before publishing.
@@ -435,18 +414,6 @@ menu along with everything else.
 Built for Qbox, on top of [`ox_lib`](https://github.com/overextended/ox_lib).
 Minimap geometry follows [`qbx_hud`](https://github.com/Qbox-project/qbx_hud)'s
 square-map preset. Manufacturer marks and the GTA typefaces are Rockstar's.
-
-The interact menu's scaleform rendering is built on
-[ScaleformUI](https://github.com/manups4e/ScaleformUI) by manups4e,
-PhilippRendell and Lacol9, vendored under `vendor/ScaleformUI_Lua` (see that
-folder's `VENDORED.md`). Thanks to the Qbox Discord for pointing to it and to
-these related repositories:
-
-- [ScaleformUI](https://github.com/QuadrupleTurbo/ScaleformUI)
-- [ScaleformUI-Scaleform](https://github.com/QuadrupleTurbo/ScaleformUI-Scaleform)
-- [FxEvents](https://github.com/QuadrupleTurbo/FxEvents)
-- [natives](https://github.com/QuadrupleTurbo/natives)
-- [NativeUI-scaleform_flash](https://github.com/QuadrupleTurbo/NativeUI-scaleform_flash)
 
 The cash icon and its ring (`html/icons/cash.png`, `html/icons/fill_green.png`),
 the health/stamina/focus badges (`html/icons/badge_*.png`), the vehicle

@@ -678,25 +678,11 @@ Config.DefaultLayout = {
     notify        = { x = 1.1, y = 1.9, sx = 1, sy = 1, anchor = 'center-left' },
 }
 
--- =============================================================================
--- Interact menu placement
--- =============================================================================
--- The interact menu (ox_target's option list) is a ScaleformUI menu, NOT part
--- of this resource's NUI page -- so /movehud cannot move it and it has no row
--- in Config.DefaultLayout above. Its position lives here instead.
---
--- Units are ScaleformUI's own 1280x720 coordinate space, NOT pixels and not
--- percentages: the vendored UIMenu converts them with `x / 1280 * screenWidth`
--- (see ConvertScaleformCoordsToResolutionCoords in
--- vendor/ScaleformUI_Lua/src/utils/Utils.lua), so 720 is the bottom of the
--- screen at any resolution and the placement holds on ultrawide.
---
--- offsetY = 0 pins the menu to the very top of the screen, which put it
--- directly under the money readout. Raise it to move the menu DOWN.
-Config.InteractMenu = {
-    offsetX = 0,
-    offsetY = 220,
-}
+-- Interact menu placement (the ox_target option list, #interact in
+-- html/index.html) is plain CSS now -- see #interact in html/style.css --
+-- not config-driven, same as everything else in the NUI page. This used to
+-- be a separate Config.InteractMenu block for ScaleformUI's own 1280x720
+-- coordinate space; removed along with ScaleformUI itself (2026-09-09).
 
 -- Honor badge thresholds. Mirrors qbx_honor's config so the toast agrees with
 -- whatever that resource decided.

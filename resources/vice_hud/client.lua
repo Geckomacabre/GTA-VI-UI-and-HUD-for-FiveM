@@ -177,6 +177,18 @@ end
 -- Handle for the 'minimap' scaleform, used to hide the native health/armour bars.
 local minimapScaleform = nil
 
+-- GetGameTimer() a dropped handle (see the pcall below) is allowed to be
+-- re-requested at. Without this, a handle that keeps failing its
+-- SETUP_HEALTH_ARMOUR call requests a brand new scaleform on literally the
+-- very next frame, forever -- this thread runs on Wait(0), so a persistent
+-- failure leaks a new handle ~60 times a second. That is enough to exhaust
+-- the client's entire scaleform pool within a second or two, starving every
+-- other resource's unrelated RequestScaleformMovie calls for the rest of the
+-- session (fenix-police's BUSTED screen never loading while vice_hud runs,
+-- 2026-09-08). A 2s backoff caps the worst case at under one leaked handle
+-- per second instead of sixty.
+local minimapScaleformRetryAt = 0
+
 -- Live multipliers on Config.MinimapComponent, driven by /hudmap so the map can
 -- be sized against the reference without a restart per attempt.
 local mapScaleW, mapScaleH = Config.MinimapScale or 1.0, Config.MinimapScale or 1.0
@@ -978,6 +990,7 @@ end
 local radarShown = nil
 local radarWanted = nil     -- the last thing we ASKED for, which is not the same
                             -- thing as what the engine is currently doing
+local hudHiddenForDeath = false -- debounces the SetHudVisible message below to one send per transition
 local function setRadar(on)
     on = on and true or false
     radarWanted = on
@@ -1775,7 +1788,10 @@ exports('ShowHonorToast', ShowHonorToast)
 exports('SetHudOffsetX', function(px) applyOffset(tonumber(px) or 0) end)
 
 --- Hide or show the whole HUD, for cutscenes, camera modes and death screens.
---- The NUI has always understood this message; nothing could send it.
+--- The main tick loop's own qbx_medical DEAD-state check sends this same
+--- message automatically (see hudHiddenForDeath); this export exists for
+--- other callers -- another cutscene resource, say -- that want the same
+--- thing without going through a death state.
 exports('SetHudVisible', function(visible)
     ui('hudVisible', { show = visible ~= false })
 end)
@@ -2217,7 +2233,15 @@ CreateThread(function()
                     -- scaleform handle each tick and could exhaust the engine's
                     -- scaleform pool, starving unrelated scaleform requests from
                     -- other resources (e.g. um_spawn's spawn-selection map).
-                    minimapScaleform = RequestScaleformMovie('minimap')
+                    --
+                    -- Also gated behind minimapScaleformRetryAt: without it, a
+                    -- handle that keeps failing SETUP_HEALTH_ARMOUR below gets
+                    -- dropped and re-requested on the very next frame, forever --
+                    -- the same leak as above, just triggered by a persistent
+                    -- method-call failure instead of a slow load.
+                    if GetGameTimer() >= minimapScaleformRetryAt then
+                        minimapScaleform = RequestScaleformMovie('minimap')
+                    end
                 elseif HasScaleformMovieLoaded(minimapScaleform) then
                     BeginScaleformMovieMethod(minimapScaleform, 'SETUP_HEALTH_ARMOUR')
                     ScaleformMovieMethodAddParamInt(3)
@@ -2226,10 +2250,11 @@ CreateThread(function()
             end)
             if not ok then
                 -- Drop the handle rather than keep retrying a scaleform method that
-                -- just errored on it -- RequestScaleformMovie runs again next frame
-                -- and either recovers cleanly or errors again harmlessly, forever
-                -- caught here instead of taking the thread down.
+                -- just errored on it -- RequestScaleformMovie runs again after the
+                -- backoff below and either recovers cleanly or errors again
+                -- harmlessly, forever caught here instead of taking the thread down.
                 minimapScaleform = nil
+                minimapScaleformRetryAt = GetGameTimer() + 2000
                 if Config.Debug then
                     print(('^1[vice_hud]^7 health-bar scaleform hide failed, dropping handle: %s'):format(tostring(err)))
                 end
@@ -2803,9 +2828,25 @@ CreateThread(function()
         -- custom pause screen is up, and the frame/badge bug this comment
         -- already describes happened there too. gk_pausemenu sets this state
         -- bag itself on open/close, the same mechanism as invOpen above.
+        --
+        -- `isDead`: read straight off qbx_medical's own replicated state bag
+        -- (same loose-coupling pattern as invOpen/pauseMenuOpen above) rather
+        -- than an export call, so vice_hud never needs qbx_medical as a hard
+        -- dependency. 3 == qbx_medical's sharedConfig.deathState.DEAD.
+        local isDead = LocalPlayer.state['qbx_medical:deathState'] == 3
         setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen)
             and not LocalPlayer.state.invOpen and not IsPauseMenuActive()
-            and not LocalPlayer.state.pauseMenuOpen)
+            and not LocalPlayer.state.pauseMenuOpen and not isDead)
+
+        -- Hides the rest of the HUD (money, weapon wheel, status bars, etc --
+        -- the whole #stage NUI root) for the same DEAD state, once per actual
+        -- transition rather than every tick, matching mapRect's debounce
+        -- above. See client.lua's SetHudVisible export, which this shares
+        -- its message with.
+        if isDead ~= hudHiddenForDeath then
+            hudHiddenForDeath = isDead
+            ui('hudVisible', { show = not isDead })
+        end
 
         local ok, err = pcall(function()
         local ped = cache.ped or PlayerPedId()
