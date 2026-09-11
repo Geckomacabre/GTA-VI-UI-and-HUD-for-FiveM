@@ -84,8 +84,13 @@ included here.
 
 - **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the
-  same Art Deco / Vice aesthetic as the rest of this set. Depends on
-  `ox_lib`, `ox_target`, `qbx_core`, `lb-phone`.
+  same Art Deco / Vice aesthetic as the rest of this set. Ryde Me's AI pickup
+  sends a driverless KnoWay robotaxi (white `vivanite2`, invisible driver)
+  that talks to you the whole way, and falls back to an ordinary car and
+  driver if your game build doesn't have that model. Depends on
+  `ox_lib`, `ox_target`, `qbx_core`, `lb-phone`. Optional:
+  [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles), for
+  the same paint and livery as the KnoWays in traffic.
 
 - **`qbx_honor`**: An RDR2-style persistent honor stat, purpose-built to
   draw its standing panel and centre-screen indicator on vice_hud's NUI
@@ -208,6 +213,9 @@ its own.
    started *before* it in `server.cfg`:
    - `vice_hud` needs **ox_lib**.
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
+     Optional: [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles),
+     installed as a folder named `knoway`, for the AI pickup's KnoWay livery
+     (without it the car is just painted white).
    - `qbx_honor` needs **qbx_core**, **ox_target**.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
      Its Slim Jim ring only shows up while `vice_hud` is also running.

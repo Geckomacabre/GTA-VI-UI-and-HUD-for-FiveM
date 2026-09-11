@@ -1131,19 +1131,42 @@ end
 ---@param dest vector3
 ---@param destLabel string
 ---@param fare number
+--- Picks a random line from `pool`, never the one it picked last time.
+local lastAiLine = nil
+local function pickLine(pool)
+    if type(pool) == 'string' then return pool end
+    if #pool == 1 then return pool[1] end
+    local line
+    repeat line = pool[math.random(#pool)] until line ~= lastAiLine
+    lastAiLine = line
+    return line
+end
+
+--- Says something as the car. Only a KnoWay talks -- if this ride fell back
+--- to an ordinary car with a visible driver, the robot jokes make no sense,
+--- so it says `plain` instead (or nothing).
+local function aiSay(key, plain, kind)
+    local cfg = Config.RiderMode.npc
+    if npcRide and npcRide.knoway then
+        lib.notify({ title = cfg.brand, description = pickLine(cfg.lines[key]), type = kind or 'inform', icon = 'robot' })
+    elseif plain then
+        lib.notify({ title = 'rydeme', description = plain, type = kind or 'inform' })
+    end
+end
+
 local function runNpcRide(dest, destLabel, fare)
     local cfg = Config.RiderMode.npc
-
-    lib.notify({
-        title = 'rydeme',
-        description = ('$%d paid. A driver is on the way.'):format(fare),
-        type = 'inform',
-    })
 
     local playerPos = GetEntityCoords(cache.ped)
     local spawnPos, spawnHeading = nearbyRoadNode(playerPos, cfg.spawnDistance)
 
+    -- A KnoWay if this game build has one, an ordinary car and driver if not.
     local model = cfg.vehicles[math.random(#cfg.vehicles)]
+    local isKnoWay = IsModelInCdimage(model)
+    if not isKnoWay then
+        model = cfg.fallbackVehicles[math.random(#cfg.fallbackVehicles)]
+    end
+
     if not lib.requestModel(model, 8000) then
         lib.notify({ title = 'rydeme', description = 'Could not find you a driver. Refunding.', type = 'error' })
         TriggerServerEvent('um_gigs:server:npcRideFailed', fare)
@@ -1157,6 +1180,16 @@ local function runNpcRide(dest, destLabel, fare)
     SetModelAsNoLongerNeeded(model)
     SetVehicleDoorsLocked(veh, 1)
     SetVehicleOnGroundProperly(veh)
+
+    if isKnoWay then
+        -- Same paint/livery as the ambient KnoWays when that resource is up;
+        -- plain metallic white otherwise.
+        if GetResourceState('knoway') == 'started' then
+            exports.knoway:styleVehicle(veh)
+        else
+            SetVehicleColours(veh, 111, 111)
+        end
+    end
 
     local driverModel = Config.Passengers.peds[math.random(#Config.Passengers.peds)]
     lib.requestModel(driverModel, 8000)
@@ -1173,7 +1206,17 @@ local function runNpcRide(dest, destLabel, fare)
     -- the car, not partway through, and that timing turned out to matter.
     SetPedKeepTask(driver, true)
 
-    npcRide = { phase = 'approach', driverVeh = veh, dest = dest, destLabel = destLabel, speedBoost = false }
+    -- The whole joke: there is a ped doing the driving, but you never see
+    -- them. Collision off as well, so the rider climbing into the front never
+    -- bumps into someone who is not there.
+    if isKnoWay and cfg.invisibleDriver then
+        SetEntityVisible(driver, false, false)
+        SetEntityCollision(driver, false, false)
+    end
+
+    npcRide = { phase = 'approach', driverVeh = veh, dest = dest, destLabel = destLabel, speedBoost = false, knoway = isKnoWay }
+
+    aiSay('dispatched', ('$%d paid. A driver is on the way.'):format(fare))
 
     -- ---- leg one: the car comes to you -------------------------------------
     -- Driven in short attempts rather than one long wait: GTA's vehicle AI
@@ -1188,7 +1231,7 @@ local function runNpcRide(dest, destLabel, fare)
     local overallDeadline = GetGameTimer() + cfg.timeoutSeconds * 1000
     local arrived = false
 
-    lib.showTextUI('Your ride is on the way...')
+    lib.showTextUI(npcRide.knoway and 'Your driverless KnoWay is on the way...' or 'Your ride is on the way...')
 
     while DoesEntityExist(veh) and not arrived and GetGameTimer() < overallDeadline do
         driveAndPark(driver, veh, playerPos, speed, style)
@@ -1222,11 +1265,7 @@ local function runNpcRide(dest, destLabel, fare)
         -- teleporting the player to wherever it got stuck, which is worse
         -- than admitting the driver could not reach them -- refunded the same
         -- way a failed spawn is, since neither is the player's fault.
-        lib.notify({
-            title = 'rydeme',
-            description = 'Your driver could not reach you. Refunding your fare.',
-            type = 'error',
-        })
+        aiSay('noShow', 'Your driver could not reach you. Refunding your fare.', 'error')
         TriggerServerEvent('um_gigs:server:npcRideFailed', fare)
         npcRide = nil
         DeleteEntity(veh)
@@ -1245,6 +1284,12 @@ local function runNpcRide(dest, destLabel, fare)
     -- rideshare driver gives you before you walk over, rather than the car
     -- just sitting there mute.
     StartVehicleHorn(veh, 350, GetHashKey('NORMAL'), false)
+    if npcRide.knoway then
+        -- A robot does not wave, it blinks its hazards at you.
+        SetVehicleIndicatorLights(veh, 0, true)
+        SetVehicleIndicatorLights(veh, 1, true)
+    end
+    aiSay('arrived')
 
     -- ---- get in -------------------------------------------------------------
     -- Auto-walk-and-board, the same idea um_beg uses for a car that pulls up
@@ -1278,9 +1323,25 @@ local function runNpcRide(dest, destLabel, fare)
     end
 
     if Config.Nav.setWaypoint then SetNewWaypoint(dest.x, dest.y) end
-    lib.notify({ title = 'rydeme', description = ('On the way to %s.'):format(destLabel), type = 'inform' })
+    SetVehicleIndicatorLights(veh, 0, false)
+    SetVehicleIndicatorLights(veh, 1, false)
+    aiSay('boarded', ('On the way to %s.'):format(destLabel))
 
     npcRide.phase = 'boarded'
+
+    -- The car talks now and then on the way, KnoWay only. A separate thread,
+    -- so the drive loop below does not have to track the timing.
+    if npcRide.knoway then
+        local ride = npcRide
+        CreateThread(function()
+            while npcRide == ride and ride.phase == 'boarded' do
+                Wait(math.random(cfg.chatterMin, cfg.chatterMax) * 1000)
+                if npcRide == ride and ride.phase == 'boarded' and not ride.endRequested then
+                    aiSay('chatter')
+                end
+            end
+        end)
+    end
 
     -- ---- leg two: the car takes you there ------------------------------------
     -- Same reasoning as leg one's approach: a drive task that reports
@@ -1316,7 +1377,7 @@ local function runNpcRide(dest, destLabel, fare)
                 style = cfg.rushedDriveStyle
                 SetDriverAggressiveness(driver, 1.0)
                 driveAndPark(driver, veh, dest, speed, style)
-                lib.notify({ title = 'rydeme', description = 'Your driver puts their foot down.', type = 'inform' })
+                aiSay('speedUp', 'Your driver puts their foot down.', 'warning')
             end
             Wait(250)
         end
@@ -1327,16 +1388,14 @@ local function runNpcRide(dest, destLabel, fare)
     end
 
     if DoesEntityExist(veh) and GetVehiclePedIsIn(cache.ped, false) == veh then
-        local message, kind
         if npcRide.endRequested then
-            message, kind = 'Fare ended early.', 'inform'
+            aiSay('endEarly', 'Fare ended early.')
         elseif reachedDest then
-            message, kind = 'You have arrived.', 'success'
+            aiSay('done', 'You have arrived.', 'success')
         else
-            message, kind = 'Your driver got stuck short of the address -- this is as close as they could get.', 'inform'
+            aiSay('stuck', 'Your driver got stuck short of the address -- this is as close as they could get.')
         end
 
-        lib.notify({ title = 'rydeme', description = message, type = kind })
         TaskLeaveVehicle(cache.ped, veh, 0)
     end
 
@@ -1380,9 +1439,12 @@ end)
 --- telling, and an NPC fare should not be the one experience that skips it.
 RegisterNUICallback('um_gigs:npcRateDriver', function(data, cb)
     local stars = math.max(1, math.min(5, math.floor(tonumber(data and data.stars) or 5)))
+    local wasKnoWay = npcRide and npcRide.knoway
     lib.notify({
-        title = 'rydeme',
-        description = ('You rated your driver %d/5. They will never know.'):format(stars),
+        title = wasKnoWay and Config.RiderMode.npc.brand or 'rydeme',
+        description = wasKnoWay
+            and ('You rated the algorithm %d/5. It has been anonymised, logged and sold.'):format(stars)
+            or ('You rated your driver %d/5. They will never know.'):format(stars),
         type = 'inform',
     })
     npcRide = nil
@@ -1469,6 +1531,7 @@ RegisterNUICallback('um_gigs:getLive', function(_, cb)
             phase = npcRide.phase,
             destLabel = npcRide.destLabel,
             speedBoost = npcRide.speedBoost or false,
+            knoway = npcRide.knoway or false,
         }
 
         if npcRide.driverVeh and DoesEntityExist(npcRide.driverVeh) then

@@ -428,10 +428,10 @@
             + '<button class="ride-pick npc" data-mode="npc">'
             + '<span class="ride-pick-icon">🤖</span>'
             + '<span class="ride-pick-body">'
-            + '<span class="ride-pick-title">AI pickup</span>'
-            + '<span class="ride-pick-sub">a car shows up right now</span>'
+            + '<span class="ride-pick-title">KnoWay AI pickup</span>'
+            + '<span class="ride-pick-sub">no driver. no small talk. no liability.</span>'
             + '</span>'
-            + '<span class="ride-pick-tag">INSTANT</span>'
+            + '<span class="ride-pick-tag">DRIVERLESS</span>'
             + '</button>'
             + '</div>';
 
@@ -639,11 +639,20 @@
         'Complaint logged in a system that does not exist.',
         'Noted. Someone cares deeply, in theory.'
     ];
+    /* Reporting the driver of a car that has no driver. */
+    var KNOWAY_REPORT_LINES = [
+        'There is no driver. You cannot report nobody.',
+        'Report forwarded to the car. The car disagrees.',
+        'KnoWay has reviewed itself and found no wrongdoing.',
+        'Thank you. Your complaint will be used to train the model.',
+        'Complaint received by an AI. It is also driving.'
+    ];
     var toastTimer = null;
-    function showReportToast() {
+    function showReportToast(lines) {
         var t = el('toast');
         if (!t) return;
-        t.textContent = REPORT_LINES[Math.floor(Math.random() * REPORT_LINES.length)];
+        var pool = Array.isArray(lines) ? lines : REPORT_LINES;
+        t.textContent = pool[Math.floor(Math.random() * pool.length)];
         t.classList.add('on');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
@@ -708,42 +717,50 @@
        on a phase change, patched live in between: the map inside it would be
        torn down by a full innerHTML rebuild every poll. */
     function npcRideHtml(n) {
+        var kw = !!n.knoway;
+
         if (n.phase === 'done') {
             var picks = '';
             for (var i = 1; i <= 5; i++) {
                 picks += '<button class="star' + (i <= rating.stars ? ' on' : '') + '" data-n="' + i + '">★</button>';
             }
             return '<div class="rate">'
-                + '<div class="ride-q">How was your AI driver?</div>'
-                + '<div class="ride-sub">' + esc(n.destLabel || '') + '</div>'
+                + '<div class="ride-q">' + (kw ? 'How did the algorithm do?' : 'How was your AI driver?') + '</div>'
+                + '<div class="ride-sub">' + esc(n.destLabel || '')
+                + (kw ? ' · your rating trains the model. it will not listen.' : '') + '</div>'
                 + '<div class="star-row">' + picks + '</div>'
                 + '<button id="npc-rate-send">Submit rating</button>'
                 + '</div>';
         }
 
         var boarded = n.phase === 'boarded';
+        var status = boarded
+            ? (kw ? 'Nobody is driving you to ' : 'On the way to ') + esc(n.destLabel) + '.'
+            : (kw ? 'Your KnoWay is on the way. Nobody is driving it.' : 'Your driver is on the way.');
 
         /* .ride-live fills the whole tab -- see the CSS note on it -- with
            #npc-map going edge to edge underneath and the status line/buttons
            floating on top of it as translucent cards, instead of the map
            being a 200px strip above a lot of empty space. */
         return '<div class="ride-live">'
-            + '<div class="ride-live-status"><p><b>'
-            + (boarded ? 'On the way to ' + esc(n.destLabel) + '.' : 'Your driver is on the way.')
-            + '</b></p></div>'
+            + '<div class="ride-live-status"><p><b>' + status + '</b></p></div>'
             + '<div id="npc-map"></div>'
             + '<div class="ride-live-actions">'
             + (boarded
                 ? '<div class="npc-actions">'
                   + '<button id="npc-speedup"' + (n.speedBoost ? ' disabled' : '') + '>'
-                  + (n.speedBoost ? 'Speeding up…' : 'Tell them to speed up')
+                  + (n.speedBoost ? speedUpDoneLabel(kw) : (kw ? 'Override safety limits' : 'Tell them to speed up'))
                   + '</button>'
-                  + '<button class="danger" id="npc-end">End fare here</button>'
+                  + '<button class="danger" id="npc-end">' + (kw ? 'Emergency stop' : 'End fare here') + '</button>'
                   + '</div>'
                 : '')
-            + '<button class="report-link" id="npc-report">Report driver</button>'
+            + '<button class="report-link" id="npc-report">' + (kw ? 'Report driver (there is none)' : 'Report driver') + '</button>'
             + '</div>'
             + '</div>';
+    }
+
+    function speedUpDoneLabel(kw) {
+        return kw ? 'Safety limits off. Good luck.' : 'Speeding up…';
     }
 
     /* Patches the live bits into whichever phase npcRideHtml() built: the car
@@ -811,7 +828,7 @@
         var speedBtn = el('npc-speedup');
         if (speedBtn && n.speedBoost) {
             speedBtn.disabled = true;
-            speedBtn.textContent = 'Speeding up…';
+            speedBtn.textContent = speedUpDoneLabel(!!n.knoway);
         }
     }
 
@@ -868,7 +885,9 @@
                     }
 
                     var reportBtn = el('npc-report');
-                    if (reportBtn) reportBtn.onclick = showReportToast;
+                    if (reportBtn) reportBtn.onclick = function () {
+                        showReportToast(n.knoway ? KNOWAY_REPORT_LINES : null);
+                    };
                 }
             }
 

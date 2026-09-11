@@ -1380,7 +1380,7 @@ RegisterNetEvent('um_gigs:server:npcRideFailed', function(fare)
     if not player then return end
 
     player.Functions.AddMoney(Config.Account, amount, 'rydeme-npc-refund')
-    exports.qbx_core:Notify(src, ('Refunded $%d -- no driver available.'):format(amount), 'inform')
+    exports.qbx_core:Notify(src, ('Refunded $%d -- no car available. (There were never any drivers.)'):format(amount), 'inform')
 end)
 
 lib.callback.register('um_gigs:server:cancelRide', function(src)

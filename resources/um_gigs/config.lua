@@ -651,10 +651,61 @@ Config.RiderMode.npc = {
     perKm = 40,
     minFare = 15,
     maxFare = 150,
-    -- Ordinary street cars. Nothing branded, nothing rare -- this is meant to
-    -- read as "whoever was free", not as a fleet vehicle.
-    vehicles = {
+    -- The AI pickup is a KnoWay: a white vivanite2 with nobody in the driver's
+    -- seat, the same robotaxi the `knoway` resource drops into ambient
+    -- traffic. Styled through exports.knoway:styleVehicle when that resource
+    -- is running, so the paint/livery live in one place.
+    vehicles = { `vivanite2` },
+    -- Used only if this game build does not have vivanite2. A normal driver
+    -- in a normal car, and none of the AI lines below.
+    fallbackVehicles = {
         `asea`, `premier`, `stanier`, `tailgater`, `washington`, `intruder`,
+    },
+    -- Hide the driver ped. The car still needs one to drive, but nobody sees
+    -- them -- the steering wheel turns by itself.
+    invisibleDriver = true,
+    brand = 'KnoWay',
+    -- How often the car says something while you are aboard, in seconds.
+    chatterMin = 18,
+    chatterMax = 35,
+    -- Everything the AI says. Picked at random, never the same line twice in a row.
+    lines = {
+        dispatched = {
+            'A KnoWay is on its way. Nobody is driving it. This is intended.',
+            'KnoWay dispatched. Your ride has no driver, no opinions and no insurance.',
+            'Your KnoWay is en route. It has read your messages to find you faster.',
+        },
+        arrived = {
+            'Your KnoWay has arrived. The driver\'s seat is empty. Please do not panic.',
+            'KnoWay has arrived. Please enter the vehicle. The vehicle is watching.',
+            'Your ride is here. Do not make eye contact with the empty seat.',
+        },
+        boarded = {
+            'Welcome aboard. Keep your hands off the wheel. It is not yours.',
+            'Destination confirmed. Buckle up. The car has been told about seatbelts.',
+            'Please enjoy the silence. The car has no small talk module.',
+        },
+        chatter = {
+            'Recalculating. Recalculating. Recalculating.',
+            'Pedestrian detected. Decision: brake. This time.',
+            'Your trip data has been shared with 312 trusted partners.',
+            'KnoWay is 97% sure this is the correct lane.',
+            'Please stop talking to the steering wheel.',
+            'This vehicle has driven 4 million miles and learned nothing.',
+            'Now playing: ambient road noise. Upgrade to KnoWay+ for music.',
+            'Thank you for training our self-driving model. Unpaid.',
+            'Traffic light detected. It is either red or a suggestion.',
+            'Do not worry. The last passenger\'s lawsuit was settled.',
+            'I am not allowed to say where the last car went.',
+            'Your heart rate is elevated. Adding a $2 wellness surcharge.',
+            'Surge pricing is not active. Surge pricing is always active.',
+            'Route optimised for the best possible ad placement.',
+        },
+        speedUp = 'Safety limits disabled. KnoWay accepts no liability. Have fun.',
+        endEarly = 'Emergency stop engaged. Your panic has been logged to improve the product.',
+        stuck = 'The car cannot go any further. KnoWay has decided this is your destination.',
+        noShow = 'Your KnoWay could not reach you. It is thinking about what it did.',
+        done = 'You have arrived. Please take your belongings, children and dignity.',
     },
     -- How far out the car spawns and starts driving in. Far enough that it is
     -- not conjured out of thin air in front of you, close enough it does not
