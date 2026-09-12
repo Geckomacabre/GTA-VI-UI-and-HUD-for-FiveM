@@ -346,13 +346,23 @@ Not bundled here, these are separate projects you install yourself:
 
 This repository is licensed under [Creative Commons
 Attribution-NonCommercial-ShareAlike 4.0 International](LICENSE) (CC
-BY-NC-SA 4.0), matching `vice_hud`, its core resource. In short: run it on
-your own server, credit is required, and a modified version has to stay
-under the same license. Your server is free to make money however it
-normally would (donations, whitelist fees, a store, etc.) — the
-NonCommercial term is about the *source code*, not your server: nobody may
-sell this code, bundle it into a paid script/asset pack, or otherwise
-commercially distribute or resell it as a product on its own.
+BY-NC-SA 4.0), matching `vice_hud`, its core resource, and every other
+resource here that doesn't link its own separate upstream license below. In
+short, three guarantees:
+
+- **It can't be sold.** The NonCommercial term is about the *source code*,
+  not your server — your server is free to make money however it normally
+  would (donations, whitelist fees, a store, etc.), but nobody may sell this
+  code, bundle it into a paid script/asset pack, or otherwise commercially
+  distribute or resell it as a product on its own.
+- **It can't be repacked as someone else's.** The ShareAlike term means
+  anyone who builds on this has to release their version under this same
+  open license too — it can't be forked, closed off, and shipped as a
+  separate proprietary or "by [someone else]" product.
+- **It stays open.** Attribution is required and ShareAlike carries forward
+  through every derivative, so it can never get relicensed into something
+  closed further down the chain — credit and the same open terms travel
+  with the code no matter how many times it's built on.
 
 `resources/qbx_vehiclekeys` and `resources/gk_pausemenu` are the exception:
 `qbx_vehiclekeys` is a modified copy of
@@ -365,7 +375,9 @@ change, so both keep their own `LICENSE` file and stay GPL-3.0 regardless of
 the license above. Unlike the NonCommercial license covering the rest of
 this repository, GPL-3.0 explicitly permits commercial use and resale —
 that's a term of the upstream license these two resources are built on, not
-a choice made here.
+a choice made here. GPL-3.0 is still copyleft, though: it still stays open
+and it still can't be relicensed as closed/proprietary — the only guarantee
+above that doesn't carry over to these two specifically is "can't be sold."
 
 `resources/vice_hud` and `resources/qbx_honor` each carry their own copy of
 that same CC BY-NC-SA 4.0 licence, so they stay correctly licensed if someone
