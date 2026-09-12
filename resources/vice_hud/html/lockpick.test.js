@@ -56,26 +56,46 @@ console.log('\n-- lockpick: hidden until shown --');
 msg({ action: 'lockpick', show: false });
 ok($('lockpick').classList.contains('hidden'), 'hidden when show:false');
 
-console.log('\n-- lockpick: opens with a zone position/width and glyph --');
-msg({ action: 'lockpick', show: true, zoneStart: 62, zoneLen: 12, glyph: 'R' });
+console.log('\n-- lockpick: opens with a glyph, no target zone any more --');
+msg({ action: 'lockpick', show: true, glyph: 'R' });
 ok(!$('lockpick').classList.contains('hidden'), 'visible');
-ok($('lp-zone').style.getPropertyValue('--lp-zone-start') === '62', 'zone start set', $('lp-zone').style.getPropertyValue('--lp-zone-start'));
-ok($('lp-zone').style.getPropertyValue('--lp-zone-len') === '12', 'zone length set');
-ok($('lp-glyph').textContent === 'R', 'glyph text set');
-ok($('lp-fill').style.getPropertyValue('--lp-pct') === '0', 'fill resets to 0 on open');
+ok($('lp-glyph-text').textContent === 'R', 'glyph text set');
+ok($('lp-fill').getAttribute('d') === '', 'fill path resets to empty on open');
+ok($('lp-glyph').style.getPropertyValue('--lp-dx') === '0', 'glyph offset resets to 0 on open');
 
-console.log('\n-- lockpick: progress updates the fill, clamped 0-100 --');
-msg({ action: 'lockpickProgress', pct: 48 });
-ok($('lp-fill').style.getPropertyValue('--lp-pct') === '48', 'fill follows pct', $('lp-fill').style.getPropertyValue('--lp-pct'));
-msg({ action: 'lockpickProgress', pct: 140 });
-ok($('lp-fill').style.getPropertyValue('--lp-pct') === '100', 'fill clamped at 100');
-msg({ action: 'lockpickProgress', pct: -10 });
-ok($('lp-fill').style.getPropertyValue('--lp-pct') === '0', 'fill clamped at 0');
+console.log('\n-- lockpick: a mouse-bound glyph draws the LMB/RMB icon, not the letters --');
+msg({ action: 'lockpick', show: true, glyph: 'LMB' });
+ok($('lp-glyph-text').querySelector('img') !== null, 'LMB glyph renders as an image');
+ok($('lp-glyph-text').textContent === '', 'no literal "LMB" text alongside the icon');
 
-console.log('\n-- lockpick: result flashes win/fail then auto-hides --');
+console.log('\n-- lockpick: right-to-left progress anchors the fill from the right, clamped 0-100 --');
+msg({ action: 'lockpickProgress', pct: 48, dir: -1 });
+ok($('lp-fill').getAttribute('d') !== '', 'fill path drawn once pct > 0');
+msg({ action: 'lockpickProgress', pct: 140, dir: -1 });
+ok($('lp-fill').getAttribute('d') !== '', 'fill path still drawn past 100 (Lua already clamps, but the page must not choke on it)');
+msg({ action: 'lockpickProgress', pct: -10, dir: -1 });
+ok($('lp-fill').getAttribute('d') === '', 'fill path cleared at pct <= 0');
+
+console.log('\n-- lockpick: left-to-right progress moves the glyph the other way --');
+msg({ action: 'lockpickProgress', pct: 50, dir: -1 });
+var dxLeft = $('lp-glyph').style.getPropertyValue('--lp-dx');
+msg({ action: 'lockpickProgress', pct: 50, dir: 1 });
+var dxRight = $('lp-glyph').style.getPropertyValue('--lp-dx');
+ok(parseFloat(dxLeft) < 0, 'dir:-1 offsets the glyph negative', dxLeft);
+ok(parseFloat(dxRight) > 0, 'dir:1 offsets the glyph positive', dxRight);
+
+console.log('\n-- lockpick: success (right-to-left to 100%) flashes lp-win, not an alarm --');
 msg({ action: 'lockpickResult', success: true });
 ok($('lockpick').classList.contains('lp-win'), 'lp-win class applied on success');
+ok(!$('lockpick').classList.contains('lp-alarm'), 'lp-alarm NOT applied on success');
 ok(!$('lockpick').classList.contains('hidden'), 'still visible immediately after the result (flash first)');
+
+console.log('\n-- lockpick: completing it left-to-right trips the alarm instead, a distinct message --');
+msg({ action: 'lockpick', show: true, glyph: 'R' });
+msg({ action: 'lockpickAlarm' });
+ok($('lockpick').classList.contains('lp-alarm'), 'lp-alarm class applied');
+ok(!$('lockpick').classList.contains('lp-win'), 'lp-win NOT applied on an alarm trip');
+ok(!$('lockpick').classList.contains('hidden'), 'still visible immediately after the alarm (flash first)');
 
 console.log(fails === 0 ? '\nALL PASS' : ('\n' + fails + ' FAILURES'));
 process.exit(fails === 0 ? 0 : 1);

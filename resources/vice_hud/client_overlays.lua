@@ -389,188 +389,203 @@ end, false)
 RegisterCommand('hudworldactionsoff', function() exports.vice_hud:HideWorldActions() end, false)
 
 -- =============================================================================
--- Lockpick check — "hold, release inside the zone"
+-- Lockpick check — analog direction-fill ring
 -- =============================================================================
 -- The caller owns the button (its own lib.addKeybind, same pattern
 -- qbx_vehiclekeys already uses for searching a car for keys) and just tells
--- this when the hold started and ended; this owns the ring's timing, the
--- zone, and the win/lose decision, then hands the result back as an event —
--- the same "plain data in, plain event out" shape the wheels use.
+-- this when the hold started and ended; this owns the ring, the direction/
+-- completion decision, and hands the result back as an event — the same
+-- "plain data in, plain event out" shape the wheels use.
 --
--- REWORKED 2026-09-12 to match the GTA VI: An Extended Look trailer's own
--- lockpick minigame, per a close frame-by-frame description (no capture
--- files exist for it, this codebase only has the written spec): the ring
--- used to fill itself on a pure wall-clock timer the instant
--- StartLockpickCheck was called, with the caller's button-hold only
--- bookending WHEN that timer ran, not how fast it moved. The reference
--- clearly shows effort-based fill instead — the ring only grows while, and
--- however hard, the player is actively working the stick/mouse, the way a
--- real "hold and steer" minigame reads. See lockpickReadEffort() below for
--- the actual input, and lockpickTick() for how that effort turns into fill.
+-- REWORKED AGAIN 2026-09-12, this time replacing the "release inside a
+-- target zone" mechanic entirely, per the user-approved HTML mockup
+-- (lockpick_preview.html) worked out over many rounds of feedback against
+-- the GTA VI: An Extended Look trailer footage. There is no more zone and
+-- no more release-based resolution at all:
+--   * dragging right-to-left fills the ring, anchored growing from the
+--     right; dragging left-to-right fills it identically, anchored growing
+--     from the left -- both LOOK the same the whole time you're mid-drag.
+--   * reaching 100% right-to-left is the real pick (success).
+--   * reaching 100% left-to-right is a trap: it trips an "alarm" outcome
+--     instead, meant to eventually wire into a car alarm elsewhere (see
+--     exports('LockpickAlarm'-adjacent event below) -- NOT built here.
+-- Direction/fill are derived live every tick from where the input currently
+-- sits, not from an accumulated "effort" score -- see lockpickTick() below.
 --
 -- Wrapped in do...end for the same reason the interact-menu/controller
 -- section is — see the comment there.
 do
 local lockpickActive = false
-local lockpickZoneStart, lockpickZoneLen = 0, 10
-local lockpickPct = 0        -- current fill, 0-100 — now STATE that accumulates
-                              -- across ticks, not something re-derived from a
-                              -- start timestamp every time it's read.
-local lockpickMaxRatePerMs = 100 / 3000 -- pct/ms at full (1.0) input magnitude
+local lockpickPct = 0   -- current fill, 0-100, always re-derived live (see lockpickTick)
+local lockpickDir = -1  -- -1 = right-to-left (the real pick), 1 = left-to-right (the trap)
 
--- INPUT_LOOK_LR / INPUT_LOOK_UD (control IDs 1/2 — confirmed against
--- _tools/fivem_docs' game-references/controls table, NOT guessed: that page
--- lists both as bound to "RIGHT STICK" on a pad AND to raw mouse-movement
--- ("MOUSE RIGHT"/"MOUSE DOWN") on keyboard, which is exactly the dual
--- pad-stick/mouse-delta signal this minigame needs from a single pair of
--- control reads). INPUT_ATTACK (24) is the same LMB control already used
--- elsewhere in this file (see WA_MOUSE_BUTTON_LABELS[24] = 'LMB' above) —
--- reused here as the "is the mouse player dragging" gate.
+-- INPUT_LOOK_LR (control ID 1 — confirmed against _tools/fivem_docs' own
+-- game-references/controls table, NOT guessed: that page lists it as bound
+-- to "RIGHT STICK X" on a pad AND to raw mouse-movement ("MOUSE RIGHT") on
+-- keyboard, which is exactly the dual pad-stick/mouse-delta signal this
+-- minigame needs). Only the horizontal axis matters now -- the mockup's own
+-- `dir`/`pct` logic is driven purely by dx, never dy (dy only ever moved
+-- the mockup's centre glyph for visual noise, which this port simplifies
+-- away, see lockpickTick's comment below). INPUT_ATTACK (24) is the same
+-- LMB control already used elsewhere in this file (see
+-- WA_MOUSE_BUTTON_LABELS[24] = 'LMB' above) — reused here as the "is the
+-- mouse player dragging" gate.
 local LOCKPICK_CONTROL_LOOK_LR = 1
-local LOCKPICK_CONTROL_LOOK_UD = 2
 local LOCKPICK_CONTROL_ATTACK  = 24
 
--- Below this input magnitude, the player isn't meaningfully steering — reads
--- as "let go" rather than "barely moving the stick", and the fill decays
--- instead of (imperceptibly) crawling forward. Also comfortably absorbs
--- analog stick deadzone noise so an idle pad doesn't slowly self-complete.
+-- Below this stick deflection, the pad isn't meaningfully steering — reads
+-- as centred/idle rather than "barely pushed", absorbing analog deadzone
+-- noise so a resting pad doesn't register a phantom direction.
 local LOCKPICK_IDLE_THRESHOLD = 0.12
 
--- How hard letting go punishes progress, as a fraction of the max FILL rate
--- (i.e. going idle at max-rate difficulty loses ground at HALF the speed it
--- would have gained it at full effort). A real "hold and steer" minigame
--- (the trailer's own read, and e.g. Bethesda-style lockpicks) loses ground
--- on letting go rather than freezing in place, but shouldn't erase a whole
--- good push for one dropped frame — 0.5 was picked as a middle ground
--- between "freezes" (0) and "punishes as hard as it rewards" (1), not
--- measured against a live client (see this repo's own note on why: FiveM
--- client crashes on this dev PC, per this session's own findings — a human
--- needs to feel this in-game and this constant is the one to retune).
-local LOCKPICK_DECAY_FACTOR = 0.5
-
--- GET_CONTROL_NORMAL's mouse-driven value for LOOK_LR/UD is a raw per-frame
--- look-camera delta, tuned for camera turn speed, not for a 0-1 effort
--- scale — nowhere near 1.0 even on a fast, deliberate mouse drag. Scaled up
--- so a real "drag hard" motion can reach full effort the same way slamming
--- the stick to its edge does on a pad. Same caveat as the decay factor
--- above: picked by reasoning about the native's usual range, not measured
--- live — retune once someone can actually play this.
+-- GET_CONTROL_NORMAL's mouse-driven value for LOOK_LR is a raw per-frame
+-- look-camera delta (tuned for camera turn speed), not a position — unlike
+-- a pad's stick, which reports where it physically IS this frame. The
+-- mockup's `dx = current.x - dragStart.x` needs an actual position, so for
+-- mouse it's reconstructed by summing that per-frame delta for as long as
+-- LMB is held — arithmetically this sum always equals "how far the mouse
+-- has moved since LMB went down", i.e. a genuine net position, not an
+-- "integrated effort" score. Scaled up for the same reason the old
+-- effort-based build scaled it: nowhere near a usable range unscaled on a
+-- deliberate drag. Not measured against a live client (see this repo's own
+-- note on why: FiveM client crashes on this dev PC) — a human needs to
+-- feel this in-game and this constant is the one to retune.
 local LOCKPICK_MOUSE_SCALE = 6.0
 
---- Reads live input magnitude for this frame as 0.0-1.0, disabling the
---- controls it reads so a lockpick doesn't ALSO spin the camera or fire a
---- weapon while it's being worked (DisableControlAction has to be called
---- every frame it should apply, and read back via GetDisabledControlNormal/
+-- How far the reconstructed mouse position (in LOCKPICK_MOUSE_SCALE-d
+-- units, see above) has to travel from centre to reach a full 100% fill —
+-- the direct analog of the mockup's "Fill sensitivity" slider (default
+-- 160, in raw drag pixels). There is no equivalent slider here, just this
+-- one constant; a caller wanting an easier/harder check no longer has a
+-- knob for it now that the mechanic is purely positional (see
+-- StartLockpickCheck's own comment on why cfg.durationMs/zoneLen are gone).
+local LOCKPICK_MOUSE_SENSITIVITY = 220
+
+-- How fast the reconstructed mouse position decays back toward centre once
+-- LMB is released mid-check (the mockup's own "Decay rate" slider, in the
+-- same units as LOCKPICK_MOUSE_SENSITIVITY per second) — letting go doesn't
+-- freeze progress in place, it drains back down, same read as the mockup's
+-- own tick() "not dragging" branch.
+local LOCKPICK_MOUSE_DECAY_PER_SEC = 90
+
+local lockpickMouseDx = 0 -- reconstructed net mouse position since LMB was last (re)pressed, see comment above
+
+--- Reads this frame's signed, normalised drag position as -1.0..1.0
+--- (negative = pushed toward right-to-left / the real pick, positive =
+--- pushed toward left-to-right / the trap), disabling the controls it
+--- reads so a lockpick doesn't ALSO spin the camera or fire a weapon while
+--- it's being worked (DisableControlAction has to be called every frame it
+--- should apply, and read back via GetDisabledControlNormal/
 --- IsDisabledControlPressed instead of the un-disabled natives once it has
 --- — see PAD::DISABLE_CONTROL_ACTION / PAD::GET_DISABLED_CONTROL_NORMAL /
 --- PAD::IS_DISABLED_CONTROL_PRESSED, all confirmed via _tools/nativedb).
 ---
---- Pad: right-stick deflection magnitude, sqrt(x^2+y^2) clamped to 1 — a
---- barely-tilted stick barely fills, a fully-deflected one fills at max
---- rate, exactly what the user asked for.
+--- Pad: the stick's OWN current x-deflection IS a position already (a
+--- physical stick doesn't need reconstructing the way a mouse delta does)
+--- — read directly, no accumulation, matching the mockup's "current
+--- position relative to where the hold started, not integrated effort over
+--- time" requirement to the letter.
 --- Mouse: gated on LMB actually being held (waUsingPad()'s counterpart,
 --- WA_MOUSE_BUTTON_LABELS[24], is the established "24 = LMB" precedent in
---- this file) — while held, the same LOOK_LR/UD pair reads as a per-frame
---- drag-speed delta rather than a static tilt, scaled by
---- LOCKPICK_MOUSE_SCALE toward the same 0-1 range the stick already uses.
---- A caller wanting drag DISTANCE rather than drag SPEED was the other
---- option the task description allowed for; speed was chosen because it
---- needs no extra per-check state (a remembered click-origin point) and
---- degrades the same way the stick case does when the player stops moving.
-local function lockpickReadEffort()
+--- this file); while held, LOOK_LR's per-frame delta accumulates into
+--- lockpickMouseDx (see its own comment above); while not held, that
+--- accumulator decays back toward 0 instead of freezing.
+local function lockpickReadDx(dtMs)
     DisableControlAction(0, LOCKPICK_CONTROL_LOOK_LR, true)
-    DisableControlAction(0, LOCKPICK_CONTROL_LOOK_UD, true)
     DisableControlAction(0, LOCKPICK_CONTROL_ATTACK, true)
 
     if waUsingPad() then
         local sx = GetDisabledControlNormal(0, LOCKPICK_CONTROL_LOOK_LR)
-        local sy = GetDisabledControlNormal(0, LOCKPICK_CONTROL_LOOK_UD)
-        return math.min(1, math.sqrt(sx * sx + sy * sy))
+        if math.abs(sx) < LOCKPICK_IDLE_THRESHOLD then return 0 end
+        return math.max(-1, math.min(1, sx))
     end
 
-    if not IsDisabledControlPressed(0, LOCKPICK_CONTROL_ATTACK) then return 0 end
+    if not IsDisabledControlPressed(0, LOCKPICK_CONTROL_ATTACK) then
+        -- LMB not held: drain the reconstructed position back toward 0,
+        -- same feel as the mockup's own decay-while-not-dragging branch.
+        local decayStep = LOCKPICK_MOUSE_DECAY_PER_SEC * (dtMs / 1000)
+        if lockpickMouseDx > 0 then
+            lockpickMouseDx = math.max(0, lockpickMouseDx - decayStep)
+        else
+            lockpickMouseDx = math.min(0, lockpickMouseDx + decayStep)
+        end
+        return lockpickMouseDx / LOCKPICK_MOUSE_SENSITIVITY
+    end
+
     local mx = GetDisabledControlNormal(0, LOCKPICK_CONTROL_LOOK_LR)
-    local my = GetDisabledControlNormal(0, LOCKPICK_CONTROL_LOOK_UD)
-    return math.min(1, math.sqrt(mx * mx + my * my) * LOCKPICK_MOUSE_SCALE)
+    lockpickMouseDx = lockpickMouseDx + mx * LOCKPICK_MOUSE_SCALE
+    lockpickMouseDx = math.max(-LOCKPICK_MOUSE_SENSITIVITY, math.min(LOCKPICK_MOUSE_SENSITIVITY, lockpickMouseDx))
+    return lockpickMouseDx / LOCKPICK_MOUSE_SENSITIVITY
 end
 
---- Advances lockpickPct by one frame's worth of effort (dtMs = real elapsed
---- time, not a fixed step — see the CreateThread below for why this now
---- runs on Wait(0) instead of the old Wait(50)) and returns the new value.
+--- Re-derives lockpickPct/lockpickDir for this frame from the current input
+--- position (dtMs = real elapsed time, used only for the mouse's own
+--- decay-while-released branch above) and returns both. Positional, not
+--- effort-accumulated, exactly like the mockup's own tick(): pct is always
+--- `abs(dx) * 100`, dir is always `dx < 0 and -1 or 1`, recomputed fresh
+--- every frame rather than built up over time.
 local function lockpickTick(dtMs)
-    local effort = lockpickReadEffort()
-    if effort > LOCKPICK_IDLE_THRESHOLD then
-        lockpickPct = lockpickPct + effort * lockpickMaxRatePerMs * dtMs
-    else
-        lockpickPct = lockpickPct - (lockpickMaxRatePerMs * LOCKPICK_DECAY_FACTOR) * dtMs
-    end
-    lockpickPct = math.max(0, math.min(100, lockpickPct))
-    return lockpickPct
+    local dx = lockpickReadDx(dtMs)
+    lockpickDir = dx < 0 and -1 or 1
+    lockpickPct = math.max(0, math.min(100, math.abs(dx) * 100))
+    return lockpickPct, lockpickDir
 end
 
---- cfg: { glyph (the button shown at the ring's centre, default 'R'),
---- zoneLen (0-100, width of the win window), zoneStart (0-100, randomised
---- within a sane range if omitted).
+--- cfg: { key (a control ID, or an ox_lib keybind's own `.hash` — resolved
+--- LIVE into a text glyph via waResolveKey, the same "the icon IS the
+--- binding, resolved" pattern ShowWorldActions/action prompts already use
+--- elsewhere in this file, rather than a hand-picked string that can drift
+--- out of sync with what's actually bound), glyph (legacy raw string
+--- fallback for a caller not yet passing `key` — kept so
+--- qbx_vehiclekeys/client/slimjim.lua's existing `glyph = 'R'` call keeps
+--- working unchanged).
 ---
---- durationMs's MEANING CHANGED with the effort-based rework above: it used
---- to be a flat "time to fill the ring" under the old auto-timer. There is
---- no more timer to size, so it's now read as "time to fill the ring AT
---- FULL (1.0) INPUT MAGNITUDE, held perfectly" — i.e. it sets the max fill
---- RATE (100 / durationMs pct per ms) rather than a hard duration. This is
---- a deliberately compatible reinterpretation, not a new field: a caller
---- like qbx_vehiclekeys passing a smaller durationMs for a harder
---- honor-tier lockpick still gets a harder check under the new model too —
---- a shorter window means the player must sustain CLOSER to full effort to
---- finish before running out of margin against the zone, whereas a
---- half-hearted, barely-above-threshold effort now visibly crawls (or even
---- nets negative once decay is figured in) rather than always eventually
---- reaching 100 the way the flat timer guaranteed. The caller's existing
---- `cfg` shape and values keep working unchanged; only what a given
---- durationMs FEELS like in play has moved.
+--- zoneLen/zoneStart are GONE: there is no more target zone at all (see the
+--- do...end's own header comment for the mechanic this replaced). A caller
+--- still passing them is harmless — they're just never read.
+---
+--- durationMs is ALSO gone as a fill-rate knob: the fill is now purely
+--- positional (see lockpickTick), so there is no rate or duration left to
+--- size. A caller still passing it is likewise harmless.
 --- Call the instant the player PRESSES the button.
 exports('StartLockpickCheck', function(cfg)
     cfg = cfg or {}
     lockpickActive = true
     lockpickPct = 0
-    local durationMs = cfg.durationMs or 3000
-    -- Floored well above 0 -- a near-zero durationMs would make
-    -- lockpickMaxRatePerMs effectively infinite and the ring would jump
-    -- straight to 100 on the very first ticked frame regardless of input.
-    if durationMs < 250 then durationMs = 250 end
-    lockpickMaxRatePerMs = 100 / durationMs
-    lockpickZoneLen = cfg.zoneLen or 10
-    -- Kept off the very start and very end of the ring on purpose: a zone
-    -- touching 0 is unreachable (there is no fill yet to be "inside" it the
-    -- instant the check starts) and one touching 100 is indistinguishable
-    -- from the auto-fail at full.
-    lockpickZoneStart = cfg.zoneStart or math.random(30, 85 - lockpickZoneLen)
-    ui('lockpick', { show = true, zoneStart = lockpickZoneStart, zoneLen = lockpickZoneLen, glyph = cfg.glyph or 'R' })
+    lockpickDir = -1
+    lockpickMouseDx = 0
+    local glyph = cfg.key ~= nil and waResolveKey(cfg.key) or cfg.glyph
+    ui('lockpick', { show = true, glyph = glyph or 'R' })
 end)
 
---- Call the instant the button is RELEASED. Resolves the check immediately
---- against whatever the ring's fill actually is at that moment.
+--- Call the instant the button is RELEASED. There is no more release-based
+--- win/lose check at all — completion is purely "pct reached 100, which
+--- direction was it" (see the CreateThread loop below), decided mid-hold,
+--- not on release. Releasing before that just abandons the attempt with no
+--- outcome, same as CancelLockpickCheck — kept as its own export (rather
+--- than folded into Cancel) because "the player let go" and "the caller is
+--- force-ending this" are different callers' events even though they now
+--- do the same thing here.
 exports('ReleaseLockpickCheck', function()
     if not lockpickActive then return end
     lockpickActive = false
-    local success = lockpickPct >= lockpickZoneStart and lockpickPct <= (lockpickZoneStart + lockpickZoneLen)
-    ui('lockpickResult', { success = success })
-    TriggerEvent('vice_hud:lockpickResult', success)
+    ui('lockpick', { show = false })
 end)
 
 --- Aborts with no result event at all — for e.g. the vehicle driving off or
---- the player being interrupted mid-hold, where neither win nor lose is
---- the right read.
+--- the player being interrupted mid-hold, where neither success nor the
+--- alarm is the right read.
 exports('CancelLockpickCheck', function()
     lockpickActive = false
     ui('lockpick', { show = false })
 end)
 
--- Wait(0) now, not the old Wait(50): reading analog stick/mouse deflection
--- and disabling its controls both need to happen every rendered frame to
--- feel responsive and to keep DisableControlAction actually in effect (it
--- only holds for the frame it's called on) — a 50ms poll would both miss
--- fast stick flicks and let the camera/weapon controls sneak back in for
--- 4 frames out of 5 at 60fps.
+-- Wait(0) now, not a slower poll: reading analog stick/mouse deflection and
+-- disabling its controls both need to happen every rendered frame to feel
+-- responsive and to keep DisableControlAction actually in effect (it only
+-- holds for the frame it's called on) — a slower poll would both miss fast
+-- stick flicks and let the camera/weapon controls sneak back in for most
+-- frames at 60fps.
 CreateThread(function()
     local lastTick = GetGameTimer()
     while true do
@@ -579,25 +594,35 @@ CreateThread(function()
         local dtMs = now - lastTick
         lastTick = now
         if lockpickActive then
-            local pct = lockpickTick(dtMs)
-            ui('lockpickProgress', { pct = pct })
+            local pct, dir = lockpickTick(dtMs)
+            ui('lockpickProgress', { pct = pct, dir = dir })
             if pct >= 100 then
-                -- Filled all the way out without releasing — an automatic
-                -- fail, same as missing the zone on purpose. Reachable
-                -- under the effort model only by holding genuinely full
-                -- input the whole way, same as before.
                 lockpickActive = false
-                ui('lockpickResult', { success = false })
-                TriggerEvent('vice_hud:lockpickResult', false)
+                if dir < 0 then
+                    -- Right-to-left to 100% — the real pick.
+                    ui('lockpickResult', { success = true })
+                    TriggerEvent('vice_hud:lockpickResult', true)
+                else
+                    -- Left-to-right to 100% — looked identical to progress
+                    -- the whole time, but this is the trap: fire a
+                    -- DISTINCT outcome rather than folding it into
+                    -- lockpickResult's boolean, so a caller can tell "you
+                    -- finished it the wrong way" apart from "you didn't
+                    -- finish it" and eventually wire a real car alarm to
+                    -- it — that wiring is a different resource's job, not
+                    -- built here. Bare TriggerEvent, no payload: there's
+                    -- nothing to report beyond "it happened".
+                    ui('lockpickAlarm', {})
+                    TriggerEvent('vice_hud:lockpickAlarm')
+                end
             end
         end
     end
 end)
 
-RegisterCommand('hudlockpick', function(_, args)
-    local zoneLen = tonumber(args[1]) or 12
-    exports.vice_hud:StartLockpickCheck({ durationMs = 3000, zoneLen = zoneLen })
-    print('^3[vice_hud]^7 /hudlockpick — ring started, tilt the right stick (or hold LMB and drag the mouse) to fill it. /hudlockpickrelease to try releasing it now.')
+RegisterCommand('hudlockpick', function()
+    exports.vice_hud:StartLockpickCheck({ key = 51 })
+    print('^3[vice_hud]^7 /hudlockpick — ring started, drag right-to-left to pick it (left-to-right traps the alarm instead). /hudlockpickrelease to abandon it now.')
 end, false)
 RegisterCommand('hudlockpickrelease', function() exports.vice_hud:ReleaseLockpickCheck() end, false)
 end -- close the do opened above local lockpickActive
