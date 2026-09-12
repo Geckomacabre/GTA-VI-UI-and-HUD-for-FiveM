@@ -304,15 +304,49 @@ Not bundled here, these are separate projects you install yourself:
   "BuckMe", so both need it installed regardless of whether you also touch
   vice_hud at all. See `docs/PATCHES.md` for the Wallet rebrand.
 
-## The arista-pro font
+## Fonts
 
-`resources/um_gigs/ui/fonts/arista-pro.pro-trial-regular.ttf` is bundled and
-registered via `@font-face` in `ui/app.css` under the family name
-`'Arista Pro'`, and listed in `fxmanifest.lua`'s `files{}` so FiveM actually
-ships it to clients. Neither app currently points `--font-body` at it.
-Ryde Me still uses GTAArtDeco, Snarf still uses the system font stack, so the
-font is just present and ready to use if you want to switch either app's
-`--font-body` to `'Arista Pro'`.
+- **GTAArtDeco, Pricedown**: bundled across most resources here
+  (`vice_hud`, `gk_pausemenu`, `qbx_relog`, `um_gigs`, and the `ox_target`/
+  `qb-menu`/`qb-input`/`lb-phone` patches). Both are Rockstar-derived —
+  GTAArtDeco is GTA VI's own marketing typeface, Pricedown is the
+  long-standing GTA-style display face — and ship as-is, as is normal
+  practice for FiveM resources. This project claims no rights over either
+  and neither is ours to license; see `resources/vice_hud/README.md`'s own
+  "Assets and fonts" section for the fuller explanation that copy was
+  written against.
+- **Optien** (`resources/um_gigs/ui/Optien.ttf`), used by the Ryde Me app:
+  designed by Måns Grebäck, published by
+  [Aring Typeface](http://www.aringtypeface.com/regular-package) —
+  **personal-use only**; a commercial license needs to be purchased
+  separately from Aring Typeface for anything beyond that.
+- **Cedarville Cursive** (`patches/lb-phone/ui/dist/assets/fonts/buckme/`),
+  used by the BuckMe card signature: a Google Fonts release, SIL Open Font
+  License — free to bundle and redistribute, no separate credit required
+  beyond this note.
+- **Arista Pro** (`resources/um_gigs/ui/fonts/arista-pro.pro-trial-regular.ttf`):
+  registered via `@font-face` in `ui/app.css` and listed in
+  `fxmanifest.lua`'s `files{}`, but neither app currently points
+  `--font-body` at it — Ryde Me still uses GTAArtDeco, Snarf still uses the
+  system font stack, so it's present but unused. Designed by Francesco
+  Canovaro (with Cosimo Lorenzo Pancini and Andrea Tartarelli) for
+  [Zetafonts](https://www.zetafonts.com/arista-2-0); this specific file is
+  their free trial cut, which Zetafonts advertises as free for
+  noncommercial use — matching this repository's own license — but the
+  trial's exact terms on redistributing the font *file itself* (versus
+  just using it locally) weren't confirmable from what's publicly
+  available. Treat this one as unresolved rather than assumed clear; check
+  Zetafonts' own EULA before relying on it.
+
+  > [!WARNING]
+  > **`BelleSansExtraCondensedBold.otf`** (`resources/vice_hud/html/fonts/`,
+  > used for the item-select list styling) is a commercial font — Belle Sans,
+  > designed by James Lyles, sold by Park Street Studio — with no free tier
+  > found anywhere. Unlike everything else on this list, there's no
+  > plausible path by which bundling this one is authorized. Same situation
+  > as `patches/dpclothing/` above: flagged rather than fixed, since pulling
+  > it out means finding or commissioning a replacement face for that part
+  > of the HUD.
 
 ## License
 

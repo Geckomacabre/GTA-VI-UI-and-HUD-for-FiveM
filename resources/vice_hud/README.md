@@ -397,6 +397,14 @@ manufacturer marks (via the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manuf
 property; this project claims no rights over them and the licence below covers
 only the code.
 
+**`html/fonts/BelleSansExtraCondensedBold.otf`** is Belle Sans, a commercial
+typeface designed by James Lyles and sold by Park Street Studio — not a free
+font, and not ours to redistribute. It's used as a stand-in for whatever
+GTA VI's own scrollable item-select lists actually set (see the comment above
+its `@font-face` rule in `html/style.css`), not because it's properly
+licensed for this. Flagged here rather than fixed; swap it for a free
+alternative if you're distributing this resource further.
+
 ## Licence
 
 [CC BY-NC-SA 4.0](LICENSE) — **non-commercial**. You may use, modify and
