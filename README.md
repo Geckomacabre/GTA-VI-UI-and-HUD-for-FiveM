@@ -256,6 +256,15 @@ updating.
 
 Not bundled here, these are separate projects you install yourself:
 
+- **[SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu)** by
+  [syno-sy](https://github.com/syno-sy) (GPL-3.0): the pause menu
+  `resources/gk_pausemenu`'s dashboard layout is reskinned on top of — see
+  the [License](#license) section and
+  [`resources/gk_pausemenu/README.md`](resources/gk_pausemenu/README.md) for
+  the full credit. Linked here too, in its own right, for anyone who wants
+  syno-sy's original unmodified version instead, or wants to check its terms
+  against their own use before running the derived copy bundled in this
+  repo.
 - **[fenix-police](https://github.com/Geckomacabre/fenix-police)** (GPL-3.0):
   an AI police dispatch/pursuit resource. Not bundled because it's a
   standalone gameplay system, not part of this repo's UI/HUD scope, but
