@@ -3792,9 +3792,19 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
    the ring's own -90deg base rather than by dash-offsetting it — simpler to
    reason about for a segment that doesn't start at zero. --lp-zone-start/
    --lp-zone-len are plain 0-100 numbers (percent of the ring), written once
-   per check by onLockpick() in app.js; 3.6deg per point is 360/100. */
+   per check by onLockpick() in app.js; 3.6deg per point is 360/100.
+
+   Recoloured 2026-09-12 to the GTA VI trailer reference (a bright pink arc,
+   not the earlier placeholder #ff6fa0/#e8467a guess): #fc74a4 is vice_hud's
+   OWN existing "pink" theme accent (client.lua:2421's ACCENT.pink, also
+   config.lua's waypointColour pink entries), not a new colour picked for
+   this ring alone — same reasoning config.lua gives for reusing it there.
+   There is no shared hex->rgba() helper anywhere in this file (checked:
+   every glow/shadow here, including this ring's own PREVIOUS drop-shadow,
+   is a hand-expanded rgba() literal matching its stroke colour) so the glow
+   below is #fc74a4 expanded to rgb(252, 116, 164) by hand, same convention. */
 #lp-zone {
-    stroke: #ff6fa0;
+    stroke: #fc74a4;
     stroke-width: 5;
     /* Bare numbers, same as .pip-fill's stroke-dasharray: 100 — pathLength
        makes the path's own length exactly 100 units, so no px/percent
@@ -3803,20 +3813,30 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     transform: rotate(calc(var(--lp-zone-start, 0) * 3.6deg));
     transform-box: fill-box;
     transform-origin: center;
-    filter: drop-shadow(0 0 0.3cqh rgba(255, 111, 160, 0.8));
+    filter: drop-shadow(0 0 0.3cqh rgba(252, 116, 164, 0.8));
 }
 /* The growing fill, exactly like .pip-fill — 0 at rest, --lp-pct written on
-   every onLockpickProgress() push while the button is held. */
+   every onLockpickProgress() push while input is driving it (see
+   client_overlays.lua's lockpick section for what drives --lp-pct now that
+   it's effort-based rather than a timer). Same #fc74a4 pink as the zone
+   above, plus a wider, softer glow behind the solid stroke — reference
+   frames 3/4 both show a soft blur bleeding outward from the arc, more than
+   the zone's own tight highlight needs. */
 #lp-fill {
-    stroke: #e8467a;
+    stroke: #fc74a4;
     stroke-width: 5;
     stroke-dasharray: 100;
     stroke-dashoffset: calc(100 - var(--lp-pct, 0));
     transition: stroke-dashoffset 80ms linear;
+    filter: drop-shadow(0 0 0.6cqh rgba(252, 116, 164, 0.65));
 }
 #lockpick.lp-win #lp-fill  { stroke: #6ec06e; transition: stroke 150ms ease; }
 #lockpick.lp-fail #lp-fill { stroke: #d9585c; transition: stroke 150ms ease; }
 
+/* Centre glyph: reference shows a SOLID WHITE disc with a bold BLACK letter
+   in every one of the four frames (idle included) -- not the dark
+   translucent/white-text disc this used to be before the trailer spec was
+   available. */
 #lp-glyph {
     position: absolute;
     left: 50%;
@@ -3826,15 +3846,39 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     height: calc(1.6 * var(--w));
     box-shadow: var(--hairline);
     border-radius: 50%;
-    background: rgba(20, 20, 22, 0.75);
-    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    background: #f2f2ef;
+    border: 1.5px solid rgba(0, 0, 0, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: calc(0.85 * var(--w));
-    color: #f2f2ef;
+    color: #14141a;
 }
+
+/* Idle "hold this" chevron -- reference frame 1 only: shown before ANY
+   input has moved the fill, gone the instant it has (frames 2-4 all drop
+   it). Toggled by the #lockpick.lp-idle class, which onLockpick() sets on
+   open and onLockpickProgress() clears the first time it sees pct > 0 --
+   same "class toggle driven from a NUI push" pattern #lockpick.lp-win/
+   .lp-fail already use above, just gated the other direction (present at
+   start, removed on first progress, instead of added at the end). */
+#lp-chevron {
+    display: none;
+    position: absolute;
+    left: 50%;
+    /* #lp-glyph is centred at #lockpick's own 50%/50% and is 1.6*var(--w)
+       across (see #lp-glyph above), so its bottom edge sits 0.8*var(--w)
+       below centre -- this starts just past that edge, not at #lockpick's
+       own bottom (100% would put it off the ring entirely). */
+    top: calc(50% + 0.8 * var(--w) + 0.15cqh);
+    transform: translateX(-50%);
+    font-size: calc(0.7 * var(--w));
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.55);
+    text-shadow: 0 0.06cqh 0.14cqh rgba(0, 0, 0, 0.6);
+}
+#lockpick.lp-idle #lp-chevron { display: block; }
 
 /* -----------------------------------------------------------------------------
    Police light editor  (/hudpolice edit)
