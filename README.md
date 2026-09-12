@@ -43,15 +43,12 @@ CyberLeek's videos and GTA VI Extended Look.
 | BuckMe card, back | Pay a contact |
 | ![lb-phone BuckMe, BuckBot support chat](docs/screenshots/buckbot-help.png) | ![qbx_relog character switcher](docs/screenshots/character-switcher.png) |
 | BuckBot support chat | `qbx_relog`: hold-to-switch character strip |
-| ![gk_pausemenu quick menu, male accent](docs/screenshots/quickmenu-male.png) | ![gk_pausemenu quick menu, female accent](docs/screenshots/quickmenu-female.png) |
-| `resources/_retired/gk_pausemenu`: quick menu, male accent colour | Quick menu, female accent colour |
-| ![gk_pausemenu map tab](docs/screenshots/pausemenu-map.png) | |
-| `resources/_retired/gk_pausemenu`: Map tab with the Locations panel | |
 
 > [!NOTE]
-> The two screenshots above are from the retired, self-drawn-map version of
-> `gk_pausemenu`. Screenshots of the current dashboard-style pause menu are
-> pending — see [`resources/gk_pausemenu`](resources/gk_pausemenu).
+> Screenshots of `gk_pausemenu` are pending — the ones that used to be here
+> were of the retired, self-drawn-map version and no longer reflect the
+> current dashboard-style pause menu. See
+> [`resources/gk_pausemenu`](resources/gk_pausemenu).
 
 ## What's in here
 
