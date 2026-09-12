@@ -748,6 +748,14 @@
         if (!d || !d.show) { show(box, false); return; }
 
         box.classList.remove('lp-win', 'lp-fail');
+        // Reference frame 1: the chevron shows before any input has moved
+        // the fill. Set here (every fresh check starts idle) and cleared by
+        // onLockpickProgress below the first time pct actually rises above
+        // zero -- an effort-driven fill can sit at 0 for a while if the
+        // player hasn't tilted the stick/dragged the mouse yet, so "the
+        // check started" is not the same moment as "input began" any more
+        // (it was, under the old fixed timer).
+        box.classList.add('lp-idle');
         var fill = $('lp-fill');
         if (fill) fill.style.setProperty('--lp-pct', 0);
         var zone = $('lp-zone');
@@ -763,7 +771,17 @@
 
     function onLockpickProgress(d) {
         var fill = $('lp-fill');
-        if (fill && d && d.pct != null) fill.style.setProperty('--lp-pct', Math.max(0, Math.min(100, d.pct)));
+        if (fill && d && d.pct != null) {
+            var pct = Math.max(0, Math.min(100, d.pct));
+            fill.style.setProperty('--lp-pct', pct);
+            // First real movement drops the idle chevron (frame 1 -> 2) --
+            // stays dropped for the rest of the check even if effort-based
+            // decay brings pct back down to 0, since input has now begun.
+            if (pct > 0) {
+                var box = $('lockpick');
+                if (box) box.classList.remove('lp-idle');
+            }
+        }
     }
 
     function onLockpickResult(d) {
@@ -2560,15 +2578,16 @@
     function propsFor(key) {
         if (NATIVE_ELEMENTS[key]) return NATIVE_PROPS;
         if (NOTIFY_ELEMENTS[key]) return NOTIFY_PROPS;
-        var list = POS_PROPS.concat(PROPS);
-        if (NO_FONT_ROW[key]) list = list.filter(function (p) { return p.k !== 'ff'; });
-        // `only` is opt-IN: a prop that carries one is offered on those
-        // elements alone. Props without one are offered everywhere, which is
-        // every prop but Brand tint.
-        list = list.filter(function (p) { return !p.only || p.only[key]; });
-        var drop = NO_ROWS[key];
-        if (drop) list = list.filter(function (p) { return !drop[p.k]; });
-        return list;
+        // Position-only for everything else. PROPS (font/icon/width/height/
+        // opacity/radius/spacing/etc.) still gets APPLIED from whatever a
+        // layout already has -- applyOffsets/offsetsForSave both read PROPS
+        // directly, not through this function -- this just stops the editor
+        // from offering rows to change any of it. Those rows existed to
+        // compensate for element sizing that used to drift across aspect
+        // ratios; now that html/style.css scales everything off --w instead
+        // of raw cqw, that compensation is no longer this menu's job, so the
+        // menu goes back to doing the one thing nothing else can: placement.
+        return POS_PROPS;
     }
 
     function propOf(k) {
@@ -2915,14 +2934,12 @@
             return;
         }
 
-        // Bounded by the Width / Height rows themselves rather than by its own
-        // numbers. Ctrl+Arrow used to stop at 2.5 while those rows went to 3,
-        // so one element had two different ceilings depending on how you
-        // reached for it.
-        var clamp = function (v) { return +Math.max(SC_MIN, Math.min(SC_MAX, v)).toFixed(4); };
-        if (axis !== 'y') o.sx = clamp(scaleX(o) + delta);
-        if (axis !== 'x') o.sy = clamp(scaleY(o) + delta);
-        applyOffsets(); renderEditor();
+        // Page elements no longer offer Width/Height rows (see propsFor) now
+        // that html/style.css scales everything off --w instead of raw cqw,
+        // so Ctrl+Arrow -- the other way to reach the same sx/sy this menu
+        // used to expose -- goes with them. Native (minimap) elements return
+        // above and are unaffected; their scale is engine-side, not CSS, and
+        // still has no other way to reach it.
     }
 
     /* Step the selected property. `dir` is -1 or +1; list properties cycle. */
