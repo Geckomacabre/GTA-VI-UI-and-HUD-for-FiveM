@@ -346,17 +346,42 @@ takes one of those folders on its own. Nothing under `patches/` ships a
 from a project rather than a full copy, and the original projects remain under
 their own upstream license:
 
-| Project | License |
-| --- | --- |
-| `ox_lib` | LGPL-3.0 |
-| `ox_target` | MIT |
-| `ox_inventory` | GPL-3.0 |
-| `qb-menu`, `qb-input` | GPL-3.0 |
-| `speedlimits`, `zseatbelt` | MIT |
-| `qbx_smallresources` | GPL-3.0 |
-| `qbx_vehiclekeys` | GPL-3.0 (see above) |
-| `qbx_core` | GPL-3.0 |
-| `SY_PauseMenu` (base of `gk_pausemenu`) | GPL-3.0 (see above) |
+| Project | License | Source |
+| --- | --- | --- |
+| `ox_lib` | LGPL-3.0 | [overextended/ox_lib](https://github.com/overextended/ox_lib) |
+| `ox_target` | MIT | [overextended/ox_target](https://github.com/overextended/ox_target) |
+| `ox_inventory` | GPL-3.0 | [overextended/ox_inventory](https://github.com/overextended/ox_inventory) |
+| `qb-menu` | GPL-3.0 | [qbcore-framework/qb-menu](https://github.com/qbcore-framework/qb-menu) |
+| `qb-input` | GPL-3.0 | [qbcore-framework/qb-input](https://github.com/qbcore-framework/qb-input) |
+| `speedlimits` | MIT | [youngsinatra99/919-speedlimits](https://github.com/youngsinatra99/919-speedlimits) |
+| `zseatbelt` | MIT | [zfbx/zseatbelt](https://github.com/zfbx/zseatbelt) |
+| `qbx_smallresources` | GPL-3.0 | [Qbox-project/qbx_smallresources](https://github.com/Qbox-project/qbx_smallresources) |
+| `qbx_vehiclekeys` | GPL-3.0 (see above) | [Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys) |
+| `qbx_core` | GPL-3.0 | [Qbox-project/qbx_core](https://github.com/Qbox-project/qbx_core) |
+| `SY_PauseMenu` (base of `gk_pausemenu`) | GPL-3.0 (see above) | [syno-sy/SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu) |
+| `dpclothing` | **Unpublished — see note below** | [andristum/dpclothing](https://github.com/andristum/dpclothing) |
+
+> [!WARNING]
+> **`dpclothing`'s license is unclear.** Its author (Dullpear, GitHub user
+> `andristum`) never published a `LICENSE` file or license statement, on
+> GitHub or in the original cfx.re forum post — it's a free public release,
+> but "free to download and run" isn't the same as "licensed for others to
+> redistribute a modified copy of," which is what `patches/dpclothing/`
+> technically is. Treat `patches/dpclothing/Client/Clothing.lua` as
+> unresolved rather than assuming it's clear to redistribute; if you're the
+> maintainer, either get the author's explicit OK to publish the patch, or
+> pull `patches/dpclothing/` from the repo and just document the two exports
+> to add by hand instead of shipping the edited file.
+
+Files under `patches/` that are modified copies of a project's own stock
+file (rather than a wholly new file added alongside it) mark what changed
+with inline `-- BEGIN (added by vice_hud) ... END` comments, and most also
+ship a `.pre-vice_hud` sibling holding the untouched original — e.g.
+`patches/ox_lib/resource/interface/client/notify.lua` next to
+`notify.lua.pre-vice_hud`. That's how those changes are called out, per each
+project's own license requiring modified files to say so
+(LGPL-3.0/GPL-3.0 §5(a); MIT doesn't require it, but the original copyright
+header inside `notify.lua` is left intact either way).
 
 `lb-phone` is different again: it's a paid, closed-source resource, not
 under any of the licenses above. Nothing of lb-phone's own code or assets is
