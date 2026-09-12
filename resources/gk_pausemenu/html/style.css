@@ -1,4 +1,66 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap');
+/*
+    Fonts -- the same set vice_hud/html/style.css uses for its own "GTA6-style
+    HUD" look, so this menu (an own-ui_page resource just like ox_target/
+    qb-menu/qb-input, which vice_hud's own header comment says share its
+    .plate surface recipe "byte for byte") reads as part of the same UI
+    family rather than a differently-themed overlay bolted on next to it.
+
+    HelveticaNeueHUD is intentionally NOT bundled here either, same reasoning
+    as vice_hud's own copy: it's a commercial Monotype/Linotype face, so
+    local() only, degrading through Helvetica -> Arial -> Liberation Sans.
+    Pricedown and GTAArtDeco (used in the game's own UI and already vendored
+    for vice_hud) ARE bundled -- copied into html/fonts/ rather than read
+    cross-resource, matching this resource's existing "no hard dependency on
+    vice_hud" stance (see fxmanifest's own description).
+*/
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue'), local('HelveticaNeue'), local('Helvetica'),
+         local('Arial'), local('Liberation Sans');
+    font-weight: 400;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue Medium'), local('HelveticaNeue-Medium'),
+         local('Helvetica'), local('Arial'), local('Liberation Sans');
+    font-weight: 500;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'HelveticaNeueHUD';
+    src: local('Helvetica Neue Bold'), local('HelveticaNeue-Bold'),
+         local('Helvetica Bold'), local('Arial Bold'), local('Arial'),
+         local('Liberation Sans Bold');
+    font-weight: 700;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Pricedown';
+    src: url('fonts/pricedown.otf') format('opentype');
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoBold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -6,8 +68,8 @@ html, body {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background: transparent; /* the game shows through everywhere except the Map tab, which paints its own background */
-    font-family: 'Oswald', 'Segoe UI', sans-serif;
+    background: transparent; /* the game shows through everywhere -- Map is now a native handoff, no NUI panel paints its own background any more */
+    font-family: 'HelveticaNeueHUD', 'Helvetica Neue', 'Segoe UI Variable Display', 'Segoe UI', Inter, system-ui, Roboto, Arial, sans-serif;
     color: #fff;
 }
 
@@ -22,7 +84,46 @@ html, body {
     --accent: #47aba7;
     --accent-ink: #0b1a19;
     --accent-soft: rgba(71, 171, 167, 0.12);
+
+    /*
+        vice_hud's own .plate surface tokens (html/style.css's :root),
+        copied verbatim rather than approximated -- the measured plate colour,
+        the hairline inset ring, the soft wide shadow. Deliberately NOT using
+        backdrop-filter anywhere below: per vice_hud's own header comment,
+        this is a transparent NUI page composited over the engine's own
+        render, and CEF rasterises an "empty" backdrop as opaque black rather
+        than leaving it alone -- a blur here would read as a black box with
+        the game gone behind it, not glass. The look is carried entirely by
+        the plate colour, the hairline ring, and the two-layer sheen gradient
+        instead, same as vice_hud/ox_target/qb-menu/qb-input all do.
+    */
+    --plate: rgba(57, 53, 59, 0.88);
+    --shadow-md: 0 4px 22px rgba(0, 0, 0, 0.46);
+    --hairline: inset 0 0 0 1.5px rgba(236, 236, 240, 0.30);
 }
+
+/* vice_hud's .plate recipe (html/style.css), reused verbatim so every panel
+   in this menu is made of the same material as vice_hud's own map panels and
+   the other own-ui_page resources (ox_target/qb-menu/qb-input) -- see the
+   :root comment above for why there is no backdrop-filter in it. */
+.plate {
+    position: relative;
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, 0.075) 0%,
+            rgba(255, 255, 255, 0.018) 42%,
+            rgba(0, 0, 0, 0.10) 100%),
+        linear-gradient(118deg,
+            rgba(255, 255, 255, 0.00) 34%,
+            rgba(255, 255, 255, 0.055) 50%,
+            rgba(255, 255, 255, 0.00) 66%),
+        var(--plate);
+    box-shadow:
+        var(--shadow-md),
+        var(--hairline),
+        inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+.plate > * { position: relative; z-index: 1; }
 
 #app {
     position: fixed;
@@ -36,397 +137,319 @@ html, body {
 
 .accent { color: var(--accent); }
 
-/* ---------------------------------------------------------------- Quick Menu */
+/* ---------------------------------------------------------------- Dashboard (home panel) */
 
-#quickmenu {
-    background: linear-gradient(135deg, rgba(10, 14, 20, 0.94) 0%, rgba(10, 14, 20, 0.94) 42%, rgba(10, 14, 20, 0.55) 55%, transparent 60%);
-    padding: 60px 0 0 48px;
-    width: 620px;
+/* No backdrop-filter/blur anywhere in this whole section -- see the
+   --plate/.plate comment near the top of this file for why (a transparent
+   NUI page over the engine's own render rasterises as opaque black under
+   CEF, not a genuine blur). #dashboard itself stays a plain flex container;
+   every surface within it (.plate below) carries the actual look. */
+#dashboard { display: flex; }
+/* Same ID-vs-class specificity trap as #dash-view-home.hidden below --
+   #dashboard's own `display: flex` outranks the generic `.hidden` utility
+   class regardless of source order, so switching to Map/Players left the
+   whole dashboard (sidebar included) visibly bleeding through underneath. */
+#dashboard.hidden { display: none; }
+
+/* ---- Sidebar: profile card, stats, OOC chat ---- */
+
+#dash-sidebar {
+    flex: 0 0 360px;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 26px 24px;
 }
+#dash-sidebar.plate { border-radius: 0; } /* full-height edge panel, not a floating card -- square corners */
 
-#quickmenu header h1 {
-    font-size: 34px;
-    font-weight: 700;
-    font-style: italic;
-    letter-spacing: 1px;
+#dash-profile { display: flex; align-items: center; gap: 16px; }
+#dash-mugshot {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.08) center/cover no-repeat;
+    border: 2px solid var(--accent);
 }
+#dash-identity h2 { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 700; font-size: 20px; }
+#dash-identity span { font-size: 13px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 0.5px; }
 
-#quickmenu .rule {
-    width: 460px;
-    height: 2px;
-    background: #fff;
-    margin: 10px 0 26px;
+#dash-sidebar .rule { width: 100%; height: 1px; background: rgba(255, 255, 255, 0.12); margin: 20px 0; }
+
+#dash-stats { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.dash-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    font-size: 14px;
 }
-
-#quickmenu-list { display: flex; flex-direction: column; }
-
-.qm-row {
+.dash-stat-label { color: rgba(255, 255, 255, 0.6); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+.dash-stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Money, same face vice_hud sets its own #money in (html/style.css) --
+   the one place this menu borrows Pricedown outside headings, matching
+   what it's used for elsewhere in this HUD family. */
+/* Pricedown is a display face with tall, ornamented strokes -- clips and
+   reads as noise at the ~14px .dash-stat-value default (see vice_hud's own
+   #money, which never runs it under ~1.3x that reference size either), so
+   this bumps size and line-height specifically rather than reusing the
+   shared .dash-stat-value size. */
+#stat-cash, #stat-bank { font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif; font-size: 15px; line-height: 1.6; letter-spacing: 0.02em; }
+/* `all: unset` wipes every property .dash-stat set above (same specificity,
+   later rule wins) -- padding/justify-content/background/border-radius/
+   font-size all have to be repeated here, not just the button-specific ones. */
+.dash-stat-btn {
     all: unset;
-    display: block;
-    width: 460px;
-    padding: 13px 18px;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #e8e8e8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 14px;
+    font-family: inherit;
+    color: inherit;
     cursor: pointer;
 }
-.qm-row:hover { color: var(--accent); }
-.qm-row.active { background: var(--accent); color: var(--accent-ink); }
-/* Keyboard/gamepad focus (app.js's moveFocus) -- distinct from :hover
-   (mouse-only, never true for a controller player) and from .active
-   (marks which PANEL is currently open, not which row is selected). */
-.qm-row.kb-focus:not(.active) { color: var(--accent); background: var(--accent-soft); }
+.dash-stat-btn:hover, .dash-stat-btn.kb-focus { background: var(--accent-soft); }
 
-/* ---------------------------------------------------------------- Map */
-
-#map { background: #05080c; }
-
-#map-viewport {
-    position: absolute;
-    inset: 0 430px 0 0; /* leave room for the locations panel on the right */
-    overflow: hidden;
-    cursor: grab;
-    touch-action: none; /* pointer drag handles panning; don't let the browser also try to scroll/zoom the page */
-    user-select: none;
-    background:
-        linear-gradient(45deg, #0d1218 25%, transparent 25%) -20px 0/40px 40px,
-        linear-gradient(-45deg, #0d1218 25%, transparent 25%) -20px 0/40px 40px,
-        linear-gradient(45deg, transparent 75%, #0d1218 75%) -20px 0/40px 40px,
-        linear-gradient(-45deg, transparent 75%, #0d1218 75%) -20px 0/40px 40px,
-        #05080c; /* neutral placeholder pattern, visible whenever map-image fails to load */
+#ooc-heading { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 500; font-size: 13px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.6); margin-bottom: 10px; }
+#ooc-log {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
 }
-#map-viewport:active { cursor: grabbing; }
+.ooc-msg { color: rgba(255, 255, 255, 0.85); word-break: break-word; }
+.ooc-msg b { color: var(--accent); }
 
-/* #map-layer is panned/scaled entirely from JS (translate + scale). */
-#map-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: 0 0;
-    will-change: transform;
-}
-
-#map-image {
-    display: block;
-    max-width: none; /* override the artifact-wide img{max-width:100%} reset -- this needs its native pixel size */
-    user-select: none;
-    pointer-events: none;
-}
-#map.no-image #map-image {
-    display: none; /* the src is always set (see app.js setupMap); this hides the browser's broken-image icon once it 404s */
-}
-
-#map-missing-hint {
-    display: none;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    font-size: 15px;
-    line-height: 1.7;
-    color: rgba(255,255,255,.55);
-}
-#map-missing-hint code {
-    background: rgba(255,255,255,.08);
-    padding: 2px 6px;
-    border-radius: 2px;
+#ooc-input-row { display: flex; gap: 8px; }
+#ooc-input {
+    flex: 1;
+    min-width: 0;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    font-family: inherit;
     font-size: 13px;
 }
-#map.no-image #map-missing-hint { display: block; }
-
-#map-blips { position: absolute; top: 0; left: 0; }
-
-/* Plain coloured dot in the blip's own real HUD colour (app.js's
-   renderMapBlips/blipColorHex) -- the fallback for any blip whose sprite
-   has no entry in html/data/blip_sprites.json, or whose hotlinked icon
-   fails to load. Centering is done in JS via transform:
-   translate(-50%,-50%) scale(...) (renderMap's counter-scale loop), not CSS
-   margin, so it stays correct at any zoom -- .map-blip-icon below shares
-   that same JS-driven centering/scaling, only the visual differs. */
-.map-blip-dot {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid rgba(6, 10, 16, .9);
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,.6);
-}
-.map-blip-dot:hover { filter: brightness(1.3); }
-
-/* The real native blip icon (app.js's renderMapBlips, every currently
-   active blip server-wide -- see client/blips.lua's GK.ScanBlips) on a
-   dark badge with the blip's own real HUD colour as a border ring -- a
-   plain <img>, not a CSS mask-image tint. mask-image was tried first and
-   made every icon blip vanish outright: FiveM's embedded CEF is
-   known-unreliable with it, and a mask that fails to apply typically
-   renders as fully transparent rather than falling back to showing the
-   element unmasked. <img> is the same tag #map-image already relies on
-   successfully, so it can't fail that way. Falls back to .map-blip-dot
-   below for a sprite with no entry in html/data/blip_sprites.json, or
-   whose hotlinked icon 404s (see the <img>.onerror in renderMapBlips). */
-.map-blip-icon {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgba(8, 12, 18, .92);
-    border: 2px solid rgba(6, 10, 16, .9); /* overwritten inline per blip to its own HUD colour */
-    box-shadow: 0 1px 3px rgba(0,0,0,.6);
+#ooc-input::placeholder { color: rgba(255, 255, 255, 0.45); }
+#ooc-send {
+    all: unset;
+    padding: 0 14px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 4px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.map-blip-icon:hover { filter: brightness(1.3); }
-.map-blip-icon img {
-    width: 15px;
-    height: 15px;
-    pointer-events: none; /* clicks/drag should hit the coloured circle (.map-blip-icon), not stop on the <img> */
-}
-/* Only the hand-confirmed-plain-silhouette local set (app.js's
-   LOCAL_ICON_SPRITES) gets this -- inverting an arbitrary hotlinked sprite
-   to white would flatten real multi-colour art, the same mistake that sank
-   two earlier full-icon-pipeline attempts (see shared/config.lua's
-   Points-of-interest comment). Those are shown at their own native colour
-   instead, via a plain, unfiltered <img>. */
-.map-blip-icon img.mono {
-    filter: brightness(0) invert(1);
-}
+#ooc-send:hover { background: #fff; }
 
-#map-player-marker {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    /* Arrow pointing along heading, rotated from JS (transform: translate(-50%,-50%) rotate(deg)) */
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-bottom: 16px solid #ffd429;
-    filter: drop-shadow(0 0 4px rgba(0,0,0,.8));
-}
+/* ---- Main column: navbar, content, footer ---- */
 
-#map-zoom-controls {
-    position: absolute;
-    bottom: 76px;
-    left: 20px;
+#dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#dash-navbar {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-#map-zoom-controls button {
-    all: unset;
-    width: 32px;
-    height: 32px;
-    text-align: center;
-    line-height: 32px;
-    font-size: 18px;
-    font-weight: 600;
-    background: rgba(8, 12, 18, 0.86);
-    border: 1px solid rgba(255,255,255,.2);
-    cursor: pointer;
-}
-#map-zoom-controls button:hover { color: var(--accent); }
-
-#map-recenter {
-    all: unset;
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    cursor: pointer;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-    color: var(--accent-ink);
-    background: var(--accent);
-    border-radius: 2px;
-}
-#map-recenter:hover { background: #fff; }
-
-/* Shows which specific blip is hovered/clicked/keyboard-focused (app.js's
-   showBlipTooltip) -- lives directly in #map, NOT inside #map-layer, so its
-   own size stays constant regardless of the map's own pan/zoom transform;
-   only its left/top (in plain CSS pixels) are recomputed as that changes. */
-#map-blip-tooltip {
-    position: absolute;
-    transform: translate(-50%, calc(-100% - 14px));
-    padding: 5px 10px;
-    background: rgba(6, 10, 16, .95);
-    border: 1px solid rgba(255,255,255,.2);
-    border-radius: 3px;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 5;
-}
-
-/* ---------------------------------------------------------------- Locations panel (docked to the map) */
-
-#locations-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 430px;
-    height: 100%;
-    background: rgba(8, 12, 18, 0.9);
-    display: flex;
-    flex-direction: column;
-}
-
-.locations-header {
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    padding: 20px 20px 14px;
-    border-bottom: 1px solid rgba(255,255,255,.15);
+    align-items: center;
+    padding: 30px 48px 10px;
 }
-.locations-header h2 {
-    font-size: 18px;
-    letter-spacing: 2px;
-    white-space: nowrap;
-}
-#location-search {
+#dash-welcome { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; line-height: 1.5; }
+#dash-welcome span { color: var(--accent); }
+#dash-clock { text-align: right; }
+#dash-time { font-size: 26px; font-weight: 700; }
+#dash-date { font-size: 12px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 1px; }
+
+#dash-content { flex: 1; min-height: 0; padding: 20px 48px; overflow-y: auto; }
+.dash-view.hidden { display: none; }
+
+/* Home view: three cards */
+#dash-view-home { display: flex; gap: 24px; height: 100%; }
+/* An ID selector's `display: flex` above outranks the generic `.dash-view.hidden`
+   rule's specificity regardless of source order (1,0 beats 0,2) -- the same
+   class of bug #settings.hidden was fixed for elsewhere in this file (see the
+   .loc-row.hidden comment). Needs its own ID-qualified override, not just the
+   shared class rule, to actually hide. */
+#dash-view-home.hidden { display: none; }
+.dash-card {
     flex: 1;
-    min-width: 0;
-    padding: 8px 12px;
-    background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.2);
-    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 32px 20px;
+    border-radius: 24px;
+    cursor: default;
+}
+.dash-card[data-view] { cursor: pointer; }
+/* .plate already carries the surface itself -- hover/focus adds an accent
+   glow on top of it (there's no border to recolour, .plate's edge is an
+   inset hairline ring, not a border) rather than swapping the background. */
+.dash-card[data-view]:hover, .dash-card[data-view].kb-focus {
+    box-shadow: var(--shadow-md), var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 0 0 1.5px var(--accent);
+}
+.dash-card-icon { font-size: 64px; margin-bottom: 12px; color: var(--accent); }
+.dash-card h3 { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 700; font-size: 20px; margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+.dash-card p { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+
+.dash-card-patchnotes { align-items: stretch; text-align: left; overflow: hidden; }
+.dash-card-patchnotes h3 { text-align: center; }
+.dash-card-patchnotes .rule { width: 100%; height: 1px; background: rgba(255, 255, 255, 0.15); margin: 8px 0 12px; }
+#patchnote-date { font-size: 12px; color: rgba(255, 255, 255, 0.55); margin-bottom: 10px; }
+#patchnote-list { list-style: none; overflow-y: auto; min-height: 0; font-size: 13px; display: flex; flex-direction: column; gap: 10px; }
+#patchnote-list li { padding-left: 14px; position: relative; color: rgba(255, 255, 255, 0.85); }
+#patchnote-list li::before { content: '\2022'; position: absolute; left: 0; color: var(--accent); }
+
+/* Player-info / report sub-views */
+.dash-back {
+    all: unset;
+    display: inline-block;
+    margin-bottom: 20px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}
+.dash-back:hover, .dash-back.kb-focus { background: var(--accent); color: var(--accent-ink); }
+
+#playerinfo-body { display: flex; gap: 40px; align-items: center; margin-bottom: 32px; }
+#playerinfo-mugshot {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08) center/cover no-repeat;
+    border: 3px solid var(--accent);
+    flex: 0 0 auto;
+}
+#playerinfo-table { border-collapse: collapse; font-size: 16px; }
+#playerinfo-table td { padding: 8px 20px 8px 0; }
+#playerinfo-table td:first-child { color: rgba(255, 255, 255, 0.55); text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
+
+#playerinfo-bars { max-width: 420px; display: flex; flex-direction: column; gap: 18px; }
+.pi-bar-row span { display: block; font-size: 13px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255, 255, 255, 0.7); }
+.pi-bar { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.pi-bar-fill { height: 100%; background: var(--accent); border-radius: 5px; transition: width 300ms ease; }
+
+#dash-view-report { max-width: 480px; }
+#dash-view-report h2 { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 700; margin-bottom: 20px; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
+#dash-view-report select,
+#dash-view-report input,
+#dash-view-report textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
     color: #fff;
     font-family: inherit;
-    font-size: 13px;
-}
-#location-search::placeholder { color: rgba(255,255,255,.5); }
-
-#locations-list {
-    flex: 1;
-    overflow-y: auto;
-}
-
-.you-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 20px;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: .5px;
-    color: var(--accent-ink);
-    background: #fff;
-    cursor: pointer;
-}
-.you-row:hover, .you-row.kb-focus { background: var(--accent); }
-.you-icon { font-size: 12px; }
-
-.cat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 20px 6px;
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: rgba(255,255,255,.55);
-    text-transform: uppercase;
-    cursor: pointer; /* the label/chevron area collapses the group -- see app.js's header click handler */
-}
-.cat-header input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--accent);
-    cursor: pointer;
-}
-/* Collapse chevron -- a plain CSS triangle, not an icon font/image, so it
-   can't fail to load the way an <img>-based one could. Points down
-   (expanded) by default, rotates to point right when the group is
-   collapsed (app.js toggles .collapsed on the header itself). */
-.cat-header .cat-chevron {
-    display: inline-block;
-    margin-right: 8px;
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid rgba(255,255,255,.55);
-    transition: transform 120ms ease;
-}
-.cat-header.collapsed .cat-chevron { transform: rotate(-90deg); }
-.cat-header-label {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-}
-
-.loc-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 9px 20px;
-    font-size: 15px;
-    cursor: pointer;
-    border-left: 3px solid transparent; /* set inline per-row to the blip's own real HUD colour, see app.js */
-    border-bottom: 1px solid rgba(255,255,255,.06);
-}
-/* .loc-row and the shared .hidden utility class both have single-class
-   specificity, and .loc-row is declared later in this file -- without this,
-   .loc-row's own `display: flex` silently wins over .hidden's `display:
-   none` on a collapsed group's rows (see app.js's header click handler),
-   the same class of bug #settings.hidden was fixed for elsewhere in this
-   file. .loc-row.hidden's combined specificity is what actually wins. */
-.loc-row.hidden { display: none; }
-.loc-row:hover, .loc-row.kb-focus { background: rgba(255,255,255,.06); }
-.loc-row.kb-focus { outline: 1px solid var(--accent); outline-offset: -1px; }
-.loc-row .loc-swatch {
-    flex: 0 0 auto;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    /* background-color set inline per row to the blip's own real HUD colour, see app.js */
-}
-.loc-row .loc-label { flex: 1; }
-.loc-row input[type="checkbox"] {
-    flex: 0 0 auto;
-    width: 17px;
-    height: 17px;
-    accent-color: var(--accent);
-    cursor: pointer;
-}
-
-.hint-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: calc(100% - 430px);
-    padding: 14px 40px;
-    background: rgba(8, 12, 18, 0.86);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 28px;
     font-size: 14px;
 }
-.hint-bar b { color: var(--accent); margin-right: 6px; }
+#dash-view-report textarea { resize: vertical; }
+#report-submit {
+    all: unset;
+    display: inline-block;
+    padding: 10px 24px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+#report-submit:hover { background: #fff; }
+#report-sent { margin-top: 14px; color: var(--accent); font-size: 13px; }
+#report-sent.hidden { display: none; }
+
+/* Footer icon row */
+#dash-footer {
+    display: flex;
+    justify-content: space-evenly;
+    padding: 18px 48px 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dash-footer-btn {
+    all: unset;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.8);
+}
+.dash-footer-icon { font-size: 24px; }
+.dash-footer-btn:hover, .dash-footer-btn.kb-focus { color: var(--accent); }
+#footer-exit:hover, #footer-exit.kb-focus { color: #ff6b6b; }
+
+/* Exit confirmation modal */
+#exit-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+#exit-modal.hidden { display: none; }
+#exit-modal-box {
+    border-radius: 8px;
+    padding: 28px 32px;
+    width: 340px;
+    text-align: center;
+}
+#exit-modal-box h3 { font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif; font-weight: 700; margin-bottom: 12px; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+#exit-modal-box p { font-size: 14px; color: rgba(255, 255, 255, 0.75); margin-bottom: 20px; }
+#exit-modal-actions { display: flex; gap: 12px; justify-content: center; }
+#exit-modal-actions button {
+    all: unset;
+    padding: 9px 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+#exit-no { background: rgba(255, 255, 255, 0.1); }
+#exit-no:hover { background: rgba(255, 255, 255, 0.2); }
+#exit-yes { background: #d64545; color: #fff; }
+#exit-yes:hover { background: #ff5c5c; }
+
+#app[data-panel="dashboard"] .back-hint { display: none; }
 
 /* ---------------------------------------------------------------- Players
-   Settings has no NUI panel/CSS of its own -- it hands off to FiveM's real
-   Settings screen instead (see client/main.lua's openNativeSettings), which
-   is unthemed stock Rockstar UI outside this resource's control entirely. */
+   Settings, Keybinds and Map all have no NUI panel/CSS of their own -- they
+   hand off to FiveM's real native frontend screens instead (see
+   client/main.lua's openNativeFrontend), which render as unthemed stock
+   Rockstar UI outside this resource's control entirely. */
 
 #players {
     background: rgba(8, 12, 18, 0.9);
     padding: 60px 0 0 48px;
 }
 #players header h1 {
+    font-family: 'GTAArtDeco', 'HelveticaNeueHUD', sans-serif;
     font-size: 34px;
     font-weight: 700;
-    font-style: italic;
     letter-spacing: 1px;
 }
 #players .rule {
@@ -463,5 +486,3 @@ html, body {
     color: rgba(255,255,255,.55);
     letter-spacing: 1px;
 }
-/* Map draws its own hint-bar (with the right-panel width subtracted), so hide this generic one there. */
-#app[data-panel="map"] .back-hint { display: none; }

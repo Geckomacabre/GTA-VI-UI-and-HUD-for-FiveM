@@ -44,9 +44,14 @@ CyberLeek's videos and GTA VI Extended Look.
 | ![lb-phone BuckMe, BuckBot support chat](docs/screenshots/buckbot-help.png) | ![qbx_relog character switcher](docs/screenshots/character-switcher.png) |
 | BuckBot support chat | `qbx_relog`: hold-to-switch character strip |
 | ![gk_pausemenu quick menu, male accent](docs/screenshots/quickmenu-male.png) | ![gk_pausemenu quick menu, female accent](docs/screenshots/quickmenu-female.png) |
-| `gk_pausemenu`: quick menu, male accent colour | Quick menu, female accent colour |
+| `resources/_retired/gk_pausemenu`: quick menu, male accent colour | Quick menu, female accent colour |
 | ![gk_pausemenu map tab](docs/screenshots/pausemenu-map.png) | |
-| `gk_pausemenu`: Map tab with the Locations panel | |
+| `resources/_retired/gk_pausemenu`: Map tab with the Locations panel | |
+
+> [!NOTE]
+> The two screenshots above are from the retired, self-drawn-map version of
+> `gk_pausemenu`. Screenshots of the current dashboard-style pause menu are
+> pending — see [`resources/gk_pausemenu`](resources/gk_pausemenu).
 
 ## What's in here
 
@@ -54,6 +59,8 @@ CyberLeek's videos and GTA VI Extended Look.
 GTA VI Resources/
 ├── resources/     Full, self-contained resources. Drag any of these
 │                  straight into your server's resources/ folder.
+│   └── _retired/  Superseded versions kept for reference only — not
+│                  maintained, not part of the install steps below.
 │
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
@@ -116,21 +123,22 @@ included here.
   if vice_hud isn't running. Depends on `qbx_core`, `ox_target`,
   `ox_inventory`.
 
-- **`gk_pausemenu`**: A fully custom NUI pause menu that replaces the native
-  ESC menu, with a self-drawn map (real GTA V map art) and a Locations panel
-  fed by a live scan of every real blip on the server (search, sprite-grouped
-  colour accents, per-location preview/waypoint). Settings still hands off to
-  the real native Settings screen. No hard dependency on vice_hud; matches
-  its gender-based accent colour when it's running, otherwise looks the same
-  either way. Depends on `ox_lib`.
+- **`gk_pausemenu`**: A custom NUI pause menu that takes over the native ESC
+  menu with a dashboard UI — sidebar profile/stats/OOC chat, navbar, Player
+  Details/Report/Patch Notes cards, footer icons — themed to match vice_hud.
+  Map, Settings and Keybinds all hand off to the real native frontend screens
+  rather than any custom NUI, so they always match whatever the base game
+  actually has. No hard dependency on vice_hud, qbx_core, or
+  `MugShotBase64`; defers to each cooperatively when running. Depends on
+  `ox_lib`. The dashboard layout is reskinned on top of
+  [SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu) by
+  [syno-sy](https://github.com/syno-sy) — see the resource's own
+  [`README.md`](resources/gk_pausemenu/README.md) for the full credit.
 
-  > [!NOTE]
-  > **The Map tab is beta.** Blip positions on the custom-stitched map image
-  > are only affine-calibrated to ~1% accuracy (see
-  > `html/images/README.md`), so a blip far from the landmarks used for that
-  > fit can visibly drift from where it actually is. Double-clicking a blip
-  > or an empty spot on the map to set a waypoint works, but expect some
-  > imprecision until the calibration gets more landmarks.
+  An earlier, self-drawn-map version of this resource (custom map art +
+  live blip scan instead of the native hand-off above) has been retired to
+  [`resources/_retired/gk_pausemenu`](resources/_retired/gk_pausemenu) and
+  is no longer maintained.
 
 - **`qbx_relog`**: Singleplayer-style character switching. `/relog` still
   works as before (confirmation, anti-combat-log wait, back to the
@@ -301,15 +309,26 @@ font is just present and ready to use if you want to switch either app's
 
 This repository is licensed under [Creative Commons
 Attribution-NonCommercial-ShareAlike 4.0 International](LICENSE) (CC
-BY-NC-SA 4.0), matching `vice_hud`, its core resource. In short: use it,
-modify it, share it, but not on a paid or commercial server, credit is
-required, and a modified version has to stay under the same license.
+BY-NC-SA 4.0), matching `vice_hud`, its core resource. In short: run it on
+your own server, credit is required, and a modified version has to stay
+under the same license. Your server is free to make money however it
+normally would (donations, whitelist fees, a store, etc.) — the
+NonCommercial term is about the *source code*, not your server: nobody may
+sell this code, bundle it into a paid script/asset pack, or otherwise
+commercially distribute or resell it as a product on its own.
 
-`resources/qbx_vehiclekeys` is the exception: it's a modified copy of
+`resources/qbx_vehiclekeys` and `resources/gk_pausemenu` are the exception:
+`qbx_vehiclekeys` is a modified copy of
 [Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys),
-which is GPL-3.0. That's Qbox-project's own license on their own code, not
-something this repository can change, so it keeps its own `LICENSE` file
-and stays GPL-3.0 regardless of the license above.
+and `gk_pausemenu` is built on top of
+[SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu) by
+[syno-sy](https://github.com/syno-sy) — both GPL-3.0. That's each original
+author's own license on their own code, not something this repository can
+change, so both keep their own `LICENSE` file and stay GPL-3.0 regardless of
+the license above. Unlike the NonCommercial license covering the rest of
+this repository, GPL-3.0 explicitly permits commercial use and resale —
+that's a term of the upstream license these two resources are built on, not
+a choice made here.
 
 `resources/vice_hud` and `resources/qbx_honor` each carry their own copy of
 that same CC BY-NC-SA 4.0 licence, so they stay correctly licensed if someone
@@ -328,6 +347,7 @@ their own upstream license:
 | `qbx_smallresources` | GPL-3.0 |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) |
 | `qbx_core` | GPL-3.0 |
+| `SY_PauseMenu` (base of `gk_pausemenu`) | GPL-3.0 (see above) |
 
 `lb-phone` is different again: it's a paid, closed-source resource, not
 under any of the licenses above. Nothing of lb-phone's own code or assets is

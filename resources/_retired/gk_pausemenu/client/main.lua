@@ -28,40 +28,27 @@
     notices the same ESC/P press the detection loop below also sees. No
     TakeControlOfFrontend/ReleaseControlOfFrontend anywhere in this file --
     an earlier version used that instead, which is a DIFFERENT and
-    incompatible mechanism that caused a lockup.
+    incompatible mechanism (see native_pages.lua's header comment for the
+    history of why that combination caused a lockup).
 
-    Map, Settings and Keybinds all hand off to FiveM's own real native
-    frontend screens (see openNativeFrontend below) rather than any custom
-    NUI -- unthemed stock Rockstar UI while they're open, in exchange for
-    being the genuine article. An earlier version of this resource drew its
-    own Map panel (self-drawn image, live blip scan, custom waypoint
-    preview) specifically to avoid that unthemed look; it was torn out in
-    favour of the same native ActivateFrontendMenu(FE_MENU_VERSION_MP_PAUSE)
-    handoff Settings already used, matching SY_PauseMenu's own Map button
-    and trading the custom theme for the real map, real blips, and real
-    waypoint-setting with none of it needing to be reimplemented or kept in
-    sync by hand.
+    Map is entirely custom NUI (see html/app.js), not a native-frontend
+    takeover -- ActivateFrontendMenu(FE_MENU_VERSION_MP_PAUSE) was tried at
+    length: it genuinely worked without locking up (a real, safe technique),
+    but renders as stock, unthemeable Rockstar UI with no scripting hook to
+    restyle it -- visibly inconsistent with this resource's own theme, which
+    isn't acceptable for the Map. Settings uses that exact same proven-safe
+    technique deliberately (see openNativeSettings below) -- unlike Map,
+    there's no way to reimplement the REAL Settings screens ourselves at all
+    (most of Graphics/Audio/Controls have no scriptable SET_ native, per
+    shared/config.lua's Settings-tab comment), so unthemed-but-real beats
+    themed-but-fake there.
 ]]
 
 local menuOpen = false
 local currentPanel = Config.DefaultPanel
 local enabled = true
 local players = {}
-local nativeFrontendOpen = false
-
---[[
-    Ping, refreshed via a server round-trip rather than a client-side native.
-    An earlier version of this file called NETWORK_GET_AVERAGE_PING directly
-    -- that native (and NETWORK_GET_AVERAGE_LATENCY) are GTA V SINGLE-PLAYER
-    natives from build 323, present in _tools/nativedb's docs mirror but NOT
-    actually exposed in FiveM's Lua environment: confirmed in-game via
-    client_log_9_8.txt, "attempt to call a nil value (global
-    'NetworkGetAveragePing')" at this file's old line 105. GET_PLAYER_PING is
-    the real one FiveM exposes, but it's server-only (takes a playerSrc, not
-    a client Player handle) -- same request/reply shape this file already
-    uses for the Players tab (gk_pausemenu:server:requestPlayers below).
-]]
-local lastPing = 0
+local nativeSettingsOpen = false
 
 local function loadEnabledSetting()
     if not Config.AllowPlayerToDisable then return end
@@ -98,92 +85,20 @@ RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     accentKey = nil
 end)
 
---[[
-    Dashboard sidebar/player-info card data -- name, job, money, hunger/thirst
-    -- read straight from qbx_core's own PlayerData rather than mirrored into
-    a separate state, same pcall-guarded pattern as resolveAccentKey() above
-    (qbx_core may not be started yet, or this could theoretically run on a
-    non-Qbox setup). Rebuilt on demand (open, and the low-frequency refresh
-    thread below) rather than cached, so it can't go stale while the menu
-    sits open across a job change, a hunger tick, or a bank deposit.
-]]
-local function buildPlayerStats()
-    local stats = {
-        firstName = '', lastName = '', job = '', jobGrade = '',
-        cash = 0, bank = 0, hunger = 100, thirst = 100,
-        ping = lastPing, -- refreshed by the server round-trip below, see this file's header comment
-        -- GET_NUM_PLAYER_INDICES is server-only (confirmed via _tools/nativedb
-        -- after this same mistake with GetPlayerPing/NetworkGetAveragePing --
-        -- also confirmed in-game, "attempt to call a nil value"). #GetActivePlayers()
-        -- is the real client-apiset equivalent: an array of active player indices.
-        playerCount = #GetActivePlayers(),
-    }
-
-    if GetResourceState('qbx_core') ~= 'started' then return stats end
-    local ok, pd = pcall(function() return exports.qbx_core:GetPlayerData() end)
-    if not ok or type(pd) ~= 'table' then return stats end
-
-    if type(pd.charinfo) == 'table' then
-        stats.firstName = pd.charinfo.firstname or ''
-        stats.lastName = pd.charinfo.lastname or ''
-    end
-    if type(pd.job) == 'table' then
-        stats.job = pd.job.label or ''
-        stats.jobGrade = type(pd.job.grade) == 'table' and pd.job.grade.name or ''
-    end
-    if type(pd.money) == 'table' then
-        stats.cash = pd.money.cash or 0
-        stats.bank = pd.money.bank or 0
-    end
-    if type(pd.metadata) == 'table' then
-        stats.hunger = pd.metadata.hunger or 100
-        stats.thirst = pd.metadata.thirst or 100
-    end
-
-    return stats
-end
-
---[[
-    Player-info card's headshot -- via resources/[standalone]/MugShotBase64,
-    the same standalone resource qbx_honor's own client/main.lua already
-    uses for its own honor-toast portrait (getMugshot() there). NOT
-    reimplemented directly against RegisterPedheadshotTransparent/
-    IS_PEDHEADSHOT_READY/UnregisterPedheadshot the way an earlier draft of
-    this file did: REGISTER_PEDHEADSHOT_TRANSPARENT is hardcoded to exactly
-    ONE shared engine texture slot server-wide (citizenfx/fivem#2611, quoted
-    in qbx_relog/client/headshots.lua's own header comment), so handing the
-    NUI a raw nui://game/<txd>/<txd> src and unregistering right after is a
-    race: the texture can be recycled before the page's <img> actually
-    decodes it. MugShotBase64's own export already solves this the correct
-    way (convert to an owned base64 PNG the page can hold onto, THEN
-    unregister) -- reusing it here instead of solving the same race twice.
-
-    Soft dependency, not a hard fxmanifest one, same stance as vice_hud
-    elsewhere in this file: if MugShotBase64 isn't running, the sidebar/
-    player-info avatars just keep their placeholder background.
-]]
-local function requestMugshot()
-    CreateThread(function()
-        local ok, dataUrl = pcall(function()
-            return exports['MugShotBase64']:GetMugShotBase64(PlayerPedId(), true)
-        end)
-        if ok and type(dataUrl) == 'string' and dataUrl ~= '' then
-            SendNUIMessage({ type = 'mugshot', url = dataUrl })
-        end
-    end)
-end
-
 local function showNui(panel)
     SendNUIMessage({
         type = 'open',
         panel = panel,
+        -- Only scanned for the Map tab -- GK.ScanBlips() is a few thousand
+        -- native calls (see its own header comment for why there's no
+        -- cheaper way to enumerate every active blip), cheap enough for an
+        -- on-demand scan but still pointless work when opening straight to
+        -- Quick Menu or Players, which never use it.
+        blips = panel == 'map' and GK.ScanBlips() or nil,
         players = players,
+        mapConfig = Config.Map,
         accent = Config.Accent[resolveAccentKey()],
-        stats = buildPlayerStats(),
-        patchNotes = Config.PatchNotes,
     })
-    requestMugshot()
-    TriggerServerEvent('gk_pausemenu:server:requestPing') -- so the sidebar doesn't sit on stale/zero ping until the refresh thread's next tick
 end
 
 local function openMenu()
@@ -243,58 +158,47 @@ local function closeMenu()
 end
 
 --[[
-    Hands off to one of FiveM's own real native frontend screens instead of a
-    custom NUI panel -- Settings, Keybinds, and now Map (see this file's top
-    header comment for why Map moved here too). Sequence:
+    Hands off to FiveM's own real Settings screen instead of a custom NUI
+    panel -- see shared/config.lua's Settings-tab comment for why. Sequence:
 
     1. Drop this resource's own NUI focus FIRST. Leaving SetNuiFocus(true,
        ...) on while a frontend menu is also active is exactly the kind of
        native/NUI mixing that caused the historical pause-menu lockup (see
        this file's top header comment) -- hand off cleanly, don't layer them.
-    2. ActivateFrontendMenu(menuHash, false, -1):
-         - FE_MENU_VERSION_LANDING_MENU (Settings footer icon) -- FiveM's own
-           reimplemented Settings screen (General/Gamepad/Audio/Display/
-           Graphics/Rockstar Editor/Voice Chat/Keyboard-Mouse/Camera/Key
-           Bindings). component=-1 opens that standalone LANDING page
-           directly -- confirmed via a community-verified working example for
-           its sibling FE_MENU_VERSION_LANDING_KEYMAPPING_MENU (jumps straight
-           to Key Bindings the same way: forum.cfx.re/t/open-fivem-keybinds-
-           in-pause-menu/4833882).
-         - FE_MENU_VERSION_LANDING_KEYMAPPING_MENU (Keybinds footer icon) --
-           same LANDING_* page convention, straight to Key Bindings.
-         - FE_MENU_VERSION_MP_PAUSE (Map footer icon) -- the WHOLE native
-           pause tree (Simple/Map/Online/etc), NOT a LANDING_* page. -1 here
-           means "open the map" specifically -- documented behaviour for
-           FE_MENU_VERSION_MP_PAUSE/SP_PAUSE, not for a LANDING_* hash, which
-           is why it can't be reused for Settings/Keybinds and vice versa.
-           Backing out of Map to the tree's OTHER tabs (Simple, Online) does
-           NOT trip the close-detection below -- IsFrontendReadyForControl()
-           stays true the whole time the tree is up, on any tab -- so a
-           player who backs out of Map onto e.g. Simple sees the real native
-           pause screen until they back out of THAT too. Same behaviour
-           SY_PauseMenu's own Map button has; not special-cased further.
+    2. ActivateFrontendMenu(GetHashKey('FE_MENU_VERSION_LANDING_MENU'), false,
+       -1) -- FiveM's own reimplemented Settings screen (General/Gamepad/
+       Audio/Display/Graphics/Rockstar Editor/Voice Chat/Keyboard-Mouse/
+       Camera/Key Bindings -- matches the reference screenshots this was
+       built from exactly), deliberately NOT FE_MENU_VERSION_MP_PAUSE (that's
+       the WHOLE native pause tree with its own Resume/Map/etc, which would
+       duplicate this resource's own Quick Menu underneath it).
+       component=-1 opens that standalone LANDING page directly -- confirmed
+       via a community-verified working example for its sibling
+       FE_MENU_VERSION_LANDING_KEYMAPPING_MENU (jumps straight to Key
+       Bindings the same way: forum.cfx.re/t/open-fivem-keybinds-in-pause-
+       menu/4833882). -1 meaning "open the map" is documented behaviour for
+       FE_MENU_VERSION_MP_PAUSE/SP_PAUSE specifically, not for a LANDING_*
+       hash.
     3. Poll IsFrontendReadyForControl() for the close edge (true -> false) to
-       detect the player backing out of it entirely, then
-       PauseMenuceptionTheKick() + SetFrontendActive(false) to fully tear it
-       down (both documented native names, matching this file's original
-       header-comment research), and restore this resource's own dashboard
-       NUI.
+       detect the player backing out of it, then PauseMenuceptionTheKick() +
+       SetFrontendActive(false) to fully tear it down (both documented native
+       names, matching this file's original header-comment research), and
+       restore this resource's own Quick Menu NUI.
 
-    No component-ID list for jumping straight to one specific SUB-tab within
-    LANDING_MENU (e.g. straight to Graphics, skipping General) is documented
-    anywhere reachable offline -- checked _tools/nativedb (native signature +
-    old single-player doc blurb only), _tools/fivem_docs (nothing on
-    ActivateFrontendMenu at all), and _tools/decompiled_scripts'
-    pausemenu_multiplayer.c (the actual GTA Online pause menu script, 150k
-    lines -- but this decompile has no native names or symbols resolved at
-    all, every call site is opaque numbered locals, so it's unsearchable for
-    this). Landing on the General tab and letting the player click across the
-    real tab bar themselves is the community-verified-safe option, not a
-    guessed shortcut.
+    No component-ID list for jumping straight to one specific SUB-tab (e.g.
+    straight to Graphics, skipping General) is documented anywhere reachable
+    offline -- checked _tools/nativedb (native signature + old single-player
+    doc blurb only), _tools/fivem_docs (nothing on ActivateFrontendMenu at
+    all), and _tools/decompiled_scripts' pausemenu_multiplayer.c (the actual
+    GTA Online pause menu script, 150k lines -- but this decompile has no
+    native names or symbols resolved at all, every call site is opaque
+    numbered locals, so it's unsearchable for this). Landing on the General
+    tab and letting the player click across the real tab bar themselves is
+    the community-verified-safe option, not a guessed shortcut.
 ]]
-local function openNativeFrontend(menuHash)
-    if nativeFrontendOpen then return end
-    nativeFrontendOpen = true
+local function openNativeSettings()
+    if nativeSettingsOpen then return end
+    nativeSettingsOpen = true
 
     SendNUIMessage({ type = 'close' })
     SetNuiFocus(false, false)
@@ -302,7 +206,7 @@ local function openNativeFrontend(menuHash)
     -- Passing togglePause=false to ActivateFrontendMenu below means WE own
     -- IsPauseMenuActive for this, not the native call itself -- the
     -- unconditional suppression thread near the bottom of this file already
-    -- stops FIGHTING it false while nativeFrontendOpen is true, but nothing
+    -- stops FIGHTING it false while nativeSettingsOpen is true, but nothing
     -- was ever setting it true. Normally ESC's own engine-level handling
     -- does that; this resource intercepts ESC itself (IsControlJustPressed,
     -- see this file's header comment) and never dispatches through that
@@ -313,10 +217,10 @@ local function openNativeFrontend(menuHash)
     -- (no fresh transition for its second-load logic to key off of).
     SetPauseMenuActive(true)
 
-    local ok, err = pcall(ActivateFrontendMenu, menuHash, false, -1)
+    local ok, err = pcall(ActivateFrontendMenu, GetHashKey('FE_MENU_VERSION_LANDING_MENU'), false, -1)
     if not ok then
-        print(('[gk_pausemenu] ActivateFrontendMenu failed, returning to the dashboard: %s'):format(err))
-        nativeFrontendOpen = false
+        print(('[gk_pausemenu] ActivateFrontendMenu failed, returning to Quick Menu: %s'):format(err))
+        nativeSettingsOpen = false
         SetPauseMenuActive(false)
         if menuOpen then
             SetNuiFocus(true, true)
@@ -347,7 +251,7 @@ local function openNativeFrontend(menuHash)
         -- later that thread happens to run first.
         SetPauseMenuActive(false)
 
-        nativeFrontendOpen = false
+        nativeSettingsOpen = false
         if menuOpen then
             SetNuiFocus(true, true)
             SetNuiFocusKeepInput(false)
@@ -363,59 +267,26 @@ end)
 
 RegisterNUICallback('setPanel', function(data, cb)
     currentPanel = data.panel
+    -- The initial showNui() on open only scans blips if Config.DefaultPanel
+    -- itself is 'map' (it isn't -- 'quickmenu' is) -- switching to Map from
+    -- the Quick Menu is the actual normal path there, so it needs its own
+    -- fresh scan rather than relying on stale (empty) data from open time.
+    if data.panel == 'map' then
+        SendNUIMessage({ type = 'blips', blips = GK.ScanBlips() })
+    end
     cb(1)
 end)
 
 RegisterNUICallback('openSettings', function(_, cb)
-    openNativeFrontend(GetHashKey('FE_MENU_VERSION_LANDING_MENU'))
+    openNativeSettings()
     cb(1)
 end)
 
-RegisterNUICallback('openKeybinds', function(_, cb)
-    openNativeFrontend(GetHashKey('FE_MENU_VERSION_LANDING_KEYMAPPING_MENU'))
-    cb(1)
-end)
-
--- The dashboard's Map footer icon -- the real native pause map (see this
--- file's top header comment for why this replaced a self-drawn one).
-RegisterNUICallback('openMap', function(_, cb)
-    openNativeFrontend(GetHashKey('FE_MENU_VERSION_MP_PAUSE'))
-    cb(1)
-end)
-
---[[
-    Runs the SAME real /ooc command qbx_core's own server/commands.lua
-    already registers (proximity broadcast, admin opt-in relay, logging
-    webhook -- all of it) rather than reimplementing any of that here. This
-    is just a convenience input box for typing into that existing system,
-    not a separate chat channel -- ExecuteCommand feeds it exactly as if the
-    player had typed `/ooc <text>` into the real chat box themselves.
-]]
-RegisterNUICallback('ooc', function(data, cb)
-    local text = type(data.text) == 'string' and data.text:gsub('[\r\n]', ' '):match('^%s*(.-)%s*$') or ''
-    if text ~= '' then
-        ExecuteCommand('ooc ' .. text)
+RegisterNUICallback('setWaypoint', function(data, cb)
+    if data.x and data.y then
+        SetNewWaypoint(data.x + 0.0, data.y + 0.0)
+        closeMenu()
     end
-    cb(1)
-end)
-
-RegisterNUICallback('report', function(data, cb)
-    local subject = type(data.subject) == 'string' and data.subject:match('^%s*(.-)%s*$') or ''
-    local text = type(data.text) == 'string' and data.text:match('^%s*(.-)%s*$') or ''
-    if subject ~= '' and text ~= '' then
-        TriggerServerEvent('gk_pausemenu:server:report', data.category, subject, text)
-    end
-    cb(1)
-end)
-
--- The dashboard's Exit footer icon -- confirmed via its own NUI modal before
--- this ever fires (see html/app.js), same "irreversible action needs an
--- explicit yes" step SY_PauseMenu's own Exit confirm modal has. Only ever
--- drops the player who clicked it (`source` on the server side resolves to
--- whoever fired this event), never anyone else.
-RegisterNUICallback('exit', function(_, cb)
-    closeMenu()
-    TriggerServerEvent('gk_pausemenu:server:exit')
     cb(1)
 end)
 
@@ -424,10 +295,6 @@ RegisterNetEvent('gk_pausemenu:client:setPlayers', function(list)
     if menuOpen and currentPanel == 'players' then
         SendNUIMessage({ type = 'players', players = players })
     end
-end)
-
-RegisterNetEvent('gk_pausemenu:client:setPing', function(ping)
-    lastPing = ping
 end)
 
 if Config.AllowPlayerToDisable then
@@ -466,8 +333,8 @@ AnimpostfxStop('MP_OrbitalCannon')
 -- researched -- don't swap it on the assumption "not deprecated" means
 -- "equivalent behavior here."
 --
--- `and not nativeFrontendOpen`: while any real native frontend screen
--- (openNativeFrontend -- Settings, Keybinds, or Map) is up, this must NOT
+-- `and not nativeSettingsOpen`: while the REAL native Settings screen
+-- (openNativeSettings, FE_MENU_VERSION_LANDING_MENU) is up, this must NOT
 -- keep forcing the flag false -- that menu's own loading sequence needs
 -- IsPauseMenuActive to actually go true to finish initializing, and this
 -- thread fighting it every single frame is what showed up as Settings
@@ -476,7 +343,7 @@ AnimpostfxStop('MP_OrbitalCannon')
 CreateThread(function()
     while true do
         Wait(0)
-        if not nativeFrontendOpen then
+        if not nativeSettingsOpen then
             SetPauseMenuActive(false)
         end
     end
@@ -499,7 +366,7 @@ CreateThread(function()
         -- player needs that to actually select things in the native menu.
         -- Suppressing it there wouldn't just be redundant, it would break
         -- using Settings at all.
-        if menuOpen and not nativeFrontendOpen then
+        if menuOpen and not nativeSettingsOpen then
             for _, control in ipairs(Config.DisableWhileOpen) do
                 DisableControlAction(0, control, true)
             end
@@ -507,19 +374,22 @@ CreateThread(function()
     end
 end)
 
--- Low-frequency (not Wait(0)) -- feeds the dashboard sidebar's ping/player
--- count/money/hunger/thirst, none of which push their own change event this
--- resource can just listen for (ping and player count have no event at all;
--- money/metadata do via QBCore:Player:SetPlayerData, but polling here is one
--- thread instead of two and this is cheap enough not to matter). Only while
--- the menu is actually open.
+-- Low-frequency (not Wait(0)) -- only feeds the NUI-drawn Map tab, and only
+-- while it's actually the visible panel, so this costs nothing the rest of
+-- the time.
 CreateThread(function()
     while true do
-        Wait(1000)
+        Wait(150)
 
-        if menuOpen then
-            TriggerServerEvent('gk_pausemenu:server:requestPing')
-            SendNUIMessage({ type = 'stats', stats = buildPlayerStats() })
+        if menuOpen and currentPanel == 'map' then
+            local ped = PlayerPedId()
+            local coords = GetEntityCoords(ped)
+            SendNUIMessage({
+                type = 'playerPos',
+                x = coords.x,
+                y = coords.y,
+                heading = GetEntityHeading(ped),
+            })
         end
     end
 end)

@@ -12,7 +12,9 @@ Config.ToggleCommand        = 'togglepausemenu'
 Config.ToggleKvp            = 'gk_pausemenu:enabled'
 
 -- Which panel the menu opens on the first time it's shown each session.
-Config.DefaultPanel = 'quickmenu' -- 'quickmenu' | 'map' | 'players'
+-- Map is not a value here -- it's a native frontend handoff (see
+-- client/main.lua's openNativeFrontend), not an NUI panel to default into.
+Config.DefaultPanel = 'dashboard' -- 'dashboard' | 'players'
 
 --------------------------------------------------------------------------------
 -- Theme
@@ -58,37 +60,9 @@ Config.Accent = {
     Editor/Voice Chat/Keyboard-Mouse/Camera/Key Bindings, every option real
     and working), at the cost of it rendering as unthemed stock Rockstar UI
     while open rather than matching this resource's own look -- see
-    client/main.lua's openNativeSettings for the full native sequence and
-    why that specific menu hash was picked over FE_MENU_VERSION_MP_PAUSE.
-]]
-
---------------------------------------------------------------------------------
--- Points of interest (Map tab's Locations panel)
---------------------------------------------------------------------------------
-
---[[
-    NOT a hand-typed list -- an earlier version of this file had one (city
-    hall/DMV/hospital/police/jail/five job depots, each grepped out of the
-    resource that placed it), and it kept drifting: a stale Trucking Depot
-    coordinate that no longer matched um_truckerjob's own config, categories
-    that stopped meaning anything once qbx_garages' dynamically-added
-    garages were mixed in, a sprite (356) that turned out to render as a
-    generic dock/anchor icon rather than anything jail-shaped because that's
-    just what rcore_prison happened to pick. Every one of those was a
-    real-world resource's blip already; keeping a second, hand-maintained
-    copy of coordinates those resources already own was the actual bug.
-
-    client/blips.lua's GK.ScanBlips() reads every currently active native
-    blip server-wide directly instead (GET_FIRST_BLIP_INFO_ID/
-    GET_NEXT_BLIP_INFO_ID walking every sprite id, filtered to
-    GET_BLIP_INFO_ID_TYPE == Coord) -- see that file's header comment for
-    the technique, the filtering, and what it genuinely cannot do (there is
-    no native to read a blip's own custom name back, so a discovered blip's
-    label is built from its sprite's generic name plus its zone, not
-    whatever specific name the creating script gave it). Nothing here needs
-    to be kept in sync by hand any more; a resource that adds, moves, or
-    removes a blip is reflected immediately, automatically, for every
-    resource on the server, not just the ones someone remembered to grep.
+    client/main.lua's openNativeFrontend for the full native sequence and
+    why that specific menu hash was picked over FE_MENU_VERSION_MP_PAUSE
+    (the Map footer icon's own target -- see that function's header comment).
 ]]
 
 --------------------------------------------------------------------------------
@@ -106,99 +80,29 @@ Config.Accent = {
 Config.DisableWhileOpen = { 200, 199, 202 } -- INPUT_FRONTEND_PAUSE, INPUT_FRONTEND_PAUSE_ALTERNATE, INPUT_FRONTEND_ACCEPT passthrough
 
 --------------------------------------------------------------------------------
--- Map tab
+-- Dashboard (home panel) -- reskinned after SY_PauseMenu's dashboard layout
+-- (sidebar/navbar/cards/footer), adapted onto qbx_core data instead of ESX's.
 --------------------------------------------------------------------------------
 
+-- Shown as their own card on the dashboard's home view.
+Config.PatchNotes = {
+    date = '08.09.2026',
+    updates = {
+        'Reskinned the pause menu into a dashboard layout.',
+    },
+}
+
 --[[
-    Deliberately NOT using SetRadarBigmapEnabled/ActivateFrontendMenu to show
-    GTA's real map -- see client/native_pages.lua's header comment for the
-    full history (a black screen that never recovered; later, a genuinely
-    working native handoff that still got reverted because it renders as
-    stock, unthemeable Rockstar UI). Instead the Map tab is a plain NUI image
-    panned/scaled under a fixed center marker -- ordinary DOM/CSS, no
-    game-frontend natives involved, so it can't reproduce the native
-    failure modes, and it can be themed to match the rest of this UI.
-
-    html/images/map.jpg is the actual GTA V map, extracted from
-    resources/[assets]/ls_map_lite's own stream/minimap_ROW_COL.ytd tiles via
-    _tools/map_extract (a small CodeWalker.Core-based tool -- see that
-    folder) and stitched into one 6144x9216 image (ROW 0-2 north->south,
-    COL 0-1 west->east, confirmed by inspecting each tile's visible
-    landmarks). ls_map_lite only re-textures this core 3x2 tile grid --
-    that's the entire map region this image covers; areas further out use
-    the base game's own unmodified minimap tiles, which weren't extracted.
-
-    worldMinX/Y and worldMaxX/Y below were previously a "widely-cited
-    community figure" (-4000/4000/-4000/8000) that turned out to be wrong --
-    it was never actually verified against this specific stitched image, and
-    doing so (see html/images/README.md's calibration procedure) showed
-    Humane Labs and Los Santos International Airport both landing in open
-    ocean, hundreds of pixels from the real coastline. Location pins across
-    the whole Map tab were off by the same kind of margin, not just those two.
-
-    Recalibrated by WEIGHTED least-squares, pixel-matching landmarks against
-    their real world coordinates (_tools/gtav_reference `zone` bbox centers)
-    and their measured icon/feature pixel position in html/images/map.jpg
-    (see html/images/README.md for the method):
-      - Humane Labs and Research: world (3530.4, 3708.2) -> pixel (5330, 3196), weight 5
-      - Maze Bank Arena:          world (-300.3, -1966.0) -> pixel (2617, 7116), weight 5
-      - Elysian Island docks:     world (597.7, -3064.5)  -> pixel (3525, 7845), weight 1
-    Humane Labs and Maze Bank Arena are precise single-icon matches; Elysian
-    Island's pixel position is an eyeballed industrial-cluster center, not a
-    discrete icon, so it carries real uncertainty of its own. An UNWEIGHTED
-    fit through all three (tried first) reproduced Elysian well but dragged
-    Maze Bank Arena's own residual out to ~127px -- letting one noisy point
-    degrade an otherwise-precise one just to accommodate it, which is worse
-    for the whole populated central-LS cluster near Maze Bank (City Hall,
-    DMV, Hospital, Police Department, Mechanic Shop, Taxi Depot) than
-    leaving that outlier a bit off. Weighting Humane/Maze 5x pulls the fit
-    back toward them (their residuals: ~11px and ~37px) while still fixing
-    the actual reported bug -- a real, script-sourced coordinate
-    (um_truckerjob's own Trucking Depot, on Elysian Island) that the
-    original two-point-only fit placed several hundred pixels out in open
-    ocean, since neither Humane Labs nor Maze Bank Arena is anywhere near
-    that part of the map. With this weighting the Trucking Depot lands
-    directly on the pier structure itself, not just near its edge.
-
-    If another far-south (or otherwise poorly-covered) location still
-    drifts, re-run html/images/README.md's procedure with a real discrete
-    icon in that area rather than nudging these numbers by feel -- Elysian's
-    own eyeballed point is the weak link here, not a limitation of the
-    method itself. A third landmark, LSIA, was also tried and excluded from
-    the X fit entirely -- its zone is a large multi-lobed polygon whose bbox
-    center sits well away from where the actual airport icon is drawn (its Y
-    still matched to ~1%, kept as a sanity check, not a fit input).
+    Bug/suggestion report form (the dashboard's Report card) -- posts straight
+    to Discord via a plain incoming webhook, no bot token needed (unlike
+    SY_PauseMenu's avatar-fetch feature, which does require one -- this
+    resource doesn't fetch Discord avatars at all, so that's not needed here).
+    Leave Config.Report.Webhook empty to disable the feature: server/main.lua
+    just logs to console instead of posting when it's blank, same pattern as
+    every other webhook-gated resource on this server.
 ]]
-Config.Map = {
-    image = 'images/map.jpg',
-
-    -- NOT the raw dimensions of map.jpg. The file itself is 6144x9216; these
-    -- are deliberately a little smaller, and both numbers are verified
-    -- in-game -- blips and the player marker land on their real positions with
-    -- these and drift with the file's own size.
-    --
-    -- They are the extent the WORLD BOUNDS below project onto, which is only
-    -- the same thing as the file size if the drawn map fills the canvas edge
-    -- to edge. It doesn't quite, so the projection is ~1.3% narrower and ~0.4%
-    -- shorter than the image.
-    --
-    -- If you are here because you checked the image properties and these look
-    -- wrong: they aren't. Re-deriving them from the file size puts every blip
-    -- back off its mark.
-    pixelWidth = 6065,
-    pixelHeight = 9176,
-
-    -- World-space bounds (GetEntityCoords units) the image's top-left and
-    -- bottom-right corners correspond to. X = east(+)/west(-),
-    -- Y = north(+)/south(-).
-    worldMinX = -4083.8,
-    worldMaxX = 4674.4,
-    worldMinY = -5019.5,
-    worldMaxY = 8344.6,
-
-    -- How many map pixels one screen pixel covers at zoom level 1 (bigger =
-    -- more zoomed out). Mouse wheel / +- buttons adjust from here in NUI.
-    metersPerPixelAtZoom1 = 6.0,
-    minZoom = 0.4,
-    maxZoom = 4.0,
+Config.Report = {
+    Webhook = '',
+    WebhookName = 'gk_pausemenu',
+    WebhookAvatar = '',
 }

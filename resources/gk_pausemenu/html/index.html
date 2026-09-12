@@ -8,71 +8,116 @@
 </head>
 <body>
     <div id="app">
-        <!-- Quick Menu: diagonal dark panel, list of tabs -->
-        <section id="quickmenu" class="panel">
-            <header>
-                <h1>QUICK MENU</h1>
-                <div class="rule"></div>
-            </header>
-            <nav id="quickmenu-list">
-                <button class="qm-row active" data-panel="quickmenu" data-action="resume">Resume</button>
-                <button class="qm-row" data-panel="map">Map</button>
-                <!-- Not a local panel -- hands off to FiveM's own real
-                     Settings screen instead of a custom NUI page, see
-                     client/main.lua's openNativeSettings. -->
-                <button class="qm-row" data-action="settings">Settings</button>
-                <button class="qm-row" data-panel="players">Players</button>
-            </nav>
-        </section>
-
-        <!-- Map: self-drawn (see html/images/README.md) -- no native bigmap involved -->
-        <section id="map" class="panel hidden">
-            <div id="map-viewport" title="Double-click to set a waypoint">
-                <div id="map-layer">
-                    <img id="map-image" alt="">
-                    <div id="map-blips"></div>
-                </div>
-                <div id="map-player-marker"></div>
-            </div>
-            <!-- Positioned in JS (app.js's positionBlipTooltip) to sit above
-                 whichever blip is currently hovered, clicked, or keyboard/
-                 gamepad-focused -- lives outside #map-layer so its own size
-                 isn't affected by that layer's pan/zoom transform. -->
-            <div id="map-blip-tooltip" class="hidden"></div>
-            <div id="map-missing-hint">
-                Drop a map image at <code>html/images/map.jpg</code> to see it here.<br>
-                See <code>html/images/README.md</code>.
-            </div>
-            <div id="map-zoom-controls">
-                <button id="map-zoom-in" type="button">+</button>
-                <button id="map-zoom-out" type="button">-</button>
-            </div>
-            <button id="map-recenter" class="hidden" type="button">Recenter</button>
-
-            <!-- Docked to the map itself, not a separate tab -->
-            <aside id="locations-panel">
-                <div class="locations-header">
-                    <h2>LOCATIONS</h2>
-                    <input id="location-search" type="text" placeholder="Search...">
-                </div>
-                <div id="locations-list">
-                    <div id="you-row" class="you-row" title="Recenter on you">
-                        <span class="you-icon">▲</span>
-                        <span>You</span>
+        <!-- Dashboard: home panel, reskinned after SY_PauseMenu's sidebar/navbar/cards/footer layout -->
+        <section id="dashboard" class="panel">
+            <aside id="dash-sidebar" class="plate">
+                <div id="dash-profile">
+                    <div id="dash-mugshot"></div>
+                    <div id="dash-identity">
+                        <h2 id="dash-name">&nbsp;</h2>
+                        <span id="dash-job">&nbsp;</span>
                     </div>
+                </div>
+                <div class="rule"></div>
+                <div id="dash-stats">
+                    <div class="dash-stat"><span class="dash-stat-label">Ping</span><span id="stat-ping" class="dash-stat-value">--</span></div>
+                    <div class="dash-stat"><span class="dash-stat-label">Cash</span><span id="stat-cash" class="dash-stat-value">$0</span></div>
+                    <div class="dash-stat"><span class="dash-stat-label">Bank</span><span id="stat-bank" class="dash-stat-value">$0</span></div>
+                    <button type="button" class="dash-stat dash-stat-btn" id="stat-players" data-panel="players"><span class="dash-stat-label">Players</span><span id="stat-playercount" class="dash-stat-value">--</span></button>
+                </div>
+                <h3 id="ooc-heading">OOC CHAT</h3>
+                <div id="ooc-log"></div>
+                <div id="ooc-input-row">
+                    <input id="ooc-input" type="text" placeholder="Type something in [OOC] chat" maxlength="200">
+                    <button type="button" id="ooc-send" title="Send">&#10148;</button>
                 </div>
             </aside>
 
-            <div class="hint-bar">
-                <span><b>Drag / Right Stick</b> Pan Map</span>
-                <span><b>↑↓ / Left Stick</b> Navigate List</span>
-                <span><b>Click / A</b> Preview</span>
-                <span><b>Double-Click / X</b> Set Waypoint</span>
-                <span><b>Y</b> Toggle Visibility</span>
-                <span><b>Scroll / RT·LT</b> Zoom</span>
-                <span><b>ESC / B</b> Back</span>
+            <div id="dash-main">
+                <nav id="dash-navbar">
+                    <div id="dash-welcome">WELCOME<br>You're at roleplay for <span id="dash-playtime">00H : 00M</span></div>
+                    <div id="dash-clock">
+                        <div id="dash-time">--:--</div>
+                        <div id="dash-date">--</div>
+                    </div>
+                </nav>
+
+                <div id="dash-content">
+                    <!-- Home: three cards -->
+                    <div id="dash-view-home" class="dash-view">
+                        <div class="dash-card plate" id="card-playerinfo" data-view="playerinfo" tabindex="0">
+                            <div class="dash-card-icon">&#9787;</div>
+                            <h3>Player Details</h3>
+                            <p>Click to open player details</p>
+                        </div>
+                        <div class="dash-card plate" id="card-report" data-view="report" tabindex="0">
+                            <div class="dash-card-icon">&#128030;</div>
+                            <h3>Report</h3>
+                            <p>Click to open the report form</p>
+                        </div>
+                        <div class="dash-card plate dash-card-patchnotes" tabindex="0">
+                            <h3>Patch Notes</h3>
+                            <div class="rule"></div>
+                            <h6 id="patchnote-date"></h6>
+                            <ul id="patchnote-list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Player info sub-view -->
+                    <div id="dash-view-playerinfo" class="dash-view hidden">
+                        <button type="button" class="dash-back" data-back="home">&#8592; Back</button>
+                        <div id="playerinfo-body">
+                            <div id="playerinfo-mugshot"></div>
+                            <table id="playerinfo-table">
+                                <tr><td>First Name</td><td id="pi-firstname">--</td></tr>
+                                <tr><td>Last Name</td><td id="pi-lastname">--</td></tr>
+                                <tr><td>Job</td><td id="pi-job">--</td></tr>
+                                <tr><td>Grade</td><td id="pi-grade">--</td></tr>
+                            </table>
+                        </div>
+                        <div id="playerinfo-bars">
+                            <div class="pi-bar-row"><span>Hunger</span><div class="pi-bar"><div id="pi-bar-hunger" class="pi-bar-fill"></div></div></div>
+                            <div class="pi-bar-row"><span>Thirst</span><div class="pi-bar"><div id="pi-bar-thirst" class="pi-bar-fill"></div></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Report sub-view -->
+                    <div id="dash-view-report" class="dash-view hidden">
+                        <button type="button" class="dash-back" data-back="home">&#8592; Back</button>
+                        <h2>Report Form</h2>
+                        <select id="report-category">
+                            <option value="Bug">Bug</option>
+                            <option value="Suggestion">Suggestion</option>
+                            <option value="Help">Help</option>
+                        </select>
+                        <input id="report-subject" type="text" placeholder="Subject" maxlength="100">
+                        <textarea id="report-text" rows="4" placeholder="Describe the issue..." maxlength="1000"></textarea>
+                        <button type="button" id="report-submit">Submit</button>
+                        <div id="report-sent" class="hidden">Report submitted, thank you.</div>
+                    </div>
+                </div>
+
+                <footer id="dash-footer">
+                    <button type="button" class="dash-footer-btn" data-action="settings"><span class="dash-footer-icon">&#9881;</span>Settings</button>
+                    <button type="button" class="dash-footer-btn" data-action="map"><span class="dash-footer-icon">&#128506;</span>Map</button>
+                    <button type="button" class="dash-footer-btn" data-action="resume"><span class="dash-footer-icon">&#9654;</span>Resume</button>
+                    <button type="button" class="dash-footer-btn" data-action="keybinds"><span class="dash-footer-icon">&#8963;</span>Keybinds</button>
+                    <button type="button" class="dash-footer-btn" id="footer-exit"><span class="dash-footer-icon">&#9099;</span>Exit</button>
+                </footer>
             </div>
         </section>
+
+        <!-- Exit confirmation -->
+        <div id="exit-modal" class="hidden">
+            <div id="exit-modal-box" class="plate">
+                <h3>Quit</h3>
+                <p>Do you really want to disconnect from the server?</p>
+                <div id="exit-modal-actions">
+                    <button type="button" id="exit-no">No</button>
+                    <button type="button" id="exit-yes">Yes</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Players -->
         <section id="players" class="panel hidden">

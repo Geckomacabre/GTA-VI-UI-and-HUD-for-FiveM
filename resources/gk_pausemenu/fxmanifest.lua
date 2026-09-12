@@ -3,8 +3,8 @@ game 'gta5'
 lua54 'yes'
 
 name        'gk_pausemenu'
-description 'Custom NUI pause menu: takes over the native ESC menu with an entirely custom-drawn UI. Map is a self-drawn image (real GTA V map art, extracted via _tools/map_extract) with a themed Locations panel fed by a live scan of every real native blip server-wide (search, sprite-grouped colour accents, real blip icons where safe, per-location toggle/preview/waypoint) -- not a native-frontend takeover, see client/main.lua for why. Settings hands off to the real native Settings screen. No hard dependency on vice_hud; defers to it cooperatively (via its exports, or by not touching HUD/radar at all) when it is running, and matches its gender-based accent colour.'
-version     '1.0.0'
+description 'Custom NUI pause menu: takes over the native ESC menu with a dashboard UI (sidebar profile/stats/OOC chat, navbar, Player Details/Report/Patch Notes cards, footer icons), reskinned after SY_PauseMenu and themed to match vice_hud (self-hosted GTAArtDeco/Pricedown fonts, its .plate glass surface, gender-based accent colour). Map, Settings and Keybinds all hand off to the real native frontend screens rather than any custom NUI -- see client/main.lua for why. No hard dependency on vice_hud, qbx_core, or MugShotBase64; defers to each cooperatively when running.'
+version     '2.0.0'
 
 dependencies {
     'ox_lib',
@@ -16,10 +16,8 @@ files {
     'html/index.html',
     'html/style.css',
     'html/app.js',
-    'html/images/*.jpg',
-    'html/images/*.png',
-    'html/images/blips/*.png', -- app.js's LOCAL_ICON_SPRITES -- the glob above isn't recursive, this subfolder needs its own line
-    'html/data/*.json',        -- app.js's SPRITE_DATA/HUD_COLORS (sprite id -> icon, HUD colour id -> hex)
+    'html/fonts/*.otf',        -- Pricedown (dashboard money figures) -- same files vice_hud/html/fonts ships, copied rather than referenced cross-resource
+    'html/fonts/*.ttf',        -- GTAArtDeco (dashboard headings/labels), ditto
 }
 
 shared_scripts {
@@ -28,8 +26,6 @@ shared_scripts {
 }
 
 client_scripts {
-    'client/blips.lua',         -- GK.ScanBlips() -- scans every active native blip server-wide, see its own header comment
-    'client/native_pages.lua',  -- history/rationale behind the current Map + Settings design; see its header comment
     'client/main.lua',
 }
 
