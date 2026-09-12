@@ -119,28 +119,31 @@
     font-display: block;
 }
 
-/* Belle Sans Extra Condensed Bold. Not the reference's real face -- nobody has
-   identified what GTA6 actually sets its scrollable item-select lists (the
-   fridge, presumably others) in -- but the closest condensed-grotesque match
-   found so far, standing in until a better one turns up. Used with a black
-   outline (see .item-select-outline below), because that is what the
-   reference actually draws: white fill, a hard black stroke round it, no
-   drop shadow doing the separation instead. */
+/* Nobody has identified what GTA6 actually sets its scrollable item-select
+   lists (the fridge, presumably others) in. Previously stood in with a
+   commercial font (Belle Sans Extra Condensed Bold) that turned out to have
+   no redistributable tier -- swapped for Plus Jakarta Sans (variable font,
+   SIL OFL -- see fonts/PlusJakartaSans-OFL.txt), same face osm-target uses
+   for its own UI text, at its heaviest weight for a condensed-ish look at a
+   glance. Used with a black outline (see .item-select-outline below),
+   because that is what the reference actually draws: white fill, a hard
+   black stroke round it, no drop shadow doing the separation instead. */
 @font-face {
-    font-family: 'BelleSansCondensed';
-    src: url('fonts/BelleSansExtraCondensedBold.otf') format('opentype');
-    font-weight: 700;
+    font-family: 'PlusJakartaSans';
+    src: url('fonts/PlusJakartaSans-Variable.ttf') format('truetype-variations');
+    font-weight: 200 800;
     font-style: normal;
     font-display: block;
 }
 
 /* The black-outline text treatment itself, kept separate from the @font-face
-   so any element can opt in once the fridge-style list this was measured
-   against exists. paint-order swaps stroke-then-fill, or the 2px stroke would
-   sit on TOP of the fill and eat into the glyph instead of ringing it. */
+   above so any element can opt in once the fridge-style list this was
+   measured against exists. paint-order swaps stroke-then-fill, or the 2px
+   stroke would sit on TOP of the fill and eat into the glyph instead of
+   ringing it. */
 .item-select-outline {
-    font-family: 'BelleSansCondensed', 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif;
-    font-weight: 700;
+    font-family: 'PlusJakartaSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 800;
     color: #f2f2ef;
     -webkit-text-stroke: 0.045em #0a0a0a;
     paint-order: stroke fill;

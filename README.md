@@ -324,6 +324,13 @@ Not bundled here, these are separate projects you install yourself:
   used by the BuckMe card signature: a Google Fonts release, SIL Open Font
   License — free to bundle and redistribute, no separate credit required
   beyond this note.
+- **Plus Jakarta Sans** (`resources/vice_hud/html/fonts/PlusJakartaSans-Variable.ttf`),
+  used by the item-select list styling: a Google Fonts release (Tokotype),
+  SIL Open Font License — free to bundle and redistribute, license text
+  ships alongside it as `PlusJakartaSans-OFL.txt`. The same face
+  [osm-target](https://github.com/Geckomacabre/osm-target) uses for its own
+  UI text. Replaces an earlier commercial font here with no redistributable
+  tier — see `resources/vice_hud/README.md`'s "Assets and fonts" section.
 - **Arista Pro** (`resources/um_gigs/ui/fonts/arista-pro.pro-trial-regular.ttf`):
   registered via `@font-face` in `ui/app.css` and listed in
   `fxmanifest.lua`'s `files{}`, but neither app currently points
@@ -337,16 +344,6 @@ Not bundled here, these are separate projects you install yourself:
   just using it locally) weren't confirmable from what's publicly
   available. Treat this one as unresolved rather than assumed clear; check
   Zetafonts' own EULA before relying on it.
-
-  > [!WARNING]
-  > **`BelleSansExtraCondensedBold.otf`** (`resources/vice_hud/html/fonts/`,
-  > used for the item-select list styling) is a commercial font — Belle Sans,
-  > designed by James Lyles, sold by Park Street Studio — with no free tier
-  > found anywhere. Unlike everything else on this list, there's no
-  > plausible path by which bundling this one is authorized. Same situation
-  > as `patches/dpclothing/` above: flagged rather than fixed, since pulling
-  > it out means finding or commissioning a replacement face for that part
-  > of the HUD.
 
 ## License
 
