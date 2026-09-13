@@ -3904,6 +3904,20 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     text-align: center;
     line-height: 1;
     overflow: hidden;
+    /* FIXED 2026-09-13 (first real in-game test): the LMB/RMB icon
+       setLockpickGlyph() swaps in (see app.js) is an <img>, and an <img>'s
+       default vertical-align:baseline leaves room for a text descender that
+       doesn't exist -- reading as visibly off-centre inside the disc even
+       though the parent #lp-glyph is already a centred flex box. Making this
+       box its own flex centre (and the img itself block-level, below) removes
+       baseline alignment from the equation entirely, for both the icon and
+       the plain-text case. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#lp-glyph-text img {
+    display: block;
 }
 /* Pinned near the bottom inner edge of the white circle, solid black -- a
    hollow/outline chevron was explicitly rejected in the mockup in favour of
