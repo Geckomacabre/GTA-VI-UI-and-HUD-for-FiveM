@@ -547,6 +547,18 @@ end
 --- durationMs is ALSO gone as a fill-rate knob: the fill is now purely
 --- positional (see lockpickTick), so there is no rate or duration left to
 --- size. A caller still passing it is likewise harmless.
+---
+--- FIXED 2026-09-13 (first real in-game test): cfg.glyph's 'R' fallback
+--- predates this file's own rework above -- filling the ring was moved to a
+--- raw LOOK_LR/ATTACK read (lockpickReadDx) that has nothing to do with any
+--- keybind, but the caller (qbx_vehiclekeys/client/slimjim.lua) still passes
+--- the old key-hold mechanic's glyph. On a pad that happens to still read
+--- right ("R" = right stick), but on keyboard/mouse it showed the letter R
+--- while the actual input is dragging with LMB held -- the player is shown a
+--- key that does nothing for filling (R only cancels, on release). Device is
+--- what decides which input actually drives the fill, so it decides the
+--- glyph too, same as everywhere else in this file (waUsingPad()) -- a
+--- caller-supplied `key` still wins outright since that IS a real binding.
 --- Call the instant the player PRESSES the button.
 exports('StartLockpickCheck', function(cfg)
     cfg = cfg or {}
@@ -554,8 +566,9 @@ exports('StartLockpickCheck', function(cfg)
     lockpickPct = 0
     lockpickDir = -1
     lockpickMouseDx = 0
-    local glyph = cfg.key ~= nil and waResolveKey(cfg.key) or cfg.glyph
-    ui('lockpick', { show = true, glyph = glyph or 'R' })
+    local glyph = cfg.key ~= nil and waResolveKey(cfg.key)
+        or (waUsingPad() and (cfg.glyph or 'R') or 'LMB')
+    ui('lockpick', { show = true, glyph = glyph })
 end)
 
 --- Call the instant the button is RELEASED. There is no more release-based
