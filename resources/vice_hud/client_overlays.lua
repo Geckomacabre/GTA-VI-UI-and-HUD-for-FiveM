@@ -451,14 +451,16 @@ local LOCKPICK_IDLE_THRESHOLD = 0.12
 --
 -- RETUNED 2026-09-13 (first real in-game feel test, via qbx_vehiclekeys'
 -- Slim Jim): felt noticeably less responsive than the browser mockup at the
--- original 6.0 -- 3x'd here as a first pass. Still tuning by feel, not by
--- measurement (see this repo's own note on why: FiveM client crashes on
--- this dev PC) -- if this overshoots (fills too easily/twitchily) the fix
--- is to bring this back down, not to touch LOCKPICK_MOUSE_SENSITIVITY, so
--- the "distance to 100%" stays the one knob for difficulty and this one
--- stays purely "how much mouse movement equals how much reconstructed
--- distance".
-local LOCKPICK_MOUSE_SCALE = 18.0
+-- original 6.0. First pass tripled it to 18.0 -- still "needs to move
+-- quicker, should follow the mouse exactly" on the second test, so this is
+-- a second, bigger jump rather than another small nudge (each retune costs
+-- a real playtest, not a local one -- see this repo's own note on why:
+-- FiveM client crashes on this dev PC). If THIS overshoots (twitchy,
+-- reaches 100% on a small flick), the fix is still to bring this one value
+-- back down, not LOCKPICK_MOUSE_SENSITIVITY, so "distance to 100%" stays
+-- the one knob for difficulty and this one stays purely "how much mouse
+-- movement equals how much reconstructed distance".
+local LOCKPICK_MOUSE_SCALE = 45.0
 
 -- How far the reconstructed mouse position (in LOCKPICK_MOUSE_SCALE-d
 -- units, see above) has to travel from centre to reach a full 100% fill —
