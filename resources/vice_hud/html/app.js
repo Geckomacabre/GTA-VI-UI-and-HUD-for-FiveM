@@ -735,41 +735,136 @@
     }
 
     /* --- lockpick check -------------------------------------------------
-       "Hold, release inside the zone." Lua owns the timing and the
-       win/lose decision entirely (see exports.vice_hud:StartLockpickCheck
-       in client.lua) — this only ever draws whatever it's told: the zone's
-       position/width once per check, the fill level while the button is
-       held, and a brief win/lose flash at the end. */
+       Analog direction-fill ring. Lua owns the input reading and the
+       direction/completion decision entirely (see exports.vice_hud:
+       StartLockpickCheck in client_overlays.lua) — this only ever draws
+       whatever it's told: the glyph once per check, the fill arc (which
+       side it grows from, and how far) on every progress push, and a
+       brief success flash or alarm state at the end.
+
+       REWORKED 2026-09-12 per the user-approved lockpick_preview.html
+       mockup: no more target zone, no more release-based win/lose. See
+       that file's own JS for the exact arc math ported below (arcPoint/
+       arcPath), and client_overlays.lua's lockpick section for the
+       dir/pct values these are fed. */
+
+    // Same CX/CY/R as index.html's baked-in #lp-capacity path (kept in sync
+    // by hand -- there are only the two numbers, R and the fixed 0-100 t
+    // range, and index.html's own comment points back here). t=0..100 walks
+    // the BOTTOM half of the circle only, left point -> bottom -> right
+    // point, exactly like the mockup's own comment describes: theta runs
+    // 180deg (left) down to 0deg (right) through 90deg (bottom, since SVG y
+    // increases downward, sin(theta) there is positive = below centre).
+    var LP_CX = 50, LP_CY = 50, LP_R = 29;
+    function lpArcPoint(t) {
+        var theta = (180 - 1.8 * t) * Math.PI / 180;
+        return { x: LP_CX + LP_R * Math.cos(theta), y: LP_CY + LP_R * Math.sin(theta) };
+    }
+    function lpArcPath(t0, t1) {
+        // Sampled polyline instead of a single SVG arc command -- ported
+        // verbatim from the mockup: an "A" command's large-arc/sweep flags
+        // depend on getting their direction semantics right, and walking
+        // arcPoint(t) in small steps and connecting the dots can't
+        // misinterpret direction the way that did.
+        var steps = Math.max(2, Math.ceil(Math.abs(t1 - t0) / 2));
+        var d = '';
+        for (var i = 0; i <= steps; i++) {
+            var t = t0 + (t1 - t0) * (i / steps);
+            var p = lpArcPoint(t);
+            d += (i === 0 ? 'M ' : 'L ') + p.x.toFixed(3) + ' ' + p.y.toFixed(3) + ' ';
+        }
+        return d;
+    }
+
     var lockpickResultTimer = null;
+
+    function setLockpickGlyph(text) {
+        var box = $('lp-glyph-text');
+        if (!box) return;
+        text = text == null ? '' : String(text);
+        // Same "mouse button drawn as the button itself" swap the world
+        // action rows and action prompts already do (see MOUSE_GLYPHS
+        // above) -- resolveKey/waResolveKey hand down 'LMB'/'RMB' as
+        // sentinels precisely so this page can make that swap, rather than
+        // ever lettering "LMB" inside the disc.
+        var mouse = MOUSE_GLYPHS[text];
+        box.innerHTML = '';
+        if (mouse) {
+            var img = document.createElement('img');
+            img.src = mouse;
+            img.alt = text;
+            img.width = 22;
+            img.height = 22;
+            box.appendChild(img);
+        } else {
+            box.textContent = text;
+        }
+    }
 
     function onLockpick(d) {
         var box = $('lockpick');
         if (!box) return;
         if (!d || !d.show) { show(box, false); return; }
 
-        box.classList.remove('lp-win', 'lp-fail');
+        box.classList.remove('lp-win', 'lp-alarm');
         var fill = $('lp-fill');
-        if (fill) fill.style.setProperty('--lp-pct', 0);
-        var zone = $('lp-zone');
-        if (zone) {
-            zone.style.setProperty('--lp-zone-start', d.zoneStart != null ? d.zoneStart : 0);
-            zone.style.setProperty('--lp-zone-len', d.zoneLen != null ? d.zoneLen : 10);
-        }
-        var glyph = $('lp-glyph');
-        if (glyph) glyph.textContent = d.glyph || 'R';
+        if (fill) fill.setAttribute('d', '');
+        var glyphBox = $('lp-glyph');
+        if (glyphBox) glyphBox.style.setProperty('--lp-dx', 0);
+        setLockpickGlyph(d.glyph || 'R');
 
         show(box, true);
     }
 
     function onLockpickProgress(d) {
         var fill = $('lp-fill');
-        if (fill && d && d.pct != null) fill.style.setProperty('--lp-pct', Math.max(0, Math.min(100, d.pct)));
+        var glyphBox = $('lp-glyph');
+        if (!d) return;
+
+        var pct = Math.max(0, Math.min(100, d.pct != null ? d.pct : 0));
+        var dir = d.dir != null && d.dir < 0 ? -1 : 1;
+
+        if (fill) {
+            if (pct <= 0) {
+                fill.setAttribute('d', '');
+            } else {
+                // Mirrors depending on which way it's currently filling --
+                // anchored at the RIGHT growing left for the real
+                // (right-to-left) pick, anchored at the LEFT growing right
+                // for the decoy (left-to-right) direction. Both look like
+                // identical "progress" so there's no visual tell between
+                // them, same as the mockup.
+                fill.setAttribute('d', dir < 0 ? lpArcPath(100 - pct, 100) : lpArcPath(0, pct));
+            }
+        }
+        // Moves the centre glyph itself toward the drag direction -- reads
+        // as the actual stick/mouse nub being pushed, not just an abstract
+        // progress number filling a bar. Simplified from the mockup's own
+        // 2D nub (which also wobbled vertically with raw mouse dy): Lua's
+        // dir/pct here are horizontal-only by design (see
+        // client_overlays.lua's lockpickTick), so --lp-dx just carries the
+        // signed fraction directly; style.css's own comment has the travel
+        // distance this multiplies against.
+        if (glyphBox) glyphBox.style.setProperty('--lp-dx', dir * (pct / 100));
     }
 
     function onLockpickResult(d) {
         var box = $('lockpick');
         if (!box) return;
-        box.classList.add(d && d.success ? 'lp-win' : 'lp-fail');
+        if (d && d.success) box.classList.add('lp-win');
+        clearTimeout(lockpickResultTimer);
+        lockpickResultTimer = setTimeout(function () { show(box, false); }, 450);
+    }
+
+    // Fired instead of onLockpickResult when the check was completed the
+    // WRONG way (left-to-right) -- see client_overlays.lua's own comment on
+    // why that's a distinct event/message rather than success:false. Flashes
+    // the alarm state (see #lockpick.lp-alarm in style.css) then closes,
+    // same timing as a normal result.
+    function onLockpickAlarm() {
+        var box = $('lockpick');
+        if (!box) return;
+        box.classList.add('lp-alarm');
         clearTimeout(lockpickResultTimer);
         lockpickResultTimer = setTimeout(function () { show(box, false); }, 450);
     }
@@ -2560,15 +2655,16 @@
     function propsFor(key) {
         if (NATIVE_ELEMENTS[key]) return NATIVE_PROPS;
         if (NOTIFY_ELEMENTS[key]) return NOTIFY_PROPS;
-        var list = POS_PROPS.concat(PROPS);
-        if (NO_FONT_ROW[key]) list = list.filter(function (p) { return p.k !== 'ff'; });
-        // `only` is opt-IN: a prop that carries one is offered on those
-        // elements alone. Props without one are offered everywhere, which is
-        // every prop but Brand tint.
-        list = list.filter(function (p) { return !p.only || p.only[key]; });
-        var drop = NO_ROWS[key];
-        if (drop) list = list.filter(function (p) { return !drop[p.k]; });
-        return list;
+        // Position-only for everything else. PROPS (font/icon/width/height/
+        // opacity/radius/spacing/etc.) still gets APPLIED from whatever a
+        // layout already has -- applyOffsets/offsetsForSave both read PROPS
+        // directly, not through this function -- this just stops the editor
+        // from offering rows to change any of it. Those rows existed to
+        // compensate for element sizing that used to drift across aspect
+        // ratios; now that html/style.css scales everything off --w instead
+        // of raw cqw, that compensation is no longer this menu's job, so the
+        // menu goes back to doing the one thing nothing else can: placement.
+        return POS_PROPS;
     }
 
     function propOf(k) {
@@ -2915,14 +3011,12 @@
             return;
         }
 
-        // Bounded by the Width / Height rows themselves rather than by its own
-        // numbers. Ctrl+Arrow used to stop at 2.5 while those rows went to 3,
-        // so one element had two different ceilings depending on how you
-        // reached for it.
-        var clamp = function (v) { return +Math.max(SC_MIN, Math.min(SC_MAX, v)).toFixed(4); };
-        if (axis !== 'y') o.sx = clamp(scaleX(o) + delta);
-        if (axis !== 'x') o.sy = clamp(scaleY(o) + delta);
-        applyOffsets(); renderEditor();
+        // Page elements no longer offer Width/Height rows (see propsFor) now
+        // that html/style.css scales everything off --w instead of raw cqw,
+        // so Ctrl+Arrow -- the other way to reach the same sx/sy this menu
+        // used to expose -- goes with them. Native (minimap) elements return
+        // above and are unaffected; their scale is engine-side, not CSS, and
+        // still has no other way to reach it.
     }
 
     /* Step the selected property. `dir` is -1 or +1; list properties cycle. */
@@ -3617,6 +3711,7 @@
         lockpick: onLockpick,
         lockpickProgress: onLockpickProgress,
         lockpickResult: onLockpickResult,
+        lockpickAlarm: onLockpickAlarm,
         mapRect: onMapRect,
         mapDebug: onMapDebug,
         zone: onZone,
@@ -3740,8 +3835,8 @@
                 { label: 'Smash Window', button: 'circle' }
             ]
         });
-        onLockpick({ show: true, zoneStart: 62, zoneLen: 12, glyph: 'R' });
-        onLockpickProgress({ pct: 48 });
+        onLockpick({ show: true, glyph: 'R' });
+        onLockpickProgress({ pct: 48, dir: -1 });
 
     }
 })();
