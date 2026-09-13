@@ -447,10 +447,18 @@ local LOCKPICK_IDLE_THRESHOLD = 0.12
 -- has moved since LMB went down", i.e. a genuine net position, not an
 -- "integrated effort" score. Scaled up for the same reason the old
 -- effort-based build scaled it: nowhere near a usable range unscaled on a
--- deliberate drag. Not measured against a live client (see this repo's own
--- note on why: FiveM client crashes on this dev PC) — a human needs to
--- feel this in-game and this constant is the one to retune.
-local LOCKPICK_MOUSE_SCALE = 6.0
+-- deliberate drag.
+--
+-- RETUNED 2026-09-13 (first real in-game feel test, via qbx_vehiclekeys'
+-- Slim Jim): felt noticeably less responsive than the browser mockup at the
+-- original 6.0 -- 3x'd here as a first pass. Still tuning by feel, not by
+-- measurement (see this repo's own note on why: FiveM client crashes on
+-- this dev PC) -- if this overshoots (fills too easily/twitchily) the fix
+-- is to bring this back down, not to touch LOCKPICK_MOUSE_SENSITIVITY, so
+-- the "distance to 100%" stays the one knob for difficulty and this one
+-- stays purely "how much mouse movement equals how much reconstructed
+-- distance".
+local LOCKPICK_MOUSE_SCALE = 18.0
 
 -- How far the reconstructed mouse position (in LOCKPICK_MOUSE_SCALE-d
 -- units, see above) has to travel from centre to reach a full 100% fill —
