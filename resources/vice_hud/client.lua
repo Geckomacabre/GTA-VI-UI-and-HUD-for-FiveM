@@ -1504,6 +1504,11 @@ local function pushPrompt(id)
         id = id, show = true, label = p.label,
         glyph = resolveKey(p.key), device = usingPad() and 'pad' or 'kbm',
         hold = p.holdMs ~= nil,
+        -- Requirement-explanation feature (2026-09-11, see ox_target's own
+        -- deniedReason handling): a lock icon in place of a key cap, no
+        -- rumble on appear (see ShowActionPrompt below) -- app.js's
+        -- renderPrompts skips the normal glyph rendering entirely for this.
+        denied = p.denied or nil,
     })
 end
 
@@ -1529,21 +1534,29 @@ local function promptRumble(durationMs, frequency)
     Citizen.InvokeNative(0x48B3886C1358D0D5, 0, durationMs, frequency)
 end
 
---- opts (optional): { hold = durationMs, onHeld = function() ... end }.
---- `key` must be a real control id (a number), not a decorative string,
---- for hold to do anything -- there is no input to poll otherwise. onHeld
---- fires once per hold (release and re-hold fires it again); the caller
---- decides what happens next (HideActionPrompt, trigger a selection, ...),
---- this only tracks and renders progress.
+--- opts (optional): { hold = durationMs, onHeld = function() ... end,
+--- denied = boolean }. `key` must be a real control id (a number), not a
+--- decorative string, for hold to do anything -- there is no input to poll
+--- otherwise. onHeld fires once per hold (release and re-hold fires it
+--- again); the caller decides what happens next (HideActionPrompt, trigger
+--- a selection, ...), this only tracks and renders progress.
+---
+--- opts.denied (2026-09-11): a non-interactive, informational prompt --
+--- ox_target's requirement-explanation feature uses this for "why can't I
+--- do this" (a locked door, a missing item), always with key = nil (there
+--- is genuinely nothing to press). Deliberately no appear-rumble below for
+--- these -- the light buzz means "something's available", which is exactly
+--- backwards for a prompt whose entire point is that it is NOT available.
 ShowActionPrompt = function(id, label, key, opts)
     if not id then return end
     local existing = prompts[id]
+    opts = opts or {}
+
     if not existing then
         promptCount = promptCount + 1
-        promptRumble(80, 15) -- light -- see promptRumble's comment
+        if not opts.denied then promptRumble(80, 15) end -- light -- see promptRumble's comment
     end
 
-    opts = opts or {}
     local holdMs = tonumber(opts.hold)
     if type(key) ~= 'number' then holdMs = nil end -- can't poll a control that isn't a real control id
 
@@ -1555,6 +1568,7 @@ ShowActionPrompt = function(id, label, key, opts)
         label = label or '', key = key,
         holdMs = holdMs, onHeld = opts.onHeld,
         heldSince = nil, lastFrac = 0, fired = false,
+        denied = opts.denied and true or nil,
     }
     pushPrompt(id)
 end
@@ -1864,6 +1878,100 @@ exports('SetReputationStanding', function(track, value, tier)
 end)
 
 exports('ShowReputationToast', ShowReputationToast)
+
+-- =============================================================================
+-- Freeroam event banner
+-- =============================================================================
+--[[
+    The real GTA Online freeroam-event banner (Business Battles, Adversary
+    Modes, etc: a big bold title + subtitle sliding in from the side), for
+    any resource that wants to announce something to the player the way the
+    game itself does. Every ambient/freeroam event on this server today
+    (popup races, um_streetlife, um_livingworld's distress calls) only ever
+    shows a small lib.notify/qbx_core:Notify toast -- this is the first use
+    of the real thing.
+
+    Scaleform + native sequence confirmed against two independent working
+    sources: ScaleformUI's documented BigMessageInstance:ShowSimpleShard, and
+    CritteRo/fivem-scaleform-lib's ShowBanner (_tools/fivem_scaleform_lib_src/
+    critScaleforms/client/cl_scaleform_functions.lua + cl_main.lua's
+    "cS.banner" handler) -- NOT reverse-engineered from the decompiled
+    business_battles.c/fm_content_business_battles.c game scripts in
+    _tools/decompiled_scripts, which turned out to be fully unsymbolized
+    (func_N/uLocal_N placeholders, no native names at all, ~300k-500k lines)
+    and unusable for this, the same limitation this codebase already
+    documented for gk_pausemenu's own native-menu research.
+
+    One handle per call, released the moment it's done -- see the
+    minimapScaleform comment above this block for why a leaked/never-cleaned
+    scaleform handle is a real, previously-hit problem on this server
+    (exhausts the whole client's ScaleformStore pool, starving every other
+    resource's scaleforms).
+]]
+local freeroamBannerActive = false
+
+exports('ShowFreeroamBanner', function(title, subtitle, durationSec, playSound)
+    if freeroamBannerActive then return end
+    freeroamBannerActive = true
+
+    CreateThread(function()
+        local scaleform = RequestScaleformMovie('MP_BIG_MESSAGE_FREEMODE')
+        local start = GetGameTimer()
+        while not HasScaleformMovieLoaded(scaleform) and GetGameTimer() - start < 3000 do
+            Wait(0)
+        end
+        if not HasScaleformMovieLoaded(scaleform) then
+            print('[vice_hud] ShowFreeroamBanner: MP_BIG_MESSAGE_FREEMODE never loaded, aborting')
+            freeroamBannerActive = false
+            return
+        end
+
+        if playSound then
+            PlaySoundFrontend(-1, 'CHECKPOINT_PERFECT', 'HUD_MINI_GAME_SOUNDSET', true)
+        end
+
+        BeginScaleformMovieMethod(scaleform, 'SHOW_SHARD_CENTERED_MP_MESSAGE')
+        EndScaleformMovieMethod()
+
+        BeginScaleformMovieMethod(scaleform, 'SHARD_SET_TEXT')
+        ScaleformMovieMethodAddParamTextureNameString(title or '')
+        ScaleformMovieMethodAddParamTextureNameString(subtitle or '')
+        ScaleformMovieMethodAddParamInt(0)
+        EndScaleformMovieMethod()
+
+        local holdMs = math.max(1, tonumber(durationSec) or 6) * 1000
+
+        CreateThread(function()
+            while freeroamBannerActive do
+                Wait(0)
+                DrawScaleformMovieFullscreen(scaleform, 255, 255, 255, 255)
+            end
+        end)
+
+        Wait(holdMs - 400)
+        BeginScaleformMovieMethod(scaleform, 'SHARD_ANIM_OUT')
+        ScaleformMovieMethodAddParamInt(2)
+        ScaleformMovieMethodAddParamFloat(0.4)
+        ScaleformMovieMethodAddParamInt(0)
+        EndScaleformMovieMethod()
+        Wait(400)
+
+        freeroamBannerActive = false
+        SetScaleformMovieAsNoLongerNeeded(scaleform)
+    end)
+end)
+
+-- Same unrestricted debug-command convention as /hudtest above -- no ACE
+-- gate, just something to run in-game to confirm the scaleform actually
+-- renders before any real freeroam event calls it.
+RegisterCommand('hudbannertest', function(_, args)
+    exports.vice_hud:ShowFreeroamBanner(
+        args[1] or 'BUSINESS BATTLE',
+        args[2] or 'Goods type: Cargo',
+        tonumber(args[3]) or 6,
+        true
+    )
+end, false)
 
 -- =============================================================================
 -- Zone bar
@@ -2751,8 +2859,16 @@ end)
 -- of medical items left the health row auto-hidden at full health, the same
 -- "row disappears while the player is actively looking at their own stats"
 -- complaint the Tab-wheel case above already exists to fix.
+-- NetworkIsInTutorialSession(): qbx_core's own character picker/creation
+-- screen (client/character.lua, chooseCharacter()/createCharacter()) runs the
+-- whole thing inside a solo tutorial session -- started right before the
+-- preview cam comes up and torn down once a character actually spawns. It is
+-- vanilla's own signal for "the multichar screen is up", set by qbx_core
+-- rather than vice_hud, so this stays the same loosely-coupled read as
+-- invOpen/pauseMenuOpen above rather than a hard dependency on qbx_core.
 local function wheelHeld()
     return IsControlPressed(0, 37) or LocalPlayer.state.invOpen == true
+        or NetworkIsInTutorialSession()
 end
 
 CreateThread(function()
@@ -2834,9 +2950,23 @@ CreateThread(function()
         -- than an export call, so vice_hud never needs qbx_medical as a hard
         -- dependency. 3 == qbx_medical's sharedConfig.deathState.DEAD.
         local isDead = LocalPlayer.state['qbx_medical:deathState'] == 3
-        setRadar((cache.vehicle ~= nil or minimapOnFoot or editorOpen)
+        -- `and not NetworkIsInTutorialSession()`: the same floating-frame bug
+        -- as invOpen/IsPauseMenuActive above, but for qbx_core's multichar
+        -- picker -- it calls DisplayRadar(false) itself (client/character.lua,
+        -- chooseCharacter()) while vice_hud's own belief about radar state
+        -- never changes, so #map-frame/#map-badge floated over the character
+        -- select screen with nothing behind them.
+        -- `cache.vehicle` (ox_lib) is `false`, not `nil`, while on foot -- see
+        -- /hudtest's own "cache.vehicle = false" line. `~= nil` is true for
+        -- BOTH false and a real vehicle entity, so this was permanently
+        -- reading as "in a vehicle" and silently overriding minimapOnFoot no
+        -- matter what it was set to. Every other read of cache.vehicle in
+        -- this file already uses it as a plain truthy value (see line ~2132,
+        -- ~3226) -- this was the one place that didn't.
+        setRadar((cache.vehicle or minimapOnFoot or editorOpen)
             and not LocalPlayer.state.invOpen and not IsPauseMenuActive()
-            and not LocalPlayer.state.pauseMenuOpen and not isDead)
+            and not LocalPlayer.state.pauseMenuOpen and not isDead
+            and not NetworkIsInTutorialSession())
 
         -- Hides the rest of the HUD (money, weapon wheel, status bars, etc --
         -- the whole #stage NUI root) for the same DEAD state, once per actual
@@ -3013,10 +3143,17 @@ CreateThread(function()
                 cash = pd.money.cash or pd.money.money
                 bank = pd.money.bank
             end
-            local key = tostring(cash) .. '|' .. tostring(bank)
+            -- wheelHeld() is folded into the dedup key, not just the payload:
+            -- the cash/bank rows are hidden on the page unless it (see onCash
+            -- in app.js), so a transition into or out of that expanded view
+            -- has to force a push of its own even when the balance itself
+            -- hasn't moved, or the rows would keep showing whatever `show`
+            -- state happened to be baked into the LAST balance change.
+            local wheel = wheelHeld()
+            local key = tostring(cash) .. '|' .. tostring(bank) .. '|' .. tostring(wheel)
             if key ~= lastCash then
                 lastCash = key
-                ui('cash', { cash = cash, bank = bank, cashCap = Config.CashCap, show = true })
+                ui('cash', { cash = cash, bank = bank, cashCap = Config.CashCap, show = true, wheel = wheel })
             end
         end
 

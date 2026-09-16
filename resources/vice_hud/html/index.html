@@ -347,6 +347,18 @@
         </div>
     </div>
 
+    <!-- Money change popup -----------------------------------------------------
+         Centre screen, shown briefly when cash or BuckMe moves -- same EVENT/
+         STATE split as honor-pop above. The cash/bank rows in #money are the
+         STATE (hidden unless the inventory/character switcher is open, see
+         onCash() in app.js) and this is the EVENT: it fires on a gain OR a
+         loss, coloured and signed like honor-pop, with the icon of whichever
+         currency actually changed. -->
+    <div id="money-pop" class="hidden" aria-hidden="true">
+        <span id="money-pop-sign"></span>
+        <img id="money-pop-icon" alt="">
+    </div>
+
     <!-- Reputation change popup ----------------------------------------------
          Centre screen, shown briefly when a track moves. Reputation only ever
          goes UP (qbx_reputation's tracks are floor-0, deltas are always

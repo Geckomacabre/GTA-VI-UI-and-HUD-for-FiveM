@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+    vice_hud / html / dui_worldpanel
+
+    A SEPARATE, minimal page from index.html -- deliberately not reusing the
+    main NUI page's #world-actions markup/CSS. This one is rendered into a
+    DUI (a runtime browser texture applied to a carrier prop in the 3D
+    world, see client_dui_worldpanel.lua), not the flat full-screen NUI
+    overlay index.html drives -- a tiny transparent page sized to the DUI's
+    own pixel dimensions, not a 1920x1080 frame with the rest of the HUD's
+    layout logic.
+
+    Driven the same way index.html is: postMessage. See
+    client_dui_worldpanel.lua's duiPanel:sendMessage calls for the
+    {show, options} shape this listens for.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    /* Transparent canvas -- only the panel itself should render onto the
+       carrier prop's surface, not a big opaque rectangle. */
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #panel {
+        display: none;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        min-width: 70%;
+        padding: 3.5% 5%;
+        border-radius: 8px;
+        background: rgba(10, 10, 12, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    #panel.show { display: block; }
+
+    .row {
+        display: flex;
+        align-items: center;
+        gap: 3%;
+        padding: 2.2% 0;
+    }
+
+    .row:not(:last-child) {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .glyph {
+        flex: 0 0 auto;
+        min-width: 15%;
+        aspect-ratio: 1 / 1;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f2f2ef;
+        font-weight: 700;
+        font-size: 1.6vw;
+        text-align: center;
+    }
+
+    .label {
+        flex: 1 1 auto;
+        color: #f2f2ef;
+        font-weight: 600;
+        font-size: 1.7vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
+</head>
+<body>
+<div id="panel"></div>
+<script>
+    var panelEl = document.getElementById('panel');
+
+    // Same shape ShowWorldActions/HideWorldActions already pass on the Lua
+    // side (see client_overlays.lua's waResolveAll) -- { label, glyph,
+    // device } per row -- so client_dui_worldpanel.lua can forward the
+    // exact same resolved list without a second translation layer.
+    function render(options) {
+        panelEl.innerHTML = '';
+        for (var i = 0; i < (options || []).length; i++) {
+            var opt = options[i];
+            var row = document.createElement('div');
+            row.className = 'row';
+
+            var glyph = document.createElement('div');
+            glyph.className = 'glyph';
+            glyph.textContent = opt.glyph || '';
+            row.appendChild(glyph);
+
+            var label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = opt.label || '';
+            row.appendChild(label);
+
+            panelEl.appendChild(row);
+        }
+    }
+
+    window.addEventListener('message', function (event) {
+        var d = event.data;
+        if (!d) return;
+
+        if (d.type === 'worldPanel') {
+            if (d.show === false) {
+                panelEl.classList.remove('show');
+                return;
+            }
+            render(d.options);
+            panelEl.classList.add('show');
+        }
+    });
+</script>
+</body>
+</html>

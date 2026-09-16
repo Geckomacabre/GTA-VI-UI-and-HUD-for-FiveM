@@ -93,21 +93,13 @@
         var oxygenRow = $('s-oxygen');
         var wheelOpen = !!d.wheel;
 
-        var cap = d.cap == null ? null : d.cap;
-        // Two different things share `cap`/`capCause`: a hunger/thirst warning
-        // ("you're hungry enough that a future heal would be capped, even
-        // though you're at full health right now") and the separate flat
-        // regen ceiling (Config.Needs.regenCeilingPct -- "you're just still
-        // hurt, below the point passive regen tops out at"). Only the FIRST
-        // is worth force-showing unconditionally: it is the one case that can
-        // fire at 100% health, where nothing else would reveal the row. The
-        // ceiling case can only ever be active while health is already below
-        // it, so ordinary damage there is exactly what healthRecentlyChanged
-        // already reveals -- force-showing it too meant the row stayed up
-        // continuously any time health sat under 62%, full belly or not,
-        // which is the same "always visible" bug being fixed here, just
-        // reached through the cap instead of the raw health value.
-        var needsWarning = cap != null && (d.capCause === 'hunger' || d.capCause === 'thirst');
+        // d.cap/d.capCause (the hunger/thirst regen cap) used to force this
+        // row up unconditionally -- see onStatus's own visibility comment
+        // below for why that was dropped. Nothing else reads them; the
+        // .scap tail they once drove was already disconnected from live
+        // game state by an earlier, explicit request (see .scap in
+        // style.css), so there is nothing left in the payload worth keeping
+        // a variable for.
 
         if (lastHealthVal !== null && health !== lastHealthVal) {
             healthRecentlyChanged = true;
@@ -128,25 +120,35 @@
         if (submerged) setFill('s-oxygen', oxygen);
 
         // Nominal state is an empty top-left corner, matching the reference.
-        // Shown on a recent change (a hit or a heal), while the weapon/item
+        // Shown on a recent change (a hit or a heal) or while the weapon/item
         // wheel is open (Tab -- client.lua reads the control directly, so
-        // this works regardless of which inventory owns the wheel), or while
-        // a hunger/thirst cap is in effect: full health you cannot heal back
-        // into is worth knowing before something takes a bite out of it, and
-        // that one is a standing condition rather than a one-off event, so it
-        // is not gated on "recently changed". The flat regen-ceiling cap
-        // (capCause 'health') is deliberately NOT in this condition -- see
-        // needsWarning above for why.
-        setVisible('health', $('s-health'), healthRecentlyChanged || wheelOpen || needsWarning);
+        // this works regardless of which inventory owns the wheel).
+        //
+        // needsWarning USED to also force this row up, on the reasoning that
+        // full health you cannot heal back into is worth knowing about before
+        // something takes a bite out of it. In practice Config.Needs.warnAt
+        // (25) means hunger or thirst dips under it during perfectly ordinary
+        // play -- nobody eats/drinks on a strict schedule -- so this held the
+        // row up almost permanently, the exact "always visible" complaint the
+        // switch to change-only flashing (see healthRecentlyChanged above)
+        // was supposed to fix in the first place, just reached through the
+        // cap instead of the raw health value. Dropped so health behaves like
+        // every other row: quiet until something actually happens to it.
+        setVisible('health', $('s-health'), healthRecentlyChanged || wheelOpen);
         // Focus is nominal at FULL (the opposite of armour's nominal-at-zero),
         // so it shows whenever it's spent at all, or actively draining.
-        setVisible('focus', focusRow, focusActive || focus < 100);
-        setVisible('stamina', staminaRow, stamina < 100);
+        // `wheelOpen` also force-shows the other three rows now -- the same
+        // "you're actively looking at your own stats" reveal health already
+        // got, so a full inventory or character switch shows every bar
+        // rather than leaving stamina/focus/oxygen hidden at their nominal
+        // values while everything else on screen is deliberately expanded.
+        setVisible('focus', focusRow, focusActive || focus < 100 || wheelOpen);
+        setVisible('stamina', staminaRow, stamina < 100 || wheelOpen);
         // Underwater the row shows unconditionally: full breath still means a
         // clock is running, and that is exactly when you want to see it. The
         // hide-hold then carries it a beat past surfacing rather than
         // blinking out the instant oxygen stops being sent.
-        setVisible('oxygen', oxygenRow, submerged);
+        setVisible('oxygen', oxygenRow, submerged || wheelOpen);
     }
 
     /* --- wanted ---------------------------------------------------------- */
@@ -245,6 +247,16 @@
         red:       'You\'ve lost them, but stay sharp<br>you\'re still in the search area'
     };
 
+    // The box used to stay up for as long as `active` (wanted > 0), which in
+    // practice meant it sat on screen for the whole chase. It is a
+    // notification -- something just changed -- not a standing readout, so it
+    // now pops up only on an actual change to the level or its state and
+    // hides itself after WANTED_HOLD_MS, the same "event, not furniture"
+    // treatment already applied to honor/reputation and to the health row.
+    var WANTED_HOLD_MS = 6000;
+    var wantedHideTimer = null;
+    var lastWantedKey = null;
+
     function onWanted(d) {
         var stars = d.stars || 0;
         var maxStars = d.maxStars || 6;
@@ -265,7 +277,26 @@
         renderTells($('tells'), tells);
         renderTells($('wanted-tells'), tells);
 
-        setVisible('wanted', $('wanted'), !!d.active);
+        var key = stars + '|' + (state || '');
+        if (!d.active || stars <= 0) {
+            lastWantedKey = key;
+            if (wantedHideTimer) { clearTimeout(wantedHideTimer); wantedHideTimer = null; }
+            setVisible('wanted', $('wanted'), false);
+            return;
+        }
+        if (key === lastWantedKey) return; // unchanged -- leave it exactly as it was
+        lastWantedKey = key;
+
+        setVisible('wanted', $('wanted'), true);
+        if (wantedHideTimer) clearTimeout(wantedHideTimer);
+        wantedHideTimer = setTimeout(function () {
+            wantedHideTimer = null;
+            // Same guard as honor/reputation's hide timers: the editor forces
+            // this panel visible with sample content, and a timer left over
+            // from before it opened must not yank it back out from under it.
+            if (editorOpen) return;
+            setVisible('wanted', $('wanted'), false);
+        }, WANTED_HOLD_MS);
     }
 
     /* --- money / weapon -------------------------------------------------- */
@@ -291,14 +322,96 @@
         ring.style.maskImage = url;
     }
 
+    // Centre-screen change indicator, same EVENT/STATE split as honor/
+    // reputation above: this is "money just moved", the corner rows are the
+    // STATE. `null` on the first read of each currency so a fresh page load
+    // or a resource restart does not treat "no history yet" as a $12,163
+    // windfall.
+    var moneyPopTimer = null;
+    var lastCashSeen = null;
+    var lastBankSeen = null;
+
+    // Same "quiet until something happens" treatment as the health row (see
+    // healthRecentlyChanged above): the wallet/bank rows used to sit on
+    // screen permanently, then got hidden permanently in favour of the
+    // centre popup alone -- this is the middle ground the popup was missing,
+    // a brief "here's the new total" next to the icon it belongs to, timed
+    // to roughly outlast the popup's own 2.2s fade so the two read as one
+    // event rather than the number outliving the announcement or vanishing
+    // before it. Cash and bank flash independently -- a cash pickup has no
+    // reason to also light up a bank balance that did not move.
+    var MONEY_FLASH_MS = 3000;
+    var cashFlashTimer = null;
+    var bankFlashTimer = null;
+    var cashRecentlyChanged = false;
+    var bankRecentlyChanged = false;
+
+    function onMoneyPop(delta, icon) {
+        var el = $('money-pop');
+        if (!el || !delta) return;
+        var up = delta > 0;
+        el.className = up ? 'up' : 'down';
+        var sign = $('money-pop-sign');
+        if (sign) sign.textContent = (up ? '+ ' : '− ') + money(delta);
+        var img = $('money-pop-icon');
+        if (img && icon) img.src = icon;
+        show(el, true);
+        if (moneyPopTimer) clearTimeout(moneyPopTimer);
+        moneyPopTimer = setTimeout(function () { show(el, false); }, 2200);
+    }
+
+    // Last payload the money rows' visibility was computed from -- ui('cash')
+    // only pushes on a dedup-key change (see the `key` diff in client.lua),
+    // unlike ui('status') which pushes every tick, so the flash timers below
+    // can't rely on a future push to re-run the visibility check once
+    // *RecentlyChanged flips back to false. They call this directly instead.
+    var lastMoneyExpanded = false;
+    var lastMoneyShowOk = true;
+
+    function updateMoneyRowVisibility() {
+        show($('cash-row'), (lastMoneyExpanded || cashRecentlyChanged) && lastMoneyShowOk && lastCashSeen != null);
+        show($('bank-row'), (lastMoneyExpanded || bankRecentlyChanged) && lastMoneyShowOk && lastBankSeen != null);
+    }
+
     function onCash(d) {
         var c = $('cash'), b = $('bank');
         if (d.cash != null && c) c.textContent = money(d.cash);
         if (d.bank != null && b) b.textContent = money(d.bank);
-        // A row only appears once it has a real value, so a server that tracks
-        // only one of the two never shows an empty second row.
-        show($('cash-row'), d.show !== false && d.cash != null);
-        show($('bank-row'), d.show !== false && d.bank != null);
+
+        if (d.cash != null) {
+            if (lastCashSeen !== null && d.cash !== lastCashSeen) {
+                onMoneyPop(d.cash - lastCashSeen, 'icons/cash.png');
+                cashRecentlyChanged = true;
+                if (cashFlashTimer) clearTimeout(cashFlashTimer);
+                cashFlashTimer = setTimeout(function () {
+                    cashFlashTimer = null;
+                    cashRecentlyChanged = false;
+                    updateMoneyRowVisibility();
+                }, MONEY_FLASH_MS);
+            }
+            lastCashSeen = d.cash;
+        }
+        if (d.bank != null) {
+            if (lastBankSeen !== null && d.bank !== lastBankSeen) {
+                onMoneyPop(d.bank - lastBankSeen, 'icons/buckme.png');
+                bankRecentlyChanged = true;
+                if (bankFlashTimer) clearTimeout(bankFlashTimer);
+                bankFlashTimer = setTimeout(function () {
+                    bankFlashTimer = null;
+                    bankRecentlyChanged = false;
+                    updateMoneyRowVisibility();
+                }, MONEY_FLASH_MS);
+            }
+            lastBankSeen = d.bank;
+        }
+
+        // Otherwise the rows only surface while there is a reason to read a
+        // standing balance -- the item wheel/full inventory (d.wheel, same
+        // flag the health row uses) or a character switch. See wheelHeld()
+        // in client.lua.
+        lastMoneyExpanded = !!d.wheel;
+        lastMoneyShowOk = d.show !== false;
+        updateMoneyRowVisibility();
 
         // Neither ring is decoration -- both fill as the CASH wallet
         // approaches d.cashCap (Config.CashCap), the same "deposit before
@@ -892,6 +1005,26 @@
         // The compass rides the map's own top edge, so it goes too. Vanish, not
         // hide: it is a .slot and fades like the rest of that family.
         if (!mapVisible) slotVanish($('nav-compass'));
+        // The zone bar / vehicle panel are anchored to the (snapshotted) map
+        // rect -- see applyPanelRect above -- which is exactly right while the
+        // map is visible and exactly wrong the moment it isn't: with no map
+        // to sit next to, the panel just floats wherever that rect happened
+        // to be (often not near any screen edge at all, see style.css's own
+        // note on #slots.map-hidden). Docking them bottom-centre instead is
+        // the same "give it a sane place to be" treatment #map-frame/
+        // #map-badge already get by hiding outright -- these can't just hide,
+        // they're still live notifications (zone changes, vehicle status).
+        var slots = $('slots');
+        if (slots) slots.classList.toggle('map-hidden', !mapVisible && footDockEnabled());
+    }
+
+    // Dock on foot (PROPS' `footdock` row) -- on by default (undefined AND
+    // null both mean "never touched" / the shipped default, see that row's
+    // own comment on why OFF is spelled 0 rather than null), off only once
+    // the player has explicitly picked "stay at Position X/Y".
+    function footDockEnabled() {
+        var v = offsets.slots && offsets.slots.footdock;
+        return v !== 0;
     }
 
     /* The last map rect we were told about, kept so the panel stack can be
@@ -2156,6 +2289,7 @@
         // meant nudging the ammo readout also nudged the stars.
         ['ammo',     'Ammo',           '#ammo-wrap', 'clip/reserve numbers + weapon icon', 'HUD'],
         ['money',    'Money',          '#money',     'cash and bank',                   'HUD'],
+        ['moneypop', 'Money +/- popup', '#money-pop', 'centre-screen change indicator', 'HUD'],
         ['slots',    'Map panels',     '#slots',     'both panels together',            'HUD'],
         /* The two panels are separate elements as well as being movable
            together. They are different kinds of text — a place name that can be
@@ -2368,6 +2502,49 @@
               + 'whatever the minimap does afterwards. On: they track the map '
               + 'live, which is what this HUD did before.' },
 
+        /* ---- the on-foot dock -----------------------------------------------
+           The three rows above place the panels relative to the MAP. Whenever
+           the map itself is not drawn (on foot with /hudminimap off, dead, a
+           full inventory, the character switcher — see applyMapChrome's own
+           comment), that reference point does not exist, so #slots.map-hidden
+           in style.css docks the stack to a fixed bottom-centre spot instead.
+           These two rows nudge THAT spot, independent of Position X/Y above
+           (which only ever apply while the map is up) — see #off-slots-foot-*
+           in style.css. markTarget() previews the dock the moment Map panels
+           is the selected row, even though the editor otherwise always forces
+           the map visible, or there would be no way to see what you're
+           tuning. */
+        // def: null / off: 0, not the more obvious def: 1 / off: null --
+        // offsetsForSave drops a prop whose value is null OR undefined (its
+        // "this wasn't touched, don't bother writing it" rule), so if OFF
+        // were spelled null it would silently fail to survive a save/reload:
+        // it would read back as undefined, and valueOf() hands undefined
+        // straight to `def`. null has to be the shipped DEFAULT's value
+        // (matching what "never touched" already resolves to) for the same
+        // reason pfollow above is null/1 rather than 1/null -- its default
+        // really is "No".
+        { k: 'footdock', label: 'Dock on foot', v: '--footdock-', def: null, only: { slots: 1 },
+          list: [[null, 'On — bottom centre when map is hidden'], [0, 'Off — stay at Position X/Y']],
+          hint: 'Whenever the minimap is not shown, move the zone bar and '
+              + 'vehicle panel to their own dock instead of leaving them '
+              + 'wherever they sit relative to the now-invisible map. Off '
+              + 'restores the old behaviour — they just stay put.' },
+        { k: 'footx', label: 'Foot position X', v: '--off-', suffix: '-foot-x', unit: 'cqw',
+          // -500/500, not POS_MAX -- POS_MAX (POS_PROPS' own guard rail) is
+          // declared further down in the file and would still be undefined
+          // at the point this array literal is evaluated. Same numbers,
+          // just spelled out (pl/pw/pb above do the same for the same
+          // reason).
+          def: 0, step: 0.1, min: -500, max: 500, dec: 2, only: { slots: 1 },
+          hint: 'Nudges the ON-FOOT dock horizontally — independent of the '
+              + 'normal Position X/Y above, which only applies while the map '
+              + 'is up.' },
+        { k: 'footy', label: 'Foot position Y', v: '--off-', suffix: '-foot-y', unit: 'cqh',
+          def: 0, step: 0.1, min: -500, max: 500, dec: 2, only: { slots: 1 },
+          hint: 'Nudges the ON-FOOT dock vertically — independent of the '
+              + 'normal Position X/Y above, which only applies while the map '
+              + 'is up.' },
+
         /* ---- the focus vignette's own tuning -------------------------------
            `only: { focusfx: 1 }` — same opt-in pattern as the panel trio
            above. Position/scale/font rows mean nothing for a full-screen
@@ -2556,7 +2733,7 @@
        one piece of this HUD whose identity is the typeface. So it gets no Font
        row at all, rather than a row that can be set to something the design
        does not want. Weight, size and the rest are still tunable. */
-    var NO_FONT_ROW = { money: 1 };
+    var NO_FONT_ROW = { money: 1, moneypop: 1 };
 
     /* Rows that would be dead controls on a given element. The badge is an
        IMAGE: a font, a weight, letter spacing, text alignment, glyph smoothing
@@ -2655,16 +2832,15 @@
     function propsFor(key) {
         if (NATIVE_ELEMENTS[key]) return NATIVE_PROPS;
         if (NOTIFY_ELEMENTS[key]) return NOTIFY_PROPS;
-        // Position-only for everything else. PROPS (font/icon/width/height/
-        // opacity/radius/spacing/etc.) still gets APPLIED from whatever a
-        // layout already has -- applyOffsets/offsetsForSave both read PROPS
-        // directly, not through this function -- this just stops the editor
-        // from offering rows to change any of it. Those rows existed to
-        // compensate for element sizing that used to drift across aspect
-        // ratios; now that html/style.css scales everything off --w instead
-        // of raw cqw, that compensation is no longer this menu's job, so the
-        // menu goes back to doing the one thing nothing else can: placement.
-        return POS_PROPS;
+        var list = POS_PROPS.concat(PROPS);
+        if (NO_FONT_ROW[key]) list = list.filter(function (p) { return p.k !== 'ff'; });
+        // `only` is opt-IN: a prop that carries one is offered on those
+        // elements alone. Props without one are offered everywhere, which is
+        // every prop but Brand tint.
+        list = list.filter(function (p) { return !p.only || p.only[key]; });
+        var drop = NO_ROWS[key];
+        if (drop) list = list.filter(function (p) { return !drop[p.k]; });
+        return list;
     }
 
     function propOf(k) {
@@ -2948,6 +3124,18 @@
     function markTarget() {
         document.querySelectorAll('.ed-target').forEach(function (n) { n.classList.remove('ed-target'); });
         var sel = EDITOR_ELEMENTS[editorSel];
+        // The editor otherwise forces the map visible the whole time it is
+        // open (editorPreview(true) above), so #slots.map-hidden never
+        // naturally applies and the Foot position X/Y rows would be tuning
+        // something nobody can see. Preview the dock ONLY while Map panels
+        // is the row actually selected -- forcing it for the whole session
+        // would hide that #slots has two different resting spots and leave
+        // no way to see (or tune) the normal, map-anchored one at all.
+        var slots = $('slots');
+        if (slots) {
+            slots.classList.toggle('map-hidden',
+                !!sel && sel[0] === 'slots' && footDockEnabled());
+        }
         if (!sel || !sel[2]) return;          // lives in another resource
         var el = document.querySelector(sel[2]);
         if (el) el.classList.add('ed-target');
@@ -3011,12 +3199,14 @@
             return;
         }
 
-        // Page elements no longer offer Width/Height rows (see propsFor) now
-        // that html/style.css scales everything off --w instead of raw cqw,
-        // so Ctrl+Arrow -- the other way to reach the same sx/sy this menu
-        // used to expose -- goes with them. Native (minimap) elements return
-        // above and are unaffected; their scale is engine-side, not CSS, and
-        // still has no other way to reach it.
+        // Bounded by the Width / Height rows themselves rather than by its own
+        // numbers. Ctrl+Arrow used to stop at 2.5 while those rows went to 3,
+        // so one element had two different ceilings depending on how you
+        // reached for it.
+        var clamp = function (v) { return +Math.max(SC_MIN, Math.min(SC_MAX, v)).toFixed(4); };
+        if (axis !== 'y') o.sx = clamp(scaleX(o) + delta);
+        if (axis !== 'x') o.sy = clamp(scaleY(o) + delta);
+        applyOffsets(); renderEditor();
     }
 
     /* Step the selected property. `dir` is -1 or +1; list properties cycle. */
@@ -3069,6 +3259,10 @@
             o[p.k] = +v.toFixed(p.pos ? 2 : p.dec + 1);
         }
         applyOffsets(); renderEditor();
+        // Cycling Map panels' own Dock on foot row has to update the preview
+        // immediately, not just on the next reselect -- markTarget is what
+        // decides whether #slots.map-hidden is showing right now.
+        markTarget();
     }
 
     /* Move the selection WITHOUT rebuilding the settings column.
@@ -3276,7 +3470,11 @@
             // weapon_pistol is ox_inventory's own art, the same nui:// path
             // client.lua's WeaponIcons table points at in game.
             onWeapon({ armed: true, icon: 'nui://ox_inventory/web/images/weapon_pistol.png', clip: 12, reserve: 84 });
-            onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true });
+            // wheel: true -- the balance rows are hidden by default now (see
+            // onCash), so the preview has to ask for the expanded view same
+            // as opening the inventory would, or Money would render as an
+            // empty box with nothing to position.
+            onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true, wheel: true });
             onDuffle({ value: 4820 });
             onChips({ value: 3450 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
@@ -3296,6 +3494,7 @@
                             holdMs: 9e6 });
             editorHonorCycle(true);
             editorReputationCycle(true);
+            editorMoneyPopCycle(true);
             editorSkillUpHold(true);
             onPrompt({ id: '_ed', label: 'Interact', glyph: 'E',
                        device: 'kbm', show: true });
@@ -3317,12 +3516,13 @@
         } else {
             editorHonorCycle(false);
             editorReputationCycle(false);
+            editorMoneyPopCycle(false);
             editorSkillUpHold(false);
             onPrompt({ id: '_ed', show: false });
             var ffxOff = $('focus-fx'); if (ffxOff) ffxOff.classList.remove('active');
             var frowOff = $('s-focus'); if (frowOff) frowOff.classList.remove('active');
             ['zone', 'vehicle', 'honor', 'wanted', 'honor-pop',
-             'reputation', 'reputation-pop', 'skillup'].forEach(function (id) {
+             'reputation', 'reputation-pop', 'money-pop', 'skillup'].forEach(function (id) {
                 show($(id), false);
             });
             // Not just a show(el, false) like the ids above: onNav's own
@@ -3347,7 +3547,34 @@
             onWeapon({ armed: false });
             onDuffle({ value: null });
             onChips({ value: null });
+            // The preview's fake $12,163/$154,200 must not become the
+            // baseline a real push is diffed against -- without this, the
+            // first real 'cash' message after closing the editor reads as a
+            // huge, bogus loss and fires a money-pop for it.
+            lastCashSeen = null;
+            lastBankSeen = null;
+            // Same reasoning for the wanted box: the preview's 3-star
+            // 'contact' state must not silently suppress the next real
+            // wanted push if it happens to land on the same key.
+            lastWantedKey = null;
         }
+    }
+
+    /* The pop fades on its own timer, which makes it impossible to position
+       (same problem editorHonorCycle solves for honor-pop). Alternates a gain
+       and a loss so both colours can be checked while placing it. */
+    var editorMoneyPopTimer = null;
+
+    function editorMoneyPopCycle(on) {
+        if (editorMoneyPopTimer) { clearInterval(editorMoneyPopTimer); editorMoneyPopTimer = null; }
+        if (!on) { show($('money-pop'), false); return; }
+        var up = false;
+        var beat = function () {
+            up = !up;
+            onMoneyPop(up ? 50 : -50, up ? 'icons/cash.png' : 'icons/buckme.png');
+        };
+        beat();
+        editorMoneyPopTimer = setInterval(beat, 1600);
     }
 
     function openEditor(d) {
@@ -3797,7 +4024,7 @@
        This is inert in game. */
     if (typeof GetParentResourceName === 'undefined') {
         onStatus({ health: 66, focus: 40, stamina: 58 });
-        onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true });
+        onCash({ cash: 12163, bank: 154200, cashCap: 20000, show: true, wheel: true });
         onDuffle({ value: 4820 });
         onChips({ value: 3450 });
         onWanted({ active: true, stars: 2, maxStars: 6, state: 'searching', tells: ['camera', 'weapon', 'person', 'people', 'hanger', 'vehicle'] });

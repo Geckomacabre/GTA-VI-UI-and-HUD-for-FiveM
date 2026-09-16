@@ -1183,6 +1183,157 @@ UpdateExhaustion = function(stamina)
 end
 
 -- =============================================================================
+-- Stamina / focus restore exports -- ox_inventory items.lua calls into these
+-- =============================================================================
+-- ox_inventory's items.lua calls into these by name, the same way it already
+-- calls health_items.medikit/painkiller for health kits (see that resource
+-- for the pattern this borrows). Neither stamina nor focus can be restored by
+-- just writing a stat the way hunger/thirst are (client.status) -- stamina is
+-- either `manualStamina` or the native's own counter, and focus is
+-- `focusMeter`, an active-toggle charge, not a depletable meter (see the file
+-- header) -- so a real function is needed on this side, not a status key.
+--
+-- Sized by name rather than taking a raw number, so items.lua just picks a
+-- tier and the actual amounts stay tunable in one place -- a new item reuses
+-- an existing tier instead of vice_hud needing to know its name.
+local staminaRestoreAmounts = { small = 20.0, medium = 40.0, full = 100.0 }
+local focusRestoreAmounts   = { small = 20.0, medium = 40.0 }
+
+--- Add to whichever stamina model is actually live.
+---
+--- Manual mode (the default -- see readStamina) has a real number to add to.
+--- Native mode does not: GetPlayerSprintStaminaRemaining is read-only, so
+--- RESTORE_PLAYER_STAMINA is used instead -- the same native GTA Online's own
+--- Sprunk/energy items call, taking a 0..1 fraction of the ped's OWN stamina
+--- stat rather than of this bar. On a native-mode build that stat IS this
+--- bar (readStamina reads straight off it), so the two never disagree.
+local function restoreStamina(amount)
+    if staminaMode == 'manual'
+       or (staminaMode == nil and (Config.Stamina and Config.Stamina.source) ~= 'native') then
+        manualStamina = math.min(100.0, manualStamina + amount)
+    else
+        pcall(RestorePlayerStamina, PlayerId(), amount / 100.0)
+    end
+end
+
+--- Add to the Focus meter. Never activates Focus by itself (see
+--- toggleFocus) -- this only means less waiting before the player can turn
+--- it on again.
+local function restoreFocusMeter(amount)
+    focusMeter = math.min(100.0, focusMeter + amount)
+end
+
+--- Wraps a tiered restore as an ox_inventory client.export.
+---
+--- Routed back through exports.ox_inventory:useItem exactly as health_items
+--- does, rather than applying the restore directly: useSlot hands control to
+--- `client.export` BEFORE the anim/usetime progress bar or the item's own
+--- `client.status` (hunger/thirst) ever run, so without this the item would
+--- restore stamina/focus instantly and silently, with no animation and no
+--- hunger/thirst change -- calling back into useItem is what gets all of
+--- that back, the same as it does for health_items' medikit/painkiller.
+---@param name string export name, e.g. 'restoreStaminaSmall'
+---@param amount number
+---@param apply fun(amount: number)
+local function registerRestoreExport(name, amount, apply)
+    exports(name, function(_, data)
+        exports.ox_inventory:useItem(data, function(result)
+            -- false/nil: cancelled, died mid-animation, or the server
+            -- rejected the use. Nothing was consumed, so nothing restores.
+            if not result then return end
+            apply(amount)
+        end)
+    end)
+end
+
+--- restoreStaminaSmall / restoreStaminaMedium / restoreStaminaFull
+for tier, amount in pairs(staminaRestoreAmounts) do
+    local name = 'restoreStamina' .. tier:sub(1, 1):upper() .. tier:sub(2)
+    registerRestoreExport(name, amount, restoreStamina)
+end
+
+--- restoreFocusSmall / restoreFocusMedium
+for tier, amount in pairs(focusRestoreAmounts) do
+    local name = 'restoreFocus' .. tier:sub(1, 1):upper() .. tier:sub(2)
+    registerRestoreExport(name, amount, restoreFocusMeter)
+end
+
+-- =============================================================================
+-- Combo restores -- one item, two (or three) things restored in the same use.
+-- =============================================================================
+-- Each combo owns its own single useItem call (one anim/progress bar/consume
+-- for the item), then applies every effect it covers on success. Amounts are
+-- tuned BELOW the equivalent single-purpose tier (15/30 here vs. 20/40 for a
+-- single-purpose small/medium) so a combo item is a convenience, not strictly
+-- better than carrying two single-purpose items in the same weight.
+--
+-- The health side of a health+something combo routes into health_items via
+-- exports.health_items:ApplyEffectRaw(key) -- a raw dose with no useItem call
+-- of its own (this function already ran the one useItem for the item), but
+-- still gated by health_items' own cooldown/cap/tolerance, so combo items
+-- can't out-heal the single-purpose antiseptic/traumakit items they borrow
+-- from. pcall'd since health_items is a separate resource.
+local comboStaminaFocusAmounts = { small = 15.0, medium = 30.0 }
+
+local function applyHealthEffect(key)
+    if GetResourceState('health_items') ~= 'started' then return end
+    pcall(function() exports.health_items:ApplyEffectRaw(key) end)
+end
+
+local function registerComboExport(name, apply)
+    exports(name, function(_, data)
+        exports.ox_inventory:useItem(data, function(result)
+            if not result then return end
+            apply()
+        end)
+    end)
+end
+
+--- restoreStaminaFocusSmall / restoreStaminaFocusMedium
+for tier, amount in pairs(comboStaminaFocusAmounts) do
+    local name = 'restoreStaminaFocus' .. tier:sub(1, 1):upper() .. tier:sub(2)
+    registerComboExport(name, function()
+        restoreStamina(amount)
+        restoreFocusMeter(amount)
+    end)
+end
+
+--- restoreHealthStaminaSmall: a quick field dose (health_items.antiseptic)
+--- plus a small stamina top-up.
+registerComboExport('restoreHealthStaminaSmall', function()
+    restoreStamina(15.0)
+    applyHealthEffect('antiseptic')
+end)
+
+--- restoreHealthStaminaMedium: a proper trauma-kit heal (health_items.traumakit)
+--- plus a medium stamina top-up.
+registerComboExport('restoreHealthStaminaMedium', function()
+    restoreStamina(30.0)
+    applyHealthEffect('traumakit')
+end)
+
+--- restoreHealthFocusSmall: a quick field dose plus a small focus top-up.
+registerComboExport('restoreHealthFocusSmall', function()
+    restoreFocusMeter(15.0)
+    applyHealthEffect('antiseptic')
+end)
+
+--- restoreAllSmall / restoreAllMedium: health + stamina + focus in one item --
+--- the rare, expensive "does everything" tier. Medium pairs with the trauma
+--- kit heal, small with the quick field dose.
+registerComboExport('restoreAllSmall', function()
+    restoreStamina(15.0)
+    restoreFocusMeter(15.0)
+    applyHealthEffect('antiseptic')
+end)
+
+registerComboExport('restoreAllMedium', function()
+    restoreStamina(30.0)
+    restoreFocusMeter(30.0)
+    applyHealthEffect('traumakit')
+end)
+
+-- =============================================================================
 -- The published surface
 -- =============================================================================
 -- Everything above is file-local. This table is the whole of what the rest of

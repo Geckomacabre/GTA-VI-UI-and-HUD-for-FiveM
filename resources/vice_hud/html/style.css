@@ -819,6 +819,24 @@ html, body {
     gap: 0.45cqh;
 }
 
+/* Whenever the native radar isn't drawn -- on foot with the map hidden
+   (`/hudminimap`), dead, the pause menu, a full inventory, the character
+   switcher -- app.js's applyMapChrome() adds this. #slots is normally
+   anchored to a SNAPSHOT of the map's rect (the comment above explains why),
+   which is exactly the wrong place to be once there is no map there to sit
+   beside: the zone bar/vehicle panel just floated wherever that rect
+   happened to fall, often nowhere near a screen edge at all. Docked to the
+   bottom centre instead, so a live "you just entered a new zone" / vehicle
+   status notification always has a sane, predictable home even with the map
+   off. `left` stays at 50% rather than following --panel-left, but width and
+   the editor's own offset/scale nudge (below, in the layout block) still
+   apply on top -- someone who tuned Map panels in /movehud keeps that tuning
+   relative to this dock instead of losing it. */
+#slots.map-hidden {
+    left: 50%;
+    bottom: 2.4cqh;
+}
+
 .slot {
     width: 100%;
     background: var(--panel);
@@ -2315,6 +2333,22 @@ html, body {
 #ammo-wrap{ transform: translate(var(--off-ammo-x,0cqw),     var(--off-ammo-y,0cqh))     scale(var(--sc-ammo-x,1), var(--sc-ammo-y,1));       transform-origin: top right; opacity: var(--op-ammo, 1); }
 #money    { transform: translate(var(--off-money-x,0cqw),    var(--off-money-y,0cqh))    scale(var(--sc-money-x,1), var(--sc-money-y,1));    transform-origin: top right; opacity: var(--op-money, 1); }
 #slots    { transform: translate(var(--off-slots-x,0cqw),    var(--off-slots-y,0cqh))    scale(var(--sc-slots-x,1), var(--sc-slots-y,1));    transform-origin: bottom left; opacity: var(--op-slots, 1); }
+/* Higher specificity than the plain #slots rule above, so it wins while the
+   dock is active. Adds the -50% half-width pullback `left: 50%` on its own
+   needs (translate can't read percentages of the element's OWN size from a
+   separate property), composed BEFORE the nudge so the nudge reads as "a bit
+   left/right of centre" rather than being fought by it. The nudge itself is
+   --off-slots-FOOT-x/y, not the plain --off-slots-x/y the rule above reads --
+   Foot position X/Y in /movehud (only offered on Map panels, only while the
+   dock is actually on screen -- see markTarget()) is a SEPARATE pair from the
+   normal Position X/Y, because that one only ever applies while the map is
+   up; reusing it here would mean moving one moved the other. */
+#slots.map-hidden {
+    transform: translate(-50%, 0)
+               translate(var(--off-slots-foot-x,0cqw), var(--off-slots-foot-y,0cqh))
+               scale(var(--sc-slots-x,1), var(--sc-slots-y,1));
+    transform-origin: bottom center;
+}
 #wanted   { transform: translate(var(--off-wanted-x,0cqw),   var(--off-wanted-y,0cqh))   scale(var(--sc-wanted-x,1), var(--sc-wanted-y,1));   transform-origin: top left; opacity: var(--op-wanted, 1); }
 #honor    { transform: translate(var(--off-honor-x,0cqw),    var(--off-honor-y,0cqh))    scale(var(--sc-honor-x,1), var(--sc-honor-y,1));    transform-origin: bottom right; opacity: var(--op-honor, 1); }
 #reputation { transform: translate(var(--off-reputation-x,0cqw), var(--off-reputation-y,0cqh)) scale(var(--sc-reputation-x,1), var(--sc-reputation-y,1)); transform-origin: bottom left; opacity: var(--op-reputation, 1); }
@@ -2325,6 +2359,13 @@ html, body {
                scale(var(--sc-honorpop-x,1), var(--sc-honorpop-y,1));
     transform-origin: center;
     opacity: var(--op-honorpop, 1);
+}
+#money-pop{
+    transform: translate(-50%, -50%)
+               translate(var(--off-moneypop-x,0cqw), var(--off-moneypop-y,0cqh))
+               scale(var(--sc-moneypop-x,1), var(--sc-moneypop-y,1));
+    transform-origin: center;
+    opacity: var(--op-moneypop, 1);
 }
 #reputation-pop{
     transform: translate(-50%, -50%)
@@ -2377,6 +2418,7 @@ html, body {
 #wanted    { gap: calc(1.1cqh  * var(--sp-wanted, 1)); }
 #honor     { gap: calc(0.8cqw  * var(--sp-honor, 1)); }
 #honor-pop { gap: calc(0.35cqw * var(--sp-honorpop, 1)); }
+#money-pop { gap: calc(0.35cqw * var(--sp-moneypop, 1)); }
 #reputation     { gap: calc(0.8cqw  * var(--sp-reputation, 1)); }
 #reputation-pop { gap: calc(0.35cqw * var(--sp-reputationpop, 1)); }
 #prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
@@ -2418,6 +2460,7 @@ html, body {
 #wanted    { font-family: var(--ff-wanted, inherit);    -webkit-font-smoothing: var(--sm-wanted, antialiased); }
 #honor     { font-family: var(--ff-honor, inherit);     -webkit-font-smoothing: var(--sm-honor, antialiased); }
 #honor-pop { font-family: var(--ff-honorpop, inherit);  -webkit-font-smoothing: var(--sm-honorpop, antialiased); }
+#money-pop { -webkit-font-smoothing: var(--sm-moneypop, antialiased); }
 #reputation     { font-family: var(--ff-reputation, inherit);     -webkit-font-smoothing: var(--sm-reputation, antialiased); }
 #reputation-pop { font-family: var(--ff-reputationpop, inherit);  -webkit-font-smoothing: var(--sm-reputationpop, antialiased); }
 #prompts   { font-family: var(--ff-prompts, inherit);   -webkit-font-smoothing: var(--sm-prompts, antialiased); }
@@ -2522,6 +2565,7 @@ html, body {
 #wanted-copy       { text-align: var(--al-wanted, left); }
 #honor-copy        { align-items: var(--ai-honor, flex-end); text-align: var(--al-honor, right); }
 #honor-pop         { justify-content: var(--ai-honorpop, center); }
+#money-pop         { justify-content: var(--ai-moneypop, center); }
 #reputation-copy   { align-items: var(--ai-reputation, flex-start); text-align: var(--al-reputation, left); }
 #reputation-pop    { justify-content: var(--ai-reputationpop, center); }
 #prompts           { align-items: var(--ai-prompts, flex-end); }
@@ -2988,6 +3032,39 @@ html, body {
     height: 0.54em;
     pointer-events: none;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+/* Money change popup ----------------------------------------------------------
+   Same "sign + icon" shape as honor-pop, but keyed off the amount's own sign
+   rather than a separate direction flag -- money has no equivalent of honor's
+   "broken" state, so up/down covers every case. */
+#money-pop {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* NO transform here -- see the note on #honor-pop above, same reason. */
+    display: flex;
+    align-items: center;
+    gap: calc(0.35 * var(--w));
+    font-size: calc((calc(3.1 * var(--w))) * var(--fs-moneypop, 1));
+    line-height: 1;
+    text-shadow: 0 0.25cqh 0.5cqh rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+}
+#money-pop-sign {
+    /* Pinned, not tunable -- same reasoning as .money-amt: money is Pricedown
+       and stays Pricedown. */
+    font-family: 'Pricedown', sans-serif;
+    font-weight: var(--fw-moneypop, 700);
+    color: #fff;
+}
+#money-pop.up   #money-pop-sign { color: #bfe3c8; }
+#money-pop.down #money-pop-sign { color: #e3a9bf; }
+#money-pop-icon {
+    width: 0.75em;
+    height: 0.75em;
+    object-fit: contain;
+    display: block;
 }
 
 /* Reputation change popup ----------------------------------------------------
