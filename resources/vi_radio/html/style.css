@@ -1,0 +1,593 @@
+@font-face {
+    font-family: 'Anton';
+    src: url('fonts/Anton.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    user-select: none;
+}
+
+/* Declared on :root only - repeating them on `body` would shadow the scale
+   value app.js writes to the root element. */
+:root {
+    /* --s is the 1080p -> actual resolution scale, set from app.js */
+    --s: 1;
+    --icon: 103px;
+    --spacing: 112px;
+    --top: 32px;
+    --border: 3.5px;
+    --box: rgba(0, 0, 0, 0.667);
+    --box-active: rgba(45, 45, 45, 0.863);
+    --outline: rgba(255, 255, 255, 0.353);
+    --outline-active: rgba(255, 255, 255, 1);
+    --slide: 110ms;
+    --side-gap: 37px;
+    --left-icon-h: 55px;
+    --right-icon-h: 24px;
+    --mute-color: #ffffff;
+    --muted-color: #ff3b30;
+    --line-y: 24px;
+    --line-w: 189px;
+    --line-h: 6.5px;
+    --station-y: 34px;
+    --station-size: 36px;
+    --title-y: 68px;
+    --title-size: 31px;
+    --artist-y: 95px;
+    --artist-size: 28px;
+}
+
+#radio {
+    position: absolute;
+    top: calc(var(--top) * var(--s));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 1;
+    transition: opacity 160ms ease;
+}
+
+#radio.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- carousel ------------------------------------------------------------ */
+
+/* Five slots wide, so neighbours fade out at the edges instead of popping.
+   The side icons are absolutely positioned so they cannot push the carousel
+   off centre - the info block below is centred on the same axis. */
+#carousel {
+    position: relative;
+    width: calc(var(--spacing) * 5 * var(--s));
+    height: calc(var(--icon) * var(--s));
+}
+
+#viewport {
+    position: relative;
+    width: 100%;
+    height: calc(var(--icon) * var(--s));
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right,
+        transparent 0%, #000 18%, #000 82%, transparent 100%);
+    mask-image: linear-gradient(to right,
+        transparent 0%, #000 18%, #000 82%, transparent 100%);
+}
+
+#track {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: transform var(--slide) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tile {
+    position: relative;
+    flex: 0 0 auto;
+    width: calc(var(--icon) * var(--s));
+    height: calc(var(--icon) * var(--s));
+    margin: 0 calc((var(--spacing) - var(--icon)) / 2 * var(--s));
+    background: var(--box);
+    border: calc(var(--border) * var(--s)) solid var(--outline);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    opacity: 0.55;
+    transform: scale(0.9);
+    transition: background var(--slide) ease,
+                border-color var(--slide) ease,
+                opacity var(--slide) ease,
+                transform var(--slide) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tile.active {
+    background: var(--box-active);
+    border-color: var(--outline-active);
+    opacity: 1;
+    transform: scale(1);
+}
+
+.tile img {
+    width: 88%;
+    height: 88%;
+    object-fit: contain;
+    image-rendering: auto;
+}
+
+/* Stations without a logo file fall back to their name. */
+.tile .fallback {
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: calc(15px * var(--s));
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-transform: uppercase;
+    color: #fff;
+    padding: 0 8%;
+    word-break: break-word;
+}
+
+.side-icon {
+    position: absolute;
+    top: 50%;
+    height: calc(var(--left-icon-h) * var(--s));
+    width: auto;
+    object-fit: contain;
+    opacity: 0.9;
+    transform: translateY(-50%);
+}
+
+#icon-left {
+    right: 100%;
+    margin-right: calc(var(--side-gap) * var(--s));
+    height: auto;
+}
+
+#icon-left img {
+    height: calc(var(--left-icon-h) * var(--s));
+    width: auto;
+    object-fit: contain;
+}
+
+/* --- the radio / on demand switch ---------------------------------------- */
+/* Redrawn from the original artwork rather than shown as it ships, because the
+   PNG has the knob baked in at RADIO and a switch that cannot move is a label.
+   Sized off --left-icon-h, the same value the static icon used, so it lands
+   where the original did at any resolution. */
+
+#od-switch-graphic {
+    display: flex;
+    align-items: stretch;
+    gap: calc(var(--left-icon-h) * 0.26 * var(--s));
+}
+
+.sw-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: calc(var(--left-icon-h) * 0.36 * var(--s));
+}
+
+.sw-label {
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: calc(var(--left-icon-h) * 0.38 * var(--s));
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+    text-shadow: 0 calc(2px * var(--s)) calc(6px * var(--s)) rgba(0, 0, 0, 0.75);
+    transition: opacity 160ms ease;
+}
+
+.sw-track {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* The line the knob travels along, tucked behind both dots. */
+.sw-track::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--left-icon-h) * 0.19 * var(--s));
+    bottom: calc(var(--left-icon-h) * 0.19 * var(--s));
+    width: max(1px, calc(var(--left-icon-h) * 0.02 * var(--s)));
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.sw-dot {
+    position: relative;
+    width: calc(var(--left-icon-h) * 0.38 * var(--s));
+    height: calc(var(--left-icon-h) * 0.38 * var(--s));
+    border-radius: 50%;
+    border: max(1px, calc(var(--left-icon-h) * 0.025 * var(--s))) solid rgba(255, 255, 255, 0.9);
+    background: transparent;
+    transition: background-color 160ms ease;
+}
+
+/* Off: knob at the top, on RADIO -- which is how the original ships. */
+.sw-top    { background: #fff; }
+.sw-radio  { opacity: 1; }
+.sw-od     { opacity: 0.45; }
+
+#radio.od-on .sw-top    { background: transparent; }
+#radio.od-on .sw-bottom { background: #fff; }
+#radio.od-on .sw-radio  { opacity: 0.45; }
+#radio.od-on .sw-od     { opacity: 1; }
+
+#icon-right {
+    left: 100%;
+    margin-left: calc(var(--side-gap) * var(--s));
+    height: calc(var(--right-icon-h) * var(--s));
+}
+
+/* The mute icon is a pure white glyph, so it is drawn as a mask filled with a
+   colour rather than an <img>. That is the only way to recolour it exactly -
+   a CSS filter cannot turn white into an arbitrary hue. */
+.mask-icon {
+    width: auto;
+    background-color: var(--mute-color);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    transition: background-color 140ms ease;
+}
+
+/* Muted: everything except the indicator drains of colour, and the indicator
+   goes red. The filter cannot live on #carousel because filters apply to
+   descendants too - it would drag the indicator down with it. */
+#radio.muted #viewport,
+#radio.muted #icon-left,
+#radio.muted #info {
+    filter: grayscale(1) brightness(0.62);
+}
+
+#radio.muted #icon-right {
+    opacity: 1;
+    background-color: var(--muted-color);
+}
+
+#radio.dim-off #viewport,
+#radio.dim-off #icon-left,
+#radio.dim-off #info {
+    filter: none;
+}
+
+/* --- info block ---------------------------------------------------------- */
+
+#info {
+    position: relative;
+    width: calc(var(--line-w) * 3.4 * var(--s));
+    height: calc((var(--artist-y) + 40px) * var(--s));
+}
+
+#info-line {
+    position: absolute;
+    top: calc(var(--line-y) * var(--s));
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(var(--line-w) * var(--s));
+    height: calc(var(--line-h) * var(--s));
+    background: #fff;
+}
+
+#station, #title, #artist {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-family: 'Anton', Impact, sans-serif;
+    text-transform: uppercase;
+    color: #fff;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 calc(2px * var(--s)) calc(6px * var(--s)) rgba(0, 0, 0, 0.75);
+}
+
+#station {
+    top: calc(var(--station-y) * var(--s));
+    font-size: calc(var(--station-size) * var(--s));
+    line-height: 1.05;
+}
+
+#title {
+    top: calc(var(--title-y) * var(--s));
+    font-size: calc(var(--title-size) * var(--s));
+    line-height: 1.05;
+    opacity: 0.92;
+}
+
+#artist {
+    top: calc(var(--artist-y) * var(--s));
+    font-size: calc(var(--artist-size) * var(--s));
+    line-height: 1.05;
+    opacity: 0.62;
+}
+
+#title:empty, #artist:empty { display: none; }
+
+/* --- On Demand panel ------------------------------------------------------ */
+/* Sized off the same --s scale as the HUD so it matches at any resolution.
+   Unlike the HUD this takes NUI focus, so it is the only part of the page that
+   is ever allowed pointer events. */
+
+#od {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    /* Pushed below the HUD rather than centred on it: the carousel stays
+       readable above the panel instead of being sliced in half by it. */
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: calc(300px * var(--s));
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 1;
+    transition: opacity 140ms ease;
+}
+
+#od.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#od-panel {
+    width: calc(620px * var(--s));
+    max-height: calc(700px * var(--s));
+    display: flex;
+    flex-direction: column;
+    gap: calc(14px * var(--s));
+    padding: calc(26px * var(--s)) calc(28px * var(--s)) calc(22px * var(--s));
+    background: rgba(12, 12, 14, 0.94);
+    border: calc(var(--border) * var(--s)) solid var(--outline-active);
+    color: #fff;
+    font-family: system-ui, 'Segoe UI', Arial, sans-serif;
+    font-size: calc(15px * var(--s));
+}
+
+#od-head {
+    display: flex;
+    align-items: center;
+    gap: calc(14px * var(--s));
+}
+
+#od-head h1 { margin-right: auto; }
+
+/* The switch is the panel's statement of what On Demand currently is: on.
+   Clicking it is how you turn it off without going back to the wheel. */
+#od button.switch {
+    display: flex;
+    align-items: center;
+    gap: calc(9px * var(--s));
+    padding: calc(6px * var(--s)) calc(10px * var(--s)) calc(6px * var(--s)) calc(6px * var(--s));
+    background: none;
+    border-color: var(--outline);
+}
+
+.switch-track {
+    position: relative;
+    width: calc(40px * var(--s));
+    height: calc(20px * var(--s));
+    border-radius: calc(10px * var(--s));
+    background: rgba(255, 255, 255, 0.16);
+    transition: background 140ms ease;
+}
+
+.switch-knob {
+    position: absolute;
+    top: calc(3px * var(--s));
+    left: calc(3px * var(--s));
+    width: calc(14px * var(--s));
+    height: calc(14px * var(--s));
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: transform 140ms cubic-bezier(0.22, 0.61, 0.36, 1), background 140ms ease;
+}
+
+.switch-state {
+    min-width: calc(30px * var(--s));
+    text-align: left;
+    opacity: 0.55;
+}
+
+#od button.switch[aria-checked="true"] .switch-track { background: var(--muted-color); }
+#od button.switch[aria-checked="true"] .switch-knob {
+    background: #fff;
+    transform: translateX(calc(20px * var(--s)));
+}
+#od button.switch[aria-checked="true"] .switch-state { opacity: 1; }
+
+#od-head h1 {
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: calc(38px * var(--s));
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-weight: normal;
+}
+
+#od-now {
+    padding: calc(14px * var(--s)) calc(16px * var(--s));
+    background: var(--box);
+    border-left: calc(4px * var(--s)) solid var(--muted-color);
+}
+
+#od-now-title {
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: calc(22px * var(--s));
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#od-now-artist {
+    margin-top: calc(2px * var(--s));
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#od-now-artist:empty { display: none; }
+
+#od-transport {
+    display: flex;
+    gap: calc(8px * var(--s));
+    margin-top: calc(12px * var(--s));
+}
+
+#od-form {
+    display: flex;
+    gap: calc(8px * var(--s));
+}
+
+#od-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: calc(10px * var(--s)) calc(12px * var(--s));
+    background: rgba(255, 255, 255, 0.07);
+    border: calc(2px * var(--s)) solid var(--outline);
+    color: #fff;
+    font: inherit;
+    outline: none;
+}
+
+#od-url:focus { border-color: var(--outline-active); }
+#od-url::placeholder { color: rgba(255, 255, 255, 0.35); }
+
+#od button {
+    padding: calc(10px * var(--s)) calc(14px * var(--s));
+    background: rgba(255, 255, 255, 0.09);
+    border: calc(2px * var(--s)) solid var(--outline);
+    color: #fff;
+    font: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+    white-space: nowrap;
+}
+
+#od button:hover { background: rgba(255, 255, 255, 0.18); border-color: var(--outline-active); }
+#od button.primary { background: #fff; color: #111; border-color: #fff; }
+#od button.primary:hover { background: rgba(255, 255, 255, 0.85); }
+#od button.danger:hover { background: var(--muted-color); border-color: var(--muted-color); }
+#od button.ghost { background: none; border: none; opacity: 0.6; padding: 0; }
+#od button.ghost:hover { opacity: 1; background: none; }
+#od button:disabled { opacity: 0.3; cursor: default; }
+#od button:disabled:hover { background: rgba(255, 255, 255, 0.09); border-color: var(--outline); }
+
+#od-notice {
+    min-height: calc(18px * var(--s));
+    font-size: calc(14px * var(--s));
+    color: var(--muted-color);
+}
+
+#od-notice.ok { color: rgba(255, 255, 255, 0.65); }
+
+#od-queue-head {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: calc(6px * var(--s));
+    border-bottom: calc(2px * var(--s)) solid var(--outline);
+    font-family: 'Anton', Impact, sans-serif;
+    font-size: calc(16px * var(--s));
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.8;
+}
+
+#od-queue {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: calc(60px * var(--s));
+    max-height: calc(240px * var(--s));
+}
+
+#od-queue li {
+    display: flex;
+    align-items: center;
+    gap: calc(10px * var(--s));
+    padding: calc(9px * var(--s)) calc(4px * var(--s));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#od-queue li.playing { background: rgba(255, 255, 255, 0.07); }
+
+#od-queue .pos {
+    width: calc(26px * var(--s));
+    opacity: 0.45;
+    font-variant-numeric: tabular-nums;
+}
+
+#od-queue li.playing .pos { opacity: 1; color: var(--muted-color); }
+
+#od-queue .name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#od-queue .by {
+    opacity: 0.45;
+    font-size: calc(13px * var(--s));
+    white-space: nowrap;
+}
+
+#od-queue .empty {
+    padding: calc(14px * var(--s)) calc(4px * var(--s));
+    opacity: 0.4;
+    border: none;
+}
+
+#od-queue button {
+    padding: calc(4px * var(--s)) calc(9px * var(--s));
+    font-size: calc(13px * var(--s));
+}
+
+#od-foot {
+    display: flex;
+    align-items: center;
+    gap: calc(18px * var(--s));
+    padding-top: calc(12px * var(--s));
+    border-top: calc(2px * var(--s)) solid var(--outline);
+    font-size: calc(14px * var(--s));
+}
+
+#od-foot label { display: flex; align-items: center; gap: calc(8px * var(--s)); cursor: pointer; }
+#od-foot .od-volume span:first-child { opacity: 0.6; white-space: nowrap; }
+#od-foot .od-check span { opacity: 0.6; white-space: nowrap; }
+#od-foot .od-hint { margin-left: auto; opacity: 0.35; white-space: nowrap; }
+
+#od-volume { width: calc(120px * var(--s)); accent-color: #fff; }
+#od-volume-value { width: calc(42px * var(--s)); font-variant-numeric: tabular-nums; opacity: 0.8; }
+#od-mute { accent-color: var(--muted-color); width: calc(15px * var(--s)); height: calc(15px * var(--s)); }
+
+/* The HUD is never selectable, but the link field has to be. */
+#od-url { user-select: text; }

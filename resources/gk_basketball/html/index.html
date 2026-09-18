@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="board" class="hidden">
+        <div class="scoreline">
+            <div class="team home">
+                <span class="name" id="home-name">Home</span>
+                <span class="score" id="home-score">0</span>
+            </div>
+
+            <div class="middle">
+                <div class="clock" id="clock">--:--</div>
+                <div class="status" id="status">Waiting</div>
+            </div>
+
+            <div class="team away">
+                <span class="score" id="away-score">0</span>
+                <span class="name" id="away-name">Away</span>
+            </div>
+        </div>
+
+        <ul class="roster" id="roster"></ul>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

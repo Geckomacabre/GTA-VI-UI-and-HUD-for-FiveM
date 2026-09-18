@@ -613,14 +613,19 @@
        A plain data-driven option list -- no targeting geometry, no raycast
        highlight, see the comment on #interact in index.html for why that
        engine is a separate, later project. Options: array of
-       { label, badges: ['stamina'|'focus', ...], selected } (selected marks
-       the ONE row that gets the X-in-circle marker; every other row gets a
-       hollow dot). Keyboard-navigable: arrows move, Enter confirms, Escape
-       cancels -- posted back to Lua as interactSelect / interactClose. */
+       { label, badges: ['health'|'stamina'|'focus', ...], selected } (selected
+       marks the ONE row that gets the X-in-circle marker; every other row
+       gets a hollow dot). Keyboard-navigable: arrows move, Enter confirms,
+       Escape cancels -- posted back to Lua as interactSelect / interactClose. */
     var INTERACT_MARKER_DOT = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>';
     var INTERACT_MARKER_X = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/>' +
         '<path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>';
     var INTERACT_BADGE_SVG = {
+        // Same heart silhouette as the health status row's badge_heart.png,
+        // redrawn as a stroke path so it matches the other chips here (flat
+        // raster art next to vector strokes would look out of place at this
+        // size).
+        health: '<svg viewBox="0 0 24 24"><path d="M12 20S4 14.5 4 9.2C4 6.3 6.2 4 9 4c1.6 0 3 .9 3 .9S13.4 4 15 4c2.8 0 5 2.3 5 5.2 0 5.3-8 10.8-8 10.8z"/></svg>',
         stamina: '<svg viewBox="0 0 24 24"><path d="M13 2 4.5 14h6L10 22l9.5-13h-6z"/></svg>',
         focus: '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +
             '<circle cx="12" cy="12" r="3"/></svg>'
@@ -643,9 +648,11 @@
             marker.innerHTML = i === interactSel ? INTERACT_MARKER_X : INTERACT_MARKER_DOT;
             row.appendChild(marker);
 
-            // Badges sit between the marker and the label (reference: marker,
-            // then badge chips, then text) -- appended before the label now,
-            // not after it.
+            var label = document.createElement('span');
+            label.className = 'interact-label item-select-outline';
+            label.textContent = opt.label || '';
+            row.appendChild(label);
+
             if (opt.badges && opt.badges.length) {
                 var badges = document.createElement('span');
                 badges.className = 'interact-badges';
@@ -657,11 +664,6 @@
                 });
                 row.appendChild(badges);
             }
-
-            var label = document.createElement('span');
-            label.className = 'interact-label item-select-outline';
-            label.textContent = opt.label || '';
-            row.appendChild(label);
 
             list.appendChild(row);
         });
@@ -680,45 +682,7 @@
         if (interactSel < 0) interactSel = 0;
 
         renderInteract();
-
-        // World-anchoring (added after this NUI panel's original build --
-        // see onInteractPos below for the per-frame version of this same
-        // positioning). `anchored` false/absent means this open call has no
-        // world point at all (client_overlays.lua's OpenInteractMenu without
-        // an `anchor` arg, e.g. qbx_vehiclekeys) -- clear any inline
-        // left/top a PREVIOUS anchored open left behind so this one falls
-        // back to the plain fixed CSS position instead of inheriting a
-        // stale spot from whatever was open before it.
-        if (d.anchored) {
-            box.classList.toggle('interact-offscreen', d.onScreen === false);
-            if (d.onScreen !== false) {
-                box.style.left = (d.x * 100) + 'cqw';
-                box.style.top = (d.y * 100) + 'cqh';
-            }
-        } else {
-            box.classList.remove('interact-offscreen');
-            box.style.left = '';
-            box.style.top = '';
-        }
-
         show(box, true);
-    }
-
-    // Per-frame follow-up to onInteract's own first-frame placement above --
-    // pushed by client_overlays.lua's world-anchoring thread while an
-    // anchored OpenInteractMenu is open, same split ShowWorldActions/
-    // onWorldActionsPos already uses and for the same reason: this would
-    // otherwise rebuild the whole option list every tick for nothing.
-    function onInteractPos(d) {
-        var box = $('interact');
-        if (!box) return;
-        if (!d || d.show === false) {
-            box.classList.add('interact-offscreen');
-            return;
-        }
-        box.classList.remove('interact-offscreen');
-        box.style.left = (d.x * 100) + 'cqw';
-        box.style.top = (d.y * 100) + 'cqh';
     }
 
     function moveInteractSel(delta) {
@@ -3932,7 +3896,6 @@
         crossKill: onKillMark,
         lapHud: onLapHud,
         interact: onInteract,
-        interactPos: onInteractPos,
         worldActions: onWorldActions,
         worldActionsPos: onWorldActionsPos,
         lockpick: onLockpick,
@@ -4046,13 +4009,19 @@
         onPolice({ active: true, edges: { top: 0, right: 0.45, bottom: 0, left: 0 } });
         onCrosshair({ active: true, mode: 'foot' });
         onLapHud({ show: true, lap: 1, laps: 2, cp: 10, cpTotal: 16, elapsedMs: 19950, running: true });
+        // Real ox_inventory items and their actual badges -- see
+        // client_overlays.lua's /hudinteractitems, which shows this exact
+        // list in-game by calling ox_inventory's Items/GetConsumableBadges
+        // exports instead of hardcoding it the way this browser-only demo
+        // has to. IFAK is included deliberately badge-less (no client.export
+        // on that item) as the contrast case.
         onInteract({
             show: true, selected: 0,
             options: [
-                { label: 'Logger Beer' },
-                { label: 'Lavazas Beer' },
-                { label: 'Blitz Berry Smoothie', badges: ['stamina', 'focus'] },
-                { label: 'Blitz Green Smoothie', badges: ['stamina'] }
+                { label: 'Sandwich', badges: ['stamina'] },
+                { label: 'Green Tea', badges: ['focus'] },
+                { label: 'Medikit', badges: ['health'] },
+                { label: 'IFAK' }
             ]
         });
         onWorldActions({

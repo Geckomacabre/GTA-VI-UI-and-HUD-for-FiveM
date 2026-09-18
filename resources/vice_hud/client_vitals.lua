@@ -1183,7 +1183,7 @@ UpdateExhaustion = function(stamina)
 end
 
 -- =============================================================================
--- Stamina / focus restore exports -- ox_inventory items.lua calls into these
+-- Consumable restores
 -- =============================================================================
 -- ox_inventory's items.lua calls into these by name, the same way it already
 -- calls health_items.medikit/painkiller for health kits (see that resource

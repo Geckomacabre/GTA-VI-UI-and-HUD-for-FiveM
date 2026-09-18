@@ -2,8 +2,9 @@
 
 A bundle of FiveM/Qbox resources built around a GTA VI (Vice City / Leonida)
 visual identity: a shared HUD, a matching popup/menu theme spread across a
-few community resources, a gig-economy phone app pair, and a reskinned
-inventory screen, organized as a standalone, installable package.
+few community resources, a gig-economy phone app pair, a reskinned inventory
+screen, a radio wheel, and playable basketball, organized as a standalone,
+installable package.
 
 Visual direction throughout this set (the HUD layout, the neon/Art Deco
 color language, the general "leaked GTA VI trailer" feel) was inspired by
@@ -62,10 +63,10 @@ GTA VI Resources/
 ├── patches/       NOT standalone resources. Small overlay files that connect
 │                  vice_hud to resources you install separately (ox_lib,
 │                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
-│                  zseatbelt, qbx_smallresources, dpclothing, qbx_core), plus
-│                  a standalone lb-phone Wallet app rebrand that doesn't touch
-│                  vice_hud at all. See docs/PATCHES.md for exact install
-│                  steps per resource.
+│                  zseatbelt, qbx_smallresources, dpclothing, qbx_core,
+│                  qbx_medical), plus a standalone lb-phone Wallet app
+│                  rebrand that doesn't touch vice_hud at all. See
+│                  docs/PATCHES.md for exact install steps per resource.
 │
 └── docs/          Extra documentation, including the patch install guide.
 ```
@@ -142,10 +143,32 @@ included here.
   multicharacter picker), and holding a key now opens a row of portrait cards
   in the corner you can cycle through and release to switch, using the
   engine's real singleplayer switch cinematic rather than a loading screen.
-  See `resources/qbx_relog/README.md` for controls, config, and the required
+  Switching now also has a chance to land you mid-scene — on a bench, finishing
+  a cigarette, hanging up a phone — using Rockstar's own arrival-scene data
+  from singleplayer instead of always dropping you in an idle stand. See
+  `resources/qbx_relog/README.md` for controls, config, and the required
   `qbx_core` patch (`patches/qbx_core`, below) this resource cannot run
   without. Depends on `ox_lib`, `qbx_core`. Optional: `illenium-appearance`
   (for real portraits instead of initials), `vice_hud`, `qbx_honor`.
+
+- **`vi_radio`**: A FiveM port of *VI Radio*, the GTA V Legacy singleplayer
+  mod by sej0bec — a GTA VI–styled radio carousel with station logos, a mute
+  system, and a slow-motion effect while browsing stations, plus **On
+  Demand**: play a link through the car radio as a shared queue everyone in
+  earshot hears. No framework dependency. Optional: `xsound`, for On Demand;
+  without it the wheel still works and On Demand switches itself off. See
+  `resources/vi_radio/README.md` for controls and credits — the station
+  artwork is sej0bec's own work, redistributed with credit and not covered
+  by this repo's licence (see its own `README.md`'s Credits section).
+
+- **`gk_basketball`**: Playable basketball — hoops, ballistic shot solving,
+  rim-plane score detection and timed pickup matches, with no throwables
+  dependency. Hoops are placed by eye with `/bball_place` (GTA's basketball
+  rims are part of the map, not props, so there's no way to find one from
+  code) and saved to `data/hoops.json`. Needs the `basketball` item
+  registered in your `ox_inventory` — see `resources/gk_basketball/README.md`
+  step 3 for the exact entry and artwork to copy in. Depends on `ox_lib`,
+  `ox_target`, `ox_inventory`, `qbx_core`, OneSync.
 
 ### `patches/`
 
@@ -190,6 +213,12 @@ Overlays for resources you install separately:
   flow, needed by `qbx_relog` (bundled above) so a quick character switch
   doesn't fight with the normal character-select screen. Not theming, a
   functional requirement.
+- **`qbx_medical`**: not theming, a timing fix so the WASTED cinematic
+  (fenix-police's own screen, see Recommended pairings below) starts the
+  instant a player dies instead of being delayed by ragdoll-settling, with
+  the resurrection pop happening off-screen once fenix-police's fade
+  confirms rather than snapping visibly before or during it. See
+  `docs/PATCHES.md`'s qbx_medical section.
 - **`lb-phone`**: a Vice-styled rebrand of lb-phone's stock Wallet app into
   "BuckMe" (card front/back with a tap-to-flip signature and CVV, a bottom
   tab bar, a Pay/Request toggle). Standalone, not part of the vice_hud glass
@@ -203,8 +232,9 @@ its own.
 ## Installing (drag-and-drop resources)
 
 1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/qbx_honor`,
-   `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`, and/or
-   `resources/qbx_relog` into your server's `resources/` folder.
+   `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`,
+   `resources/qbx_relog`, `resources/vi_radio`, and/or
+   `resources/gk_basketball` into your server's `resources/` folder.
 2. Add them to `server.cfg`:
    ```
    ensure vice_hud
@@ -213,6 +243,8 @@ its own.
    ensure qbx_vehiclekeys
    ensure gk_pausemenu
    ensure qbx_relog
+   ensure vi_radio
+   ensure gk_basketball
    ```
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
@@ -228,6 +260,11 @@ its own.
    - `qbx_relog` needs **ox_lib** and **qbx_core**, and won't run at all
      without the `patches/qbx_core` hand-edit below applied first. See
      `resources/qbx_relog/README.md`.
+   - `vi_radio` has no hard dependency. Optional: **xsound**, started before
+     it, for On Demand playback.
+   - `gk_basketball` needs **ox_lib**, **ox_target**, **ox_inventory**,
+     **qbx_core**, and OneSync on. The `basketball` item also needs
+     registering in `ox_inventory` — see `resources/gk_basketball/README.md`.
 4. Restart the resource (or the server) and confirm it starts clean in the
    server console.
 
@@ -300,6 +337,22 @@ Not bundled here, these are separate projects you install yourself:
   `patches/lb-phone` is a standalone rebrand of its stock Wallet app into
   "BuckMe", so both need it installed regardless of whether you also touch
   vice_hud at all. See `docs/PATCHES.md` for the Wallet rebrand.
+- **[osm-target](https://github.com/Geckomacabre/osm-target)**: a drop-in
+  replacement for `ox_target`/`qb-target`/`qtarget` with its own bespoke
+  designs and a SQL-backed admin panel. Not bundled here since it already
+  ships as its own public resource with its own install steps and release
+  cadence; use it in place of `ox_target` wherever this repo's resources
+  depend on `ox_target`.
+- **RoxCam Pro V1** ("vice_cctv" on this repo's own server, by Nyrox): a
+  CCTV camera network and monitoring station. On this server it calls
+  `exports.vice_hud:ReportWantedTellSighting('camera', 'vice_cctv')` when a
+  camera spots a wanted player, lighting `vice_hud`'s camera wanted tell —
+  see "The camera tell" in `resources/vice_hud/README.md` for the export,
+  and `streetkings` above for another resource that calls the same one. Not
+  bundled here: it's a Tebex product whose own terms don't permit
+  redistribution. Get it from
+  [Tebex](https://roxdev.tebex.io/package/roxcam-pro-v1) directly if you want
+  it.
 
 ## Fonts
 
@@ -379,9 +432,15 @@ a choice made here. GPL-3.0 is still copyleft, though: it still stays open
 and it still can't be relicensed as closed/proprietary — the only guarantee
 above that doesn't carry over to these two specifically is "can't be sold."
 
-`resources/vice_hud` and `resources/qbx_honor` each carry their own copy of
-that same CC BY-NC-SA 4.0 licence, so they stay correctly licensed if someone
-takes one of those folders on its own. Nothing under `patches/` ships a
+`resources/vice_hud`, `resources/qbx_honor`, and `resources/gk_basketball`
+each carry their own copy of that same CC BY-NC-SA 4.0 licence, so they stay
+correctly licensed if someone takes one of those folders on its own.
+`resources/vi_radio` is different again: it's licensed under the
+[PolyForm Noncommercial License 1.0.0](resources/vi_radio/LICENSE.md), its own
+choice, not this repo's default — see its own `README.md`'s License section,
+and note that the station artwork and sound effects inside it are sej0bec's
+own work, credited but not covered by any license here; ask before reusing
+them elsewhere. Nothing under `patches/` ships a
 `LICENSE`, since each of those is only a handful of individual files extracted
 from a project rather than a full copy, and the original projects remain under
 their own upstream license:
@@ -398,6 +457,7 @@ their own upstream license:
 | `qbx_smallresources` | GPL-3.0 | [Qbox-project/qbx_smallresources](https://github.com/Qbox-project/qbx_smallresources) |
 | `qbx_vehiclekeys` | GPL-3.0 (see above) | [Qbox-project/qbx_vehiclekeys](https://github.com/Qbox-project/qbx_vehiclekeys) |
 | `qbx_core` | GPL-3.0 | [Qbox-project/qbx_core](https://github.com/Qbox-project/qbx_core) |
+| `qbx_medical` | GPL-3.0 | [Qbox-project/qbx_medical](https://github.com/Qbox-project/qbx_medical) |
 | `SY_PauseMenu` (base of `gk_pausemenu`) | GPL-3.0 (see above) | [syno-sy/SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu) |
 | `dpclothing` | **Unpublished — see note below** | [andristum/dpclothing](https://github.com/andristum/dpclothing) |
 

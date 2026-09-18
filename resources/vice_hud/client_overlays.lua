@@ -659,33 +659,35 @@ end -- close the do opened above local lockpickActive
 -- all of that blind in one pass with no live game to test against was
 -- explicitly ruled out. This resource has no idea what calls it.
 --
--- NUI-based (html/index.html's #interact, html/app.js's onInteract /
--- moveInteractSel / confirmInteract / closeInteract), holding NUI focus
--- while open so the page's own keyboard (arrows/Enter/Escape) and mouse
--- (click a row) handling both just work.
---
--- [Fix, 2026-09-09] This briefly ran through ScaleformUI's UIMenu instead of
--- this NUI panel, because ScaleformUI's own input polling avoided
--- SetNuiFocus. That trade turned out to cost far more than it saved:
--- ScaleformUI eagerly holds several scaleform handles for the ENTIRE client
--- session -- including three for a pause-menu system nothing in this
--- resource ever opens -- badly enough to starve OTHER resources' own
--- RequestScaleformMovie calls (fenix-police's BUSTED arrest screen, and
--- previously um_spawn's map scaleform -- see the removed
--- client_scaleform_safety.lua's own history for that report). ScaleformUI
--- has been removed from this resource entirely rather than patched further,
--- which fixes that starvation at the source instead of chasing it resource
--- by resource. This NUI panel was never actually deleted when the Lua side
--- moved to ScaleformUI, so this just rewires Lua back to talk to it -- no
--- controller-specific input polling is restored here (out of scope for this
--- pass; keyboard and mouse are fully functional).
---
--- Released the same three ways /movehud's own focus is: on select/close, on
--- this resource (re)starting, and /hudfocus's broadcast in case whatever
--- opened it never tells it to close.
+-- Holds NUI focus while open — arrow keys / Enter / Escape drive the list —
+-- released the same three ways /movehud's own focus is: on select/close,
+-- on this resource (re)starting, and a watchdog in case whatever opened it
+-- never tells it to close.
+
+-- Wrapped in one do...end: this and the whole controller-support section
+-- below it together add 14 top-level locals, all read/written only within
+-- this combined region (nothing outside it references any of them). Lua's
+-- 200-local-per-main-chunk cap is a hard PARSE-TIME limit — a script that
+-- crosses it fails to load at all, silently, with nothing visible
+-- server-side and only a client-console error to go on. A do...end block
+-- lets these registers be reused once the block ends instead of staying
+-- live for the rest of the file, which is what keeps client.lua under
+-- that cap as it grows.
+-- This panel used to be an NUI page with its own keyboard/controller polling
+-- and SetNuiFocus juggling. ScaleformUI's UIMenu/MenuHandler owns all of
+-- that itself now (input polling, Up/Down/Accept/Cancel, weapon-wheel/
+-- attack/aim disabling while a menu is open) via the CreateThread loop
+-- already running in vendor/ScaleformUI_Lua/src/ScaleformUI/mainScaleform.lua,
+-- and reads controls natively rather than through NUI focus, so none of the
+-- old SetNuiFocus/DisableControlAction/polling-thread machinery is needed
+-- here any more.
 do
-local menuOpen = false     -- true while #interact has NUI focus
-local interactAnchor = nil -- world point to track, or nil for the fixed CSS position
+local interactMenu = nil -- rebuilt fresh on every OpenInteractMenu call
+-- true while THIS file is the one closing the menu (a select, or an explicit
+-- CloseInteractMenu/releaseFocus) -- the old NUI version fired
+-- vice_hud:interactClose ONLY for Cancel/Back, never for those, and
+-- OnMenuClose below fires for every close path so it needs to tell them apart.
+local suppressCloseEvent = false
 
 -- Opaque value the current menu's OPENER passed to OpenInteractMenu, echoed
 -- back on both events. Two callers (qbx_vehiclekeys and, as of the ox_target
@@ -699,65 +701,100 @@ local interactAnchor = nil -- world point to track, or nil for the fixed CSS pos
 -- existed, so this is backward compatible with any caller ignoring it.
 local currentToken = nil
 
--- Genuinely silent: hiding the NUI panel and dropping focus never makes the
--- page itself post interactSelect/interactClose back (only the PLAYER
--- confirming/cancelling does that, via the keydown/click handlers in
--- app.js) -- unlike the old ScaleformUI version, there is no close-triggered
--- callback here to suppress.
+-- ScaleformUI has no exact 'stamina'/'focus' badge -- these are the closest
+-- built-in BadgeStyle icons (see vendor/ScaleformUI_Lua/src/Elements/Badge.lua)
+-- until real custom icons are worth the runtime-texture-dict setup. 'health'
+-- needs no substitute -- HEALTH_HEART is the exact icon for it, the same one
+-- 'stamina' above only ever borrowed for lack of a better option.
+local BADGE_MAP = {
+    health  = BadgeStyle.HEALTH_HEART,
+    stamina = BadgeStyle.HEALTH_HEART,
+    focus   = BadgeStyle.STAR,
+}
+
+--[[ ---------------------------------------------------------------------------
+     mz_textui-style reskin  --  BEGIN  (added by vice_hud; safe to delete, see
+     git history for the pre-patch OpenInteractMenu)
+     ---------------------------------------------------------------------------
+     ScaleformUI's UIMenu is a compiled native scaleform, not an NUI page --
+     there is no CSS here, so this can only push it AS CLOSE as its documented
+     Lua API allows toward the naked-text, hard-outline look #prompts already
+     uses for the single-option case (see this file's header comment and
+     html/style.css's `.prompt`/`.glyph`, both of which credit the same
+     reference textui by name). The banner image and the item list's own
+     background panel are baked into the scaleform itself -- SetBannerColor
+     only tints the banner, it does not remove it, and nothing in the
+     documented API removes the list panel at all. What IS reachable:
+       - HasInstructionalButtons(false): drops the bottom control-glyph bar,
+         which is native GTA menu chrome mz_textui has none of.
+       - MenuAlignment(RIGHT): anchors to the same side of the screen the
+         single-option prompt and mz_textui itself both sit on, rather than
+         the engine's left-aligned default -- so a player doesn't see the
+         prompt jump from one corner to a completely different one depending
+         on whether one option or several are on offer. True bottom-anchoring
+         is not exposed by the API; the vertical position stays wherever
+         ScaleformUI itself places a right-aligned menu.
+       - Per-item HighlightColor: recoloured to the same live accent every
+         other popup on this server already themes from (see resolveAccentColor
+         below), so the one row a player is about to confirm reads as the
+         same "accent means selected" language, not GTA's default blue
+         highlight. There is no HighlightedTextColor (or even TextColor) in
+         THIS Lua port despite both being documented -- only MainColor and
+         HighlightColor exist on vendor/ScaleformUI_Lua's own UIMenuItem (see
+         Items/_UIMenuItem.lua) -- so the text-on-highlight contrast is
+         whatever ScaleformUI's compiled scaleform already does natively,
+         same as every other UIMenu on this server.
+     ]] --
+
+--- Reads the same 'vice_hud:theme' state bag ox_lib/resource/client.lua and
+--- (formerly) ox_target/client/vice_theme.lua already read -- personal
+--- choice winning over the server-wide default, same convention as this
+--- file's own theme.lua. Falls back to theme.lua's own DEFAULT.preset
+--- ('earned') accent for the one tick before theme.lua's startup thread has
+--- published anything yet.
+local ACCENT_FALLBACK = '#5fd8c8'
+
+local function resolveAccentColor()
+    local ok, personal = pcall(function() return LocalPlayer.state['vice_hud:theme'] end)
+    local t = (ok and type(personal) == 'table') and personal or GlobalState['vice_hud:theme']
+    local hex = (type(t) == 'table' and type(t.accent) == 'string') and t.accent or ACCENT_FALLBACK
+    return SColor.FromHex('#FF' .. hex:gsub('#', ''))
+end
+-- vice_hud: mz_textui-style reskin -- END (see below for the three more call
+-- sites inside OpenInteractMenu itself) ---------------------------------
+
 local function closeInteractMenuSilently()
-    if menuOpen then
-        menuOpen = false
-        SetNuiFocus(false, false)
+    if interactMenu and interactMenu:Visible() then
+        suppressCloseEvent = true
+        interactMenu:Visible(false)
+        suppressCloseEvent = false
     end
-    ui('interact', { show = false })
-    interactAnchor = nil
 end
 
--- World-anchoring tracking thread -- confirmed live feedback (2026-09-07):
--- the menu sat at a fixed screen position no matter what it was about,
--- instead of appearing near the reticle/bone ox_target resolved it from.
--- Same mechanism ShowWorldActions already uses above (waCoords) -- a
--- per-frame thread projects a world point via GetScreenCoordFromWorldCoord
--- and pushes it as its own lightweight message (see onInteractPos in
--- app.js) rather than folding it into the full 'interact' open message,
--- which rebuilds the whole option list DOM. interactAnchor nil (the default
--- -- qbx_vehiclekeys and any caller that omits it) leaves the menu at its
--- fixed CSS position, untouched by this thread.
-CreateThread(function()
-    while true do
-        if interactAnchor and menuOpen then
-            local onScreen, sX, sY = GetScreenCoordFromWorldCoord(interactAnchor.x, interactAnchor.y, interactAnchor.z)
-            ui('interactPos', { show = onScreen, x = sX, y = sY })
-            Wait(0)
-        else
-            Wait(200)
-        end
-    end
-end)
-
---- options: array of { label, badges: {'stamina'|'focus', ...}, selected }
+--- options: array of { label, badges: {'health'|'stamina'|'focus', ...}, selected }
 --- selected (top-level, optional, 0-based): which row starts highlighted;
 --- defaults to whichever option has selected=true, or the first one.
 --- token (optional): opaque value echoed back on interactSelect/interactClose
 --- so a caller can tell those events apart from another caller's menu (see
---- currentToken's comment above).
---- anchor (optional): a vector3 world point (e.g. the bone/offset ox_target
---- already resolved, or the aim raycast's endpoint) to track the menu to
---- instead of the fixed CSS position -- see interactAnchor's comment above.
-exports('OpenInteractMenu', function(options, selected, token, anchor)
+--- currentToken's comment above). Omit it and behaviour is exactly as before.
+exports('OpenInteractMenu', function(options, selected, token)
     options = options or {}
 
     -- A caller opening over an already-open menu force-closes the PREVIOUS
-    -- one -- that owner needs a real interactClose with ITS token so it
-    -- resets instead of going stale.
-    if menuOpen then
+    -- one -- that owner needs a real (non-suppressed) interactClose with ITS
+    -- token so it resets instead of going stale, unlike the other
+    -- closeInteractMenuSilently() call sites below (select/CloseInteractMenu/
+    -- releaseFocus/onResourceStop), which are the current owner closing its
+    -- own menu and already fire their own event or intentionally don't.
+    if interactMenu and interactMenu:Visible() then
         local previousToken = currentToken
-        closeInteractMenuSilently()
+        suppressCloseEvent = true
+        interactMenu:Visible(false)
+        suppressCloseEvent = false
         TriggerEvent('vice_hud:interactClose', previousToken)
     end
 
     currentToken = token
-    interactAnchor = anchor
 
     local startIndex = tonumber(selected)
     if startIndex == nil then
@@ -767,29 +804,62 @@ exports('OpenInteractMenu', function(options, selected, token, anchor)
         end
     end
 
-    local payload = { show = true, options = options, selected = startIndex }
+    -- Rebuilt on every open rather than reused: ScaleformUI menus are cheap
+    -- to throw away, and a fresh menu means a caller changing `options`
+    -- between calls can never see a stale item left over from the last one.
+    -- Offset comes from Config.InteractMenu (ScaleformUI's 1280x720 space, see
+    -- that block's comment). Read defensively so a config predating it still
+    -- loads -- falling back to the old 0,0 top-of-screen placement rather than
+    -- erroring on a nil index.
+    local menuCfg = Config.InteractMenu or {}
+    interactMenu = UIMenu.New('', '', menuCfg.offsetX or 0, menuCfg.offsetY or 0, false, '', '', false)
+    interactMenu:CanPlayerCloseMenu(true)
+    -- mz_textui-style reskin -- see this function's header comment above.
+    interactMenu:MenuAlignment(MenuAlignment.RIGHT)
+    interactMenu:HasInstructionalButtons(false)
 
-    -- Anchor's first frame: compute it up front rather than waiting for the
-    -- tracking thread's next tick, so an anchored menu never flashes at the
-    -- fixed position for even one frame before jumping to the real spot.
-    if anchor then
-        local onScreen, sX, sY = GetScreenCoordFromWorldCoord(anchor.x, anchor.y, anchor.z)
-        payload.anchored, payload.onScreen, payload.x, payload.y = true, onScreen, sX, sY
+    local accent = resolveAccentColor()
+
+    for _, opt in ipairs(options) do
+        local item = UIMenuItem.New(tostring(opt.label or ''), '')
+        item:HighlightColor(accent)
+        for _, badge in ipairs(opt.badges or {}) do
+            local style = BADGE_MAP[badge]
+            if style then item:LeftBadge(style) end
+        end
+        interactMenu:AddItem(item)
     end
 
-    ui('interact', payload)
-    menuOpen = true
-    SetNuiFocus(true, true)
+    interactMenu.OnItemSelect = function(_, _, index)
+        -- Old NUI version closed BEFORE firing the select event; keep that
+        -- order in case a caller opens a new menu from inside its handler.
+        closeInteractMenuSilently()
+        -- ScaleformUI indices are 1-based; the public event contract here
+        -- has always been 0-based (qbx_vehiclekeys already depends on it).
+        TriggerEvent('vice_hud:interactSelect', index - 1, token)
+    end
+    interactMenu.OnMenuClose = function()
+        -- Fires for EVERY close (Cancel/Back included) -- suppressCloseEvent
+        -- is what keeps this matching the old contract of "only a Cancel
+        -- fires interactClose".
+        if not suppressCloseEvent then
+            TriggerEvent('vice_hud:interactClose', token)
+        end
+    end
+
+    interactMenu:Visible(true)
+    interactMenu:CurrentSelection(startIndex + 1)
 
     -- Light rumble on open, matching ShowActionPrompt's own appear pulse
     -- (client.lua) so both textui pieces give the same "something just
-    -- appeared" feedback.
+    -- appeared" feedback. No sound here on purpose -- ScaleformUI's own
+    -- menu-open cue already plays natively; adding vice_hud's would double up.
     --
     -- Invoked by hash, not the generated `SetControlShake` global -- see
     -- client.lua's promptRumble for why (confirmed nil live in-game despite
     -- being a real, long-standing native). This particular call site errored
-    -- AFTER the menu had already been shown above, so it opened and then
-    -- immediately got torn down when the error propagated up through
+    -- AFTER Visible(true) above had already run, so the menu was opened and
+    -- then immediately torn down when the error propagated up through
     -- ox_target's driveUi and its pcall'd supervisor closed it again --
     -- looked like the menu never appeared at all.
     Citizen.InvokeNative(0x48B3886C1358D0D5, 0, 80, 15)
@@ -797,30 +867,6 @@ end)
 
 exports('CloseInteractMenu', function()
     closeInteractMenuSilently()
-end)
-
--- The other half of moveInteractSel's own comment in app.js: Lua doesn't
--- track a selection cache of its own (no controller-side polling to keep in
--- sync with in this pass), so there's nothing to do here beyond ack'ing the
--- fetch -- kept registered so a future controller-input pass has a slot
--- ready and so app.js's post() never quietly 404s in the meantime.
-RegisterNUICallback('interactMove', function(_, cb)
-    cb({ ok = true })
-end)
-
-RegisterNUICallback('interactSelect', function(data, cb)
-    local index = tonumber(data and data.index) or 0
-    local token = currentToken
-    closeInteractMenuSilently()
-    TriggerEvent('vice_hud:interactSelect', index, token)
-    cb({ ok = true })
-end)
-
-RegisterNUICallback('interactClose', function(_, cb)
-    local token = currentToken
-    closeInteractMenuSilently()
-    TriggerEvent('vice_hud:interactClose', token)
-    cb({ ok = true })
 end)
 
 -- /hudfocus already broadcasts this to clear every focus-holding panel in
@@ -835,15 +881,13 @@ RegisterCommand('hudinteract', function()
         { label = 'Lavazas Beer' },
         { label = 'Blitz Berry Smoothie', badges = { 'stamina', 'focus' } },
         { label = 'Blitz Green Smoothie', badges = { 'stamina' } },
+        { label = 'Medkit', badges = { 'health' } },
     }, 0)
-    print('^3[vice_hud]^7 /hudinteract — sample data. Arrows/click to move, Enter/click to pick, Esc to cancel.')
+    print('^3[vice_hud]^7 /hudinteract — sample data. Arrows to move, Enter to pick, Esc to cancel.')
 end, false)
 
--- NUI focus is GLOBAL and survives this resource restarting, so a panel
--- that died holding it takes the player's hotbar keys with it until they
--- rejoin. Same safety net client_skills.lua's own panel has.
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
-    if menuOpen then SetNuiFocus(false, false) end
+    closeInteractMenuSilently()
 end)
 end -- close the do opened above

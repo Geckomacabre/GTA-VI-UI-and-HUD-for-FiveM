@@ -154,9 +154,9 @@
    clean rather than to replicate compression artefacts. Proportions and colour
    still come from measurement. */
 :root {
-    --r-sm: 0.18cqw;   /* pills, small plates */
-    --r-md: 0.30cqw;   /* zone bar, wanted box */
-    --r-lg: 0.62cqw;   /* minimap frame, vehicle panel */
+    --r-sm: calc(0.18 * var(--w));   /* pills, small plates */
+    --r-md: calc(0.30 * var(--w));   /* zone bar, wanted box */
+    --r-lg: calc(0.62 * var(--w));   /* minimap frame, vehicle panel */
 
     /* Plate sampled across 113 frames: median #3c393d over typical scenery,
        #6e6b6f over bright. Slightly purple-grey — my old value was too blue.
@@ -196,7 +196,7 @@
        be written out inside .plate only: every surface that wasn't .plate
        quietly went without one, and #nav-turn -- which IS .plate -- lost it
        again by setting its own box-shadow over the top. */
-    --hairline: inset 0 0 0 0.085cqw rgba(236, 236, 240, 0.30);
+    --hairline: inset 0 0 0 calc(0.085 * var(--w)) rgba(236, 236, 240, 0.30);
 
     --text:      #f4f4f2;
     --text-dim:  #c2c2c6;
@@ -401,7 +401,7 @@ html, body {
    badge sitting clearly separate from the bar, not overlapping it. An
    earlier pass here tried a negative-margin overlap off a much blurrier
    crop and overcorrected. */
-.srow { display: flex; align-items: center; gap: 0.22cqw; }
+.srow { display: flex; align-items: center; gap: calc(0.22 * var(--w)); }
 
 /* Icon: a dark disc with a glyph TINTED to match its bar (pink / teal /
    purple), per the reference stills. */
@@ -412,7 +412,7 @@ html, body {
     background: rgba(28, 26, 32, 0.72);
     /* The thin ring is what reads as a "badge" rather than a flat disc --
        the reference outlines every icon circle with a faint light edge. */
-    border: 0.045cqw solid rgba(255, 255, 255, 0.22);
+    border: calc(0.045 * var(--w)) solid rgba(255, 255, 255, 0.22);
     color: #fff;
     display: flex;
     align-items: center;
@@ -463,13 +463,13 @@ html, body {
        what made this bar read as a fat strip next to the real one. Mixing cqw
        for length with cqh for height also meant the proportion drifted with the
        display's aspect; it no longer does.) */
-    height: 0.655cqw;
+    height: calc(0.655 * var(--w));
     /* Squared-off corners -- this used to switch between this and a fully
        rounded pill via /hudbars and a Config.StatusBarShape toggle. Pill was
        removed as a choice; square is now the only shape. Confirmed square in
        the reference crop: the fill starts at the same x on the bar's top row
        as on its middle row, so there is no corner inset to reproduce. */
-    border-radius: calc((0.06cqw) * var(--rad-status, 1));
+    border-radius: calc((0.06 * var(--w)) * var(--rad-status, 1));
     overflow: hidden;
     position: relative;
     /* A DARK stroke, not a light one. The reference outlines the bar in a
@@ -478,7 +478,7 @@ html, body {
        edge. That outline is most of why the reference bar reads as a solid
        object and this one used to read as a pale smear. Thickness: ~1.5px on a
        15px-tall bar = 10% of bar height = 0.065cqw. */
-    border: 0.065cqw solid rgba(29, 26, 31, 0.95);
+    border: calc(0.065 * var(--w)) solid rgba(29, 26, 31, 0.95);
     box-shadow: 0 0.08cqh 0.20cqh rgba(0, 0, 0, 0.45);
 }
 
@@ -508,14 +508,14 @@ html, body {
     top: 0;
     bottom: 0;
     right: 0;
-    width: 0.09cqw;
+    width: calc(0.09 * var(--w));
     background: rgba(28, 30, 32, 0.70);
 }
 
-#s-health  .strack { width: 9.6cqw; background: rgba(122, 86, 96, 0.62); }
-#s-stamina .strack { width: 5.6cqw; background: rgba(62, 92, 94, 0.62); }
-#s-focus   .strack { width: 5.8cqw; background: rgba(78, 70, 116, 0.62); }
-#s-oxygen  .strack { width: 6.0cqw; background: rgba(62, 92, 94, 0.62); }
+#s-health  .strack { width: calc(9.6 * var(--w)); background: rgba(122, 86, 96, 0.62); }
+#s-stamina .strack { width: calc(5.6 * var(--w)); background: rgba(62, 92, 94, 0.62); }
+#s-focus   .strack { width: calc(5.8 * var(--w)); background: rgba(78, 70, 116, 0.62); }
+#s-oxygen  .strack { width: calc(6.0 * var(--w)); background: rgba(62, 92, 94, 0.62); }
 
 /* Engaged focus: the eye glows rather than sitting flat, so the one moment
    the world visibly slows down is also the one moment this row visibly says
@@ -523,14 +523,14 @@ html, body {
    "a different colour". */
 #s-focus.active .sic {
     color: #d6c8ff;
-    text-shadow: 0 0 0.5cqw rgba(189, 170, 230, 0.85);
+    text-shadow: 0 0 calc(0.5 * var(--w)) rgba(189, 170, 230, 0.85);
     animation: focus-pulse 1.1s ease-in-out infinite;
 }
 /* text-shadow above does nothing on an <img> -- drop-shadow is the
    img-compatible equivalent, so the badge still glows rather than just
    pulsing opacity with the colour cue gone. */
 #s-focus.active .sic.has-badge img {
-    filter: drop-shadow(0 0 0.5cqw rgba(189, 170, 230, 0.85)) brightness(1.15);
+    filter: drop-shadow(0 0 calc(0.5 * var(--w)) rgba(189, 170, 230, 0.85)) brightness(1.15);
 }
 @keyframes focus-pulse {
     0%, 100% { opacity: 1; }
@@ -563,11 +563,11 @@ html, body {
        Both flanks come from one box-shadow with two offsets rather than
        borders, so the marker stays exactly centred on the 50% mark and the
        flanks cannot change its layout width. */
-    width: 0.087cqw;
-    margin-left: -0.0435cqw;
+    width: calc(0.087 * var(--w));
+    margin-left: calc(-0.0435 * var(--w));
     background: rgb(255, 255, 255);
-    box-shadow: -0.087cqw 0 0 0 rgb(29, 26, 31),
-                 0.087cqw 0 0 0 rgb(29, 26, 31);
+    box-shadow: calc(-0.087 * var(--w)) 0 0 0 rgb(29, 26, 31),
+                 calc(0.087 * var(--w)) 0 0 0 rgb(29, 26, 31);
     pointer-events: none;
 }
 
@@ -611,7 +611,7 @@ html, body {
      spacing  35.5px       = 1.85% centre-to-centre  => gap 0.57%
      right    36px         = 1.88%
      top      32px         = 2.96% */
-#stars { display: flex; gap: 0.73cqw; }
+#stars { display: flex; gap: calc(0.73 * var(--w)); }
 
 .star {
     width: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
@@ -646,13 +646,18 @@ html, body {
    shared column. */
 #tells {
     display: flex;
-    gap: 0.65cqw;
+    gap: calc(0.65 * var(--w));
     /* The stars and the tell row are separate groups in the reference, with a
        clear break between them — measured at ~0.45x a star's height across two
        reference frames. #topright's shared 0.14cqh row gap alone left them
        almost touching. */
     margin-top: 0.78cqh;
-    /* Tell row sits a hair further right than the stars (1.82% vs 1.93%). */
+    /* Tell row sits a hair further right than the stars (1.82% vs 1.93%).
+       Left as raw cqw, NOT converted to --w: unlike the gap/margin-top above,
+       this is a horizontal NUDGE of the row's position relative to the shared
+       #topright column, not the row's own size -- the same "edge-anchored
+       position, leave alone" reasoning the left/right/top offsets elsewhere
+       get, even though it is spelled as a margin rather than an inset. */
     margin-right: -0.11cqw;
 }
 
@@ -693,7 +698,7 @@ html, body {
     gap: 0.45cqh;
     margin-top: 1.15cqh;
 }
-.money-row { display: flex; align-items: center; gap: 0.6cqw; }
+.money-row { display: flex; align-items: center; gap: calc(0.6 * var(--w)); }
 
 .money-amt {
     /* Pinned, not tunable. Money is Pricedown — GTA's own display face — and
@@ -712,8 +717,8 @@ html, body {
 }
 
 .money-ic {
-    width: calc((1.15cqw) * var(--ic-money, 1));
-    height: calc((1.15cqw) * var(--ic-money, 1));
+    width: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
+    height: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -770,7 +775,7 @@ html, body {
 #ammo {
     display: flex;
     align-items: baseline;
-    gap: 0.78cqw;
+    gap: calc(0.78 * var(--w));
     font-family: var(--ff-ammo, 'Pricedown', 'Segoe UI', Arial, sans-serif);
     line-height: 1;
     color: #d8d8d4;
@@ -781,7 +786,7 @@ html, body {
 
 /* Measured 63x43px at 1920x1080 => 3.28% wide, 3.98% tall. */
 #weapon-icon {
-    width: calc((3.28cqw) * var(--ic-ammo, 1));
+    width: calc((calc(3.28 * var(--w))) * var(--ic-ammo, 1));
     height: auto;
     max-height: calc((3.98cqh) * var(--ic-ammo, 1));
     object-fit: contain;
@@ -921,7 +926,7 @@ html, body {
     height: 3.11cqh;
     display: flex;
     align-items: center;
-    padding: 0 0.85cqw;
+    padding: 0 calc(0.85 * var(--w));
 }
 #zone.water { background: rgba(46, 116, 178, 0.88); }
 #zone-text {
@@ -1020,7 +1025,7 @@ html, body {
    that; --sp- is the gap multiplier. */
 #veh-pips {
     display: flex;
-    gap: calc(0.7cqw * var(--sp-vehpips, 1));
+    gap: calc(0.7 * var(--w) * var(--sp-vehpips, 1));
     /* No margin: the foot band's own padding is the separation now, and a
        margin here would push the discs off centre inside it. */
     margin-top: 0;
@@ -1030,8 +1035,8 @@ html, body {
        their own row keeps rendering exactly as it did. Once the Vehicle icons
        row is touched it takes over, rather than multiplying with the panel and
        giving one visual size two places to come from. */
-    width: calc((1.5cqw) * var(--ic-vehpips, var(--ic-slots, 1)));
-    height: calc((1.5cqw) * var(--ic-vehpips, var(--ic-slots, 1)));
+    width: calc((calc(1.5 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
+    height: calc((calc(1.5 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
     border-radius: calc(50% * var(--rad-vehpips, 1));
     display: flex;
     align-items: center;
@@ -1300,7 +1305,7 @@ html, body {
     align-items: var(--ai-slots, center);
     justify-content: center;
     gap: 0.35cqh;
-    padding: 0.55cqh 0.5cqw;
+    padding: 0.55cqh calc(0.5 * var(--w));
     /* Deliberately NOT a stacking context -- position without a z-index. The
        badge inside it has to stay UNDER #vehicle::after, and a stacking context
        here would trap it above the sheen along with everything else in the
@@ -1406,16 +1411,16 @@ html, body {
     position: absolute;
     left: 1.5cqw;
     top: 26.7cqh;
-    width: 23cqw;
+    width: calc(23 * var(--w));
     background: var(--plate-soft);
     border-radius: calc((var(--r-md)) * var(--rad-wanted, 1));
     box-shadow: var(--shadow-sm), var(--hairline);
-    padding: 1.5cqh 1.1cqw 1.35cqh;
+    padding: 1.5cqh calc(1.1 * var(--w)) 1.35cqh;
     display: flex;
     flex-direction: column;
     gap: 1.1cqh;
 }
-#wanted-line { display: flex; align-items: flex-start; gap: 0.7cqw; }
+#wanted-line { display: flex; align-items: flex-start; gap: calc(0.7 * var(--w)); }
 #wanted-copy {
     flex: 1;
     font-size: calc((calc(1.05 * var(--w))) * var(--fs-wanted, 1));
@@ -1425,8 +1430,8 @@ html, body {
     letter-spacing: var(--ls-wanted, 0.004em);
     text-shadow: var(--ink-shadow);
 }
-#wanted .star { width: calc((1.2cqw) * var(--ic-wanted, 1)); height: calc((1.2cqw) * var(--ic-wanted, 1)); flex-shrink: 0; }
-#wanted-tells { display: flex; gap: 0.55cqw; }
+#wanted .star { width: calc((calc(1.2 * var(--w))) * var(--ic-wanted, 1)); height: calc((calc(1.2 * var(--w))) * var(--ic-wanted, 1)); flex-shrink: 0; }
+#wanted-tells { display: flex; gap: calc(0.55 * var(--w)); }
 
 /* -----------------------------------------------------------------------------
    Honor toast — transient, fires only on an honor change
@@ -1446,10 +1451,10 @@ html, body {
     display: flex;
     flex-direction: row-reverse;
     align-items: flex-end;
-    gap: 0.8cqw;
-    padding: 0.9cqh 0.5cqw 0.9cqh 1.3cqw;
+    gap: calc(0.8 * var(--w));
+    padding: 0.9cqh calc(0.5 * var(--w)) 0.9cqh calc(1.3 * var(--w));
     background: rgba(18, 18, 22, 0.82);
-    border-radius: calc((0.4cqw) * var(--rad-honor, 1));
+    border-radius: calc((calc(0.4 * var(--w))) * var(--rad-honor, 1));
 }
 /* Config.Honor.showValue = false: no copy column at all, so the row gap and
    the copy-side padding both have to go -- otherwise the box keeps the width
@@ -1459,7 +1464,7 @@ html, body {
    still gets the right box. */
 #honor.bare {
     gap: 0;
-    padding: 0.9cqh 0.5cqw;
+    padding: 0.9cqh calc(0.5 * var(--w));
 }
 #honor-copy {
     align-items: flex-end;
@@ -1470,15 +1475,15 @@ html, body {
    4.25% of width by 7.74% of height. */
 #honor-mug {
     position: relative;
-    width: calc((4.25cqw) * var(--ic-honor, 1));
+    width: calc((calc(4.25 * var(--w))) * var(--ic-honor, 1));
     height: calc((7.74cqh) * var(--ic-honor, 1));
-    border-radius: calc((0.3cqw) * var(--rad-honor, 1));
+    border-radius: calc((calc(0.3 * var(--w))) * var(--rad-honor, 1));
     background: linear-gradient(155deg, #8d7f74, #4a423c);
     border: 1px solid rgba(255, 255, 255, 0.16);
     overflow: visible;
     flex-shrink: 0;
 }
-#honor-mug img { width: 100%; height: 100%; object-fit: cover; border-radius: calc((0.3cqw) * var(--rad-honor, 1)); display: block; }
+#honor-mug img { width: 100%; height: 100%; object-fit: cover; border-radius: calc((calc(0.3 * var(--w))) * var(--rad-honor, 1)); display: block; }
 /* 1.0 * --w, not the 1.35 a font-size multiplier would suggest -- this is a
    raw <img>, and an emoji glyph at that font-size carries its own internal
    margin that a bare image doesn't, so reusing the old emoji constant here
@@ -1541,10 +1546,10 @@ html, body {
     display: flex;
     flex-direction: row;
     align-items: flex-end;
-    gap: 0.8cqw;
-    padding: 0.9cqh 1.3cqw 0.9cqh 0.5cqw;
+    gap: calc(0.8 * var(--w));
+    padding: 0.9cqh calc(1.3 * var(--w)) 0.9cqh calc(0.5 * var(--w));
     background: rgba(18, 18, 22, 0.82);
-    border-radius: calc((0.4cqw) * var(--rad-reputation, 1));
+    border-radius: calc((calc(0.4 * var(--w))) * var(--rad-reputation, 1));
 }
 #reputation-icon {
     flex-shrink: 0;
@@ -1873,9 +1878,15 @@ html, body {
     0%, 100% { transform: translateY(calc(var(--pol-sweep, 1.6) * -1vh)); }
     50%      { transform: translateY(calc(var(--pol-sweep, 1.6) * 1vh)); }
 }
+/* vw, not --w: this is the X drift for the LEFT/RIGHT lamps, so it has the
+   same width-tracks-too-far bug raw cqw would -- 1vw is exactly 1cqw's
+   sibling (both 1% of the same full-viewport-width box), so it converts the
+   same way. The Y version above stays in vh: height doesn't have this bug
+   (see the header note on --w), so 1vh is already a constant physical drift
+   at every aspect ratio. */
 @keyframes polSweepX {
-    0%, 100% { transform: translateX(calc(var(--pol-sweep, 1.6) * -1vw)); }
-    50%      { transform: translateX(calc(var(--pol-sweep, 1.6) * 1vw)); }
+    0%, 100% { transform: translateX(calc(var(--pol-sweep, 1.6) * -1 * var(--w))); }
+    50%      { transform: translateX(calc(var(--pol-sweep, 1.6) * var(--w))); }
 }
 
 @keyframes polRed {
@@ -1921,15 +1932,32 @@ html, body {
    whichever edge it was on, which sounded right but actually meant the same
    lamp looked like a different shape depending which edge it landed on
    (tall on the sides, short and wide on top/bottom). Same numbers, same
-   shape, everywhere now; only the position swaps per edge. */
-.pol-left   .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% - var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-left   .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% + var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-right  .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% - var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-right  .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% + var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-top    .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * 1%) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-top    .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * 1%) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-bottom .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * 1%) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.pol-bottom .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * 1%) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+   shape, everywhere now; only the position swaps per edge.
+
+   UNIT CHOICE, deliberately mixed:
+   The gradient box here is `.pol > span`, which is `position:fixed; inset:0`
+   -- full physical viewport, same as .stage. A percentage resolves against
+   that box's OWN width for the first (horizontal) radius and its OWN height
+   for the second (vertical) one, so "16%" horizontal is exactly the cqw bug
+   this whole pass exists to fix (it grows with viewport width on a wide
+   screen), while "24%" vertical already tracks height and is fine as-is,
+   same as any other cqh value in this file. So the FIRST number of each pair
+   converts to `var(--w)` (which is calibrated to equal "1% of width" at the
+   16:9 reference, see --w's own comment) and the SECOND stays a plain
+   percent. --pol-spread gets the same split: on the left/right lamps it
+   offsets the pair vertically (percent of height, left alone); on the
+   top/bottom lamps it offsets them horizontally (percent of width, so it
+   converts too) -- otherwise the two lamps on a top/bottom edge would sit a
+   width-scaled distance apart on an ultrawide instead of the reference's
+   fixed physical spacing. */
+.pol-left   .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% - var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-left   .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at 0% calc(50% + var(--pol-spread, 24) * 1%),   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-right  .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% - var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-right  .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at 100% calc(50% + var(--pol-spread, 24) * 1%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-top    .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * var(--w)) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-top    .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * var(--w)) 0%,   var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-bottom .pol-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% - var(--pol-spread, 24) * var(--w)) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.pol-bottom .pol-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at calc(50% + var(--pol-spread, 24) * var(--w)) 100%, var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
 
 /* Punchier than before: these are meant to feel like light spilling in from
    off-camera, and at 0.62 they were closer to a tint. */
@@ -1939,13 +1967,14 @@ html, body {
    --pol-lamp-a/b). A takedown is a tight hot spot, not a wash - letting it
    cover the same area as the colours just greys the screen out.
    --pol-white-a is the takedown's own intensity, tunable separately from the
-   red/blue brightness slider. Same "always a-wide-b-tall" rule as above. */
+   red/blue brightness slider. Same "always a-wide-b-tall" rule as above, and
+   the same width-radius-converts/height-radius-stays split as the lamps. */
 .pol-w { --polc: rgba(255, 250, 240, var(--pol-white-a, 0.70)); }
 #police.no-white .pol-w { display: none; }
-.pol-left   .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 0% 50%,   var(--polc) 0%, transparent 58%); }
-.pol-right  .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 100% 50%, var(--polc) 0%, transparent 58%); }
-.pol-top    .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 50% 0%,   var(--polc) 0%, transparent 58%); }
-.pol-bottom .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at 50% 100%, var(--polc) 0%, transparent 58%); }
+.pol-left   .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * var(--w)) calc(var(--pol-white-h, 30) * 1%) at 0% 50%,   var(--polc) 0%, transparent 58%); }
+.pol-right  .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * var(--w)) calc(var(--pol-white-h, 30) * 1%) at 100% 50%, var(--polc) 0%, transparent 58%); }
+.pol-top    .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * var(--w)) calc(var(--pol-white-h, 30) * 1%) at 50% 0%,   var(--polc) 0%, transparent 58%); }
+.pol-bottom .pol-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * var(--w)) calc(var(--pol-white-h, 30) * 1%) at 50% 100%, var(--polc) 0%, transparent 58%); }
 
 /* -----------------------------------------------------------------------------
    Radius police glow
@@ -1972,9 +2001,12 @@ html, body {
 .polr-b { animation: polBlue var(--pol-flash, 900ms) linear infinite; }
 .polr-w { animation: polWhite var(--pol-flash, 900ms) linear infinite; }
 
-.polr-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-rx, 50%) var(--pol-ry, 0%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.polr-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * 1%) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-bx, 100%) var(--pol-by, 50%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
-.polr-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * 1%) calc(var(--pol-white-h, 30) * 1%) at var(--pol-wx, 75%) var(--pol-wy, 25%), var(--polc) 0%, transparent 58%); }
+/* Same width-radius-converts/height-radius-stays split as the edges mode
+   above -- see the comment there. --pol-rx/ry/bx/by/wx/wy are genuine
+   POSITIONS (client.lua's live bearing calc), left untouched. */
+.polr-r { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-rx, 50%) var(--pol-ry, 0%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.polr-b { background: radial-gradient(ellipse calc(var(--pol-lamp-a, 16) * var(--w)) calc(var(--pol-lamp-b, 24) * 1%) at var(--pol-bx, 100%) var(--pol-by, 50%), var(--polc) 0%, transparent calc(var(--pol-softness, 68) * 1%)); }
+.polr-w { background: radial-gradient(ellipse calc(var(--pol-white-w, 19) * var(--w)) calc(var(--pol-white-h, 30) * 1%) at var(--pol-wx, 75%) var(--pol-wy, 25%), var(--polc) 0%, transparent 58%); }
 
 .polr-r { --polc: rgba(255, 42, 58, 0.92); }
 .polr-b { --polc: rgba(64, 118, 255, 0.92); }
@@ -2006,8 +2038,8 @@ html, body {
        land on it, so the two axes have to move independently. */
     width:  calc(var(--map-width, 15.8cqw) * var(--sc-mapframe-x, 1));
     height: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1));
-    border: 0.085cqw solid rgba(236, 236, 240, 0.30);
-    border-radius: calc((0.62cqw) * var(--rad-mapframe, 1));
+    border: calc(0.085 * var(--w)) solid rgba(236, 236, 240, 0.30);
+    border-radius: calc((calc(0.62 * var(--w))) * var(--rad-mapframe, 1));
     /* --shadow-md rather than the one-off 0 0.25cqh 0.6cqh rgba(0,0,0,0.42)
        that used to be here. It was within a hair of the token and had no reason
        to be its own value: the frame and the two panels stacked on top of it
@@ -2035,10 +2067,16 @@ html, body {
    height = the map's top), since nothing publishes a top offset directly. */
 #map-badge {
     position: absolute;
-    left: calc(var(--map-left, 1.75cqw) + 0.4cqw);
-    bottom: calc(var(--map-bottom-edge, 2.6cqh) + var(--map-height, 15.4cqh) - 0.4cqh - 2.1cqw);
-    width: 2.1cqw;
-    height: 2.1cqw;
+    /* The map's own rect (--map-left/-bottom-edge/-height) is left in raw cqw/
+       cqh -- it is a snapshot of the native, aspect-bucket-managed minimap
+       rect and out of scope here (see the header comment on #map-frame). The
+       fixed 0.4 inset and the badge's own 2.1 size are this element's own
+       geometry, though, so those two convert to --w the same as any other
+       icon size/margin. */
+    left: calc(var(--map-left, 1.75cqw) + calc(0.4 * var(--w)));
+    bottom: calc(var(--map-bottom-edge, 2.6cqh) + var(--map-height, 15.4cqh) - 0.4cqh - calc(2.1 * var(--w)));
+    width: calc(2.1 * var(--w));
+    height: calc(2.1 * var(--w));
     object-fit: contain;
     pointer-events: none;
     z-index: 3;
@@ -2236,7 +2274,21 @@ html, body {
    Darkens and closes in from the screen edges as stamina empties, with a slow
    breathing pulse. Kept mild on purpose — it is a "you are winded" cue, not a
    damage overlay, so it must never fight the HUD for attention.
-   -------------------------------------------------------------------------- */
+
+   UNIT CHOICE (audited during the --w aspect-ratio pass, deliberately NOT
+   touched): --exhaust-w/-h are plain PERCENTAGES of this element's own box
+   (#exhaust is `position: fixed; inset: 0`, i.e. the full physical viewport),
+   not cqw/cqh, so they were never subject to the bug the rest of this file's
+   --w conversion fixes. That is also the CORRECT unit for a full-screen
+   vignette specifically, unlike an icon or a panel: a vignette's job is to
+   frame whatever screen it is on, so its aperture should scale with both the
+   viewport's width AND height and keep the same RELATIVE coverage at every
+   aspect ratio, not stay a fixed physical size the way a HUD element does.
+   Converting these to --w would do the opposite of what's wanted here: on an
+   ultrawide the aperture would stay pinned to its 16:9 physical size while
+   the screen grew around it, leaving a widescreen gap of un-vignetted space
+   down the middle instead of a proportionally-framed edge. Same reasoning
+   applies to #focus-fx's `150% 135%` gradient below -- left alone too. */
 #exhaust {
     position: fixed;
     inset: 0;
@@ -2293,7 +2345,14 @@ html, body {
             transparent 38%,
             rgba(58, 30, 92, calc(0.32 * var(--fxstrength-focusfx, 1))) 70%,
             rgba(28, 10, 52, calc(0.68 * var(--fxstrength-focusfx, 1))) 100%);
-    box-shadow: inset 0 0 calc(7cqw * var(--fxstrength-focusfx, 1)) rgba(180, 140, 240, calc(0.55 * var(--fxstrength-focusfx, 1)));
+    /* Blur DEPTH, not the ellipse's own coverage -- unlike the two-axis radial
+       gradient above (left as plain %, see the header note on #exhaust for
+       why a full-screen vignette's aperture should scale with the viewport
+       in both directions), a single box-shadow blur radius has only one
+       number to give both axes, so leaving it in cqw would grow the glow's
+       reach disproportionately on a wide screen the same way an icon would.
+       calc(7 * var(--w)) keeps it a constant physical depth instead. */
+    box-shadow: inset 0 0 calc(7 * var(--w) * var(--fxstrength-focusfx, 1)) rgba(180, 140, 240, calc(0.55 * var(--fxstrength-focusfx, 1)));
 }
 #focus-fx.active {
     opacity: 1;
@@ -2412,17 +2471,17 @@ html, body {
    -------------------------------------------------------------------------- */
 #status    { gap: calc(1.6cqh  * var(--sp-status, 1)); }
 #topright  { gap: calc(0.14cqh * var(--sp-topright, 1)); }
-#tells     { gap: calc(0.65cqw * var(--sp-tells, 1)); }
+#tells     { gap: calc(0.65 * var(--w) * var(--sp-tells, 1)); }
 #money     { gap: calc(0.45cqh * var(--sp-money, 1)); }
 #slots     { gap: calc(0.45cqh * var(--sp-slots, 1)); }
 #wanted    { gap: calc(1.1cqh  * var(--sp-wanted, 1)); }
-#honor     { gap: calc(0.8cqw  * var(--sp-honor, 1)); }
-#honor-pop { gap: calc(0.35cqw * var(--sp-honorpop, 1)); }
-#money-pop { gap: calc(0.35cqw * var(--sp-moneypop, 1)); }
-#reputation     { gap: calc(0.8cqw  * var(--sp-reputation, 1)); }
-#reputation-pop { gap: calc(0.35cqw * var(--sp-reputationpop, 1)); }
+#honor     { gap: calc(0.8 * var(--w) * var(--sp-honor, 1)); }
+#honor-pop { gap: calc(0.35 * var(--w) * var(--sp-honorpop, 1)); }
+#money-pop { gap: calc(0.35 * var(--w) * var(--sp-moneypop, 1)); }
+#reputation     { gap: calc(0.8 * var(--w) * var(--sp-reputation, 1)); }
+#reputation-pop { gap: calc(0.35 * var(--w) * var(--sp-reputationpop, 1)); }
 #prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
-.srow      { gap: calc(0.22cqw * var(--sp-status, 1)); }
+.srow      { gap: calc(0.22 * var(--w) * var(--sp-status, 1)); }
 
 /* -----------------------------------------------------------------------------
    Per-element typeface and text rasterisation (HUD editor)
@@ -2485,7 +2544,7 @@ html, body {
     bottom: 100%;
     font-size: calc(0.72 * var(--w));
     line-height: 1.2;
-    padding: 0 0.25cqw;
+    padding: 0 calc(0.25 * var(--w));
     white-space: nowrap;
     /* Black on the outline's own colour. NOT `background: currentColor` — the
        span sets its own `color` for the text, so currentColor resolves to that
@@ -2995,7 +3054,7 @@ html, body {
        select "Honor +/- popup" but never actually move it. */
     display: flex;
     align-items: center;
-    gap: 0.35cqw;
+    gap: calc(0.35 * var(--w));
     font-size: calc((calc(3.1 * var(--w))) * var(--fs-honorpop, 1));
     line-height: 1;
     text-shadow: 0 0.25cqh 0.5cqh rgba(0, 0, 0, 0.75);
@@ -3078,7 +3137,7 @@ html, body {
     /* Transform lives in the layout block above; see the note on #honor-pop. */
     display: flex;
     align-items: center;
-    gap: 0.35cqw;
+    gap: calc(0.35 * var(--w));
     font-size: calc((calc(3.1 * var(--w))) * var(--fs-reputationpop, 1));
     line-height: 1;
     text-shadow: 0 0.25cqh 0.5cqh rgba(0, 0, 0, 0.75);
@@ -3285,18 +3344,20 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     background: #ff2ea6;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85);
 }
-/* Horizontal arm */
+/* Horizontal arm. left is HALF of width, negated, to keep the arm centred on
+   the map's middle point -- same "position tied to size" relationship as
+   .scap's marker above, so both convert together rather than just width. */
 #map-cross::before {
-    left: -3cqw;
+    left: calc(-3 * var(--w));
     top: -0.075cqh;
-    width: 6cqw;
+    width: calc(6 * var(--w));
     height: 0.15cqh;
 }
-/* Vertical arm */
+/* Vertical arm -- same centring pairing as the horizontal one above. */
 #map-cross::after {
     top: -2.4cqh;
-    left: -0.04cqw;
-    width: 0.08cqw;
+    left: calc(-0.04 * var(--w));
+    width: calc(0.08 * var(--w));
     height: 4.8cqh;
 }
 
@@ -3612,11 +3673,6 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     color: #f2f2ef;
 }
 #interact.hidden { display: none !important; }
-/* GetScreenCoordFromWorldCoord reported an anchored menu's world point is
-   behind the camera this frame -- hide without touching the row list itself,
-   same as #world-actions' own .wa-offscreen. Separate from .hidden, which is
-   the caller explicitly closing the menu. */
-#interact.interact-offscreen { display: none !important; }
 
 #interact-list {
     display: flex;
@@ -3693,15 +3749,14 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Solid accent fill with a plain off-white icon on top -- reference has
-       filled teal/purple chips, not a dark chip with a coloured stroke icon. */
-    background: currentColor;
+    background: rgba(20, 20, 22, 0.6);
 }
-.interact-badge svg { width: 62%; height: 62%; fill: none; stroke: #f2f2ef; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.interact-badge svg circle { fill: #f2f2ef; stroke: none; }
-/* Same two concepts vice_hud's own stamina/focus status rows already use --
-   reused here rather than invented fresh, so an item that boosts one reads
+.interact-badge svg { width: 62%; height: 62%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.interact-badge svg circle { fill: currentColor; stroke: none; }
+/* Same concepts vice_hud's own health/stamina/focus status rows already use --
+   reused here rather than invented fresh, so an item that restores one reads
    consistently everywhere it shows up. */
+.interact-badge.health  { color: #f5acc6; }
 .interact-badge.stamina { color: #5fd8c8; }
 .interact-badge.focus   { color: #b98bd6; }
 
@@ -3734,15 +3789,10 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 
 /* Icon-only at range, full label once close enough to actually interact --
    see WA_COMPACT_DISTANCE in client_overlays.lua for the threshold this is
-   driven by. The badge (.wa-btn) stays either way; only the text label
-   disappears, so approaching a prop reads as the same marker growing a
-   label rather than two different things swapping. The row's own gap
-   collapses along with it -- left at its normal value, compact mode left a
-   dangling empty gap where the (now-hidden) label used to sit, which is
-   part of what made the icon-only state read as unfinished rather than a
-   deliberate compact marker. */
+   driven by. The circle badge (.wa-btn) stays either way; only the text
+   label disappears, so approaching a prop reads as the same marker growing
+   a label rather than two different things swapping. */
 #world-actions.wa-compact .wa-label { display: none; }
-#world-actions.wa-compact .wa-row { gap: 0; }
 
 .wa-row {
     display: flex;
@@ -3751,38 +3801,26 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     color: #f2f2ef;
     text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.85);
 }
-/* Same solid keycap treatment as #prompts' own .glyph (background/shadow/
-   colour/shape all copied from there, not reinvented) -- a translucent
-   ring read as a half-finished outline with nothing behind it, especially
-   with no label beside it in compact mode above. One keycap language
-   across both prompt systems now instead of two. Rounded SQUARE, not a
-   circle, for the identical reason .glyph itself is one: a circle reads as
-   a gamepad face button specifically, which is wrong once this same badge
-   is also the keyboard/mouse case -- see .glyph's own comment. */
 .wa-btn {
     flex: 0 0 auto;
     width: calc(1.6 * var(--w));
     height: calc(1.6 * var(--w));
-    border-radius: calc(0.28 * var(--w));
+    border-radius: 50%;
+    border: 2px solid #f2f2ef;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f4f0e8;
-    box-shadow:
-        0 0 1px rgba(0, 0, 0, 0.95),
-        0 0 2px rgba(0, 0, 0, 0.9),
-        0 2px 3px rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.35);
 }
-.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #212529; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-/* Mouse button (see MOUSE_GLYPHS in app.js). NOT inverted, unlike this
-   badge's old dark-fill version: the art is black line work, and now that
-   the badge is the same light keycap the corner prompt's own mouse glyph
-   already sits on, it reads correctly with no filter at all. 60% matches
-   the pad shapes above so a mouse and a face button are the same size in
-   the same badge. */
-.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; }
+.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* Mouse button (see MOUSE_GLYPHS in app.js). INVERTED, unlike the same image
+   in the prompt stack: the art is black line work, which reads correctly on
+   the prompt's light key cap but would vanish into this button's dark fill.
+   60% matches the pad shapes above so a mouse and a face button are the same
+   size in the same circle. */
+.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; filter: invert(1); }
 /* Keyboard (or an unmapped pad button, e.g. a shoulder/trigger/D-pad bind):
-   the resolved key text sits plainly in the same badge rather than a
+   the resolved key text sits plainly in the same circle rather than a
    guessed shape -- see WA_PAD_SHAPE in app.js for which pad letters get a
    shape instead of landing here. */
 .wa-btn-text {
@@ -3790,7 +3828,6 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     font-weight: 700;
     font-size: calc(0.8 * var(--w));
     line-height: 1;
-    color: #212529;
 }
 .wa-label {
     font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
@@ -3996,7 +4033,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding: 0 4cqw;
+    padding: 0 calc(4 * var(--w));
     pointer-events: none;
     font-family: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
                  'SF Pro Text', Inter, Roboto, sans-serif;

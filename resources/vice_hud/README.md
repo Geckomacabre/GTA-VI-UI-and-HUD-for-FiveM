@@ -170,7 +170,7 @@ exports.vice_hud:ShowActionPrompt(id, label, key, opts)
 exports.vice_hud:HideActionPrompt(id)
 
 exports.vice_hud:OpenInteractMenu(options, selected, token)
--- options: array of { label, badges: {'stamina'|'focus', ...}, selected }
+-- options: array of { label, badges: {'health'|'stamina'|'focus', ...}, selected }
 -- selected (optional, 0-based): starting row; token (optional): opaque
 -- value echoed back on the events below, so a caller can tell its own menu's
 -- events apart from another caller's -- see client_overlays.lua's comment.

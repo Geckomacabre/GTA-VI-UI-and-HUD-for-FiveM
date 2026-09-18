@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>VI Radio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="radio" class="hidden">
+        <div id="carousel">
+            <div id="icon-left" class="side-icon">
+                <!-- The original artwork is a two-position switch with the knob
+                     baked in at RADIO. Redrawn here so the knob can actually
+                     move; the PNG is still used when On Demand is disabled. -->
+                <div id="od-switch-graphic">
+                    <div class="sw-labels">
+                        <span class="sw-label sw-radio">Radio</span>
+                        <span class="sw-label sw-od">On Demand</span>
+                    </div>
+                    <div class="sw-track">
+                        <span class="sw-dot sw-top"></span>
+                        <span class="sw-dot sw-bottom"></span>
+                    </div>
+                </div>
+                <img id="icon-left-img" src="icons/On_Demand.png" alt="" hidden>
+            </div>
+            <div id="viewport">
+                <div id="track"></div>
+            </div>
+            <div id="icon-right" class="side-icon mask-icon"></div>
+        </div>
+        <div id="info">
+            <div id="info-line"></div>
+            <div id="station"></div>
+            <div id="title"></div>
+            <div id="artist"></div>
+        </div>
+    </div>
+
+    <!-- On Demand. Only ever on screen while the client holds NUI focus. -->
+    <div id="od" class="hidden">
+        <div id="od-panel">
+            <div id="od-head">
+                <h1>On Demand</h1>
+                <button id="od-switch" type="button" class="switch" role="switch" aria-checked="true">
+                    <span class="switch-track"><span class="switch-knob"></span></span>
+                    <span class="switch-state">On</span>
+                </button>
+                <button id="od-close" type="button" class="ghost">Close</button>
+            </div>
+
+            <div id="od-now">
+                <div id="od-now-title">Nothing playing</div>
+                <div id="od-now-artist"></div>
+                <div id="od-transport">
+                    <button type="button" data-act="prev">Previous</button>
+                    <button type="button" data-act="pause">Pause</button>
+                    <button type="button" data-act="next">Skip</button>
+                    <button type="button" data-act="stop" class="danger">Stop</button>
+                </div>
+            </div>
+
+            <form id="od-form" autocomplete="off">
+                <input id="od-url" type="text" spellcheck="false"
+                       placeholder="Paste a YouTube link" maxlength="512">
+                <button type="submit" class="primary">Play now</button>
+                <button type="button" id="od-queue-btn">Add to queue</button>
+            </form>
+
+            <div id="od-notice"></div>
+
+            <div id="od-queue-head">
+                <span>Queue</span>
+                <span id="od-queue-count"></span>
+            </div>
+            <ol id="od-queue"></ol>
+
+            <div id="od-foot">
+                <label class="od-volume">
+                    <span>Your volume</span>
+                    <input id="od-volume" type="range" min="0" max="100" step="5">
+                    <span id="od-volume-value">0%</span>
+                </label>
+                <label class="od-check">
+                    <input id="od-mute" type="checkbox">
+                    <span>Mute On Demand</span>
+                </label>
+                <span class="od-hint">Esc to close</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

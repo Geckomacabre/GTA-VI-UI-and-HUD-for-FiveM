@@ -199,6 +199,10 @@ RegisterNetEvent('qbx_relog:client:begin', function(citizenId, targetName)
 
     busy = true
 
+    -- Switching away mid-scene: the prop and the anim belong to the character
+    -- being left, not the progress bar about to run.
+    Relog.scenes.stop()
+
     -- Checked here rather than server side: vehicle state natives are client only.
     if Config.blockInVehicle and IsPedInAnyVehicle(cache.ped, false) then
         exports.qbx_core:Notify('You cannot relog while in a vehicle.', 'error')
@@ -283,6 +287,12 @@ RegisterNetEvent('qbx_relog:client:quickSwitchSpawn', function(position)
     Wait(Config.switchSkyHoldMs)
     Relog.switch.placeAt(position)
 
+    -- Last thing before coming down, on the ped that will actually be landed
+    -- on: maybe give them something to be in the middle of. nil = the plain
+    -- standing arrival.
+    local scene, spot = Relog.scenes.pick()
+    local staged = scene and Relog.scenes.stage(scene, spot)
+
     Relog.switch.descend(pending.airborne)
 
     -- Both characters may look different next time -- the one just parked could
@@ -295,6 +305,9 @@ RegisterNetEvent('qbx_relog:client:quickSwitchSpawn', function(position)
     characterCache = nil
 
     busy = false
+
+    -- Blocks for the length of the exit anim, so it goes last.
+    if staged then Relog.scenes.play(staged) end
 end)
 
 RegisterNetEvent('qbx_relog:client:switchFailed', function()

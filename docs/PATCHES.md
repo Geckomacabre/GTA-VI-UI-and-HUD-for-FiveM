@@ -6,9 +6,9 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
 (ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
-qbx_smallresources, dpclothing, lb-phone) to connect it to vice_hud. Copy the
-files into place, then make the one- or two-line edit shown below for that
-resource.
+qbx_smallresources, dpclothing, qbx_core, qbx_medical, lb-phone) to connect
+it to vice_hud. Copy the files into place, then make the one- or two-line
+edit shown below for that resource.
 
 `lb-phone` is the one exception to "connect it to vice_hud" above; its patch
 is a standalone rebrand of that resource's own Wallet app (see the lb-phone
@@ -17,13 +17,15 @@ because lb-phone is paid, so, same as every other patch, only the handful of
 files actually changed are included, never the resource itself.
 
 Most of these are presentational only — a stylesheet plus a script that
-listens for a theme broadcast from vice_hud. Two are not: `speedlimits` and
-`zseatbelt` are **positioning hooks** (they let vice_hud's `/movehud` editor
-move that resource's own on-screen icon, which vice_hud otherwise has no way
-to reach since each one draws through its own NUI page rather than
-vice_hud's), and `qbx_smallresources` is a **functional conflict fix** (a
+listens for a theme broadcast from vice_hud. A few are not: `speedlimits`
+and `zseatbelt` are **positioning hooks** (they let vice_hud's `/movehud`
+editor move that resource's own on-screen icon, which vice_hud otherwise has
+no way to reach since each one draws through its own NUI page rather than
+vice_hud's), `qbx_smallresources` is a **functional conflict fix** (a
 competing script that resets player stamina every 500ms, which pins vice_hud's
-stamina bar at full and makes it look broken).
+stamina bar at full and makes it look broken), `qbx_core` is a **functional
+requirement** for `qbx_relog`, and `qbx_medical` is a **timing fix** so the
+WASTED cinematic (via fenix-police) isn't delayed by ragdoll settling.
 
 **Version pinned against:** ox_lib 3.32.3, ox_target 1.18.0, ox_inventory
 2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um,
@@ -683,6 +685,44 @@ That's the whole patch, three small additions to one file. Version pinned
 against `qbx_core` as of this repo's last commit; check the target file
 still matches the snippets above before pasting in if your copy is far
 ahead or behind.
+
+## qbx_medical
+
+Not theming, a **timing fix** for the WASTED cinematic —
+[fenix-police](https://github.com/Geckomacabre/fenix-police) (see this
+repo's Recommended pairings) fires its own WASTED screen fade on death, but
+stock `qbx_medical` used to settle the ped (stop ragdoll, resurrect, force a
+standing pose) *before* that cinematic started, which delayed WASTED by
+however long ragdoll physics took to settle and then snapped the ped's
+rotation once it had. This patch defers settling until fenix-police
+confirms its screen has faded to black
+(`fenix-police:client:wastedScreenFadedOut`), with a 6-second timeout
+fallback if fenix-police isn't installed or running, so WASTED starts the
+instant the player dies and the resurrection pop happens off-screen instead
+of before or during it. Also folds in two unrelated `qbx_ambulancejob`
+timing fixes (a screen fade around the hospital-bed respawn teleport, and
+skipping a redundant fade-in after a walkout cutscene) and permanently
+removes the hold-F AI-medic respawn option, leaving hold-E as the only
+respawn path — see the file's own `[Removed, 2026-09-09]` comment for why.
+
+Requires `fenix-police` for the timing fix to do anything; without it,
+death still resolves correctly after the 6-second fallback, just without
+the improved timing.
+
+Replace, don't copy alongside:
+
+```
+patches/qbx_medical/client/dead.lua
+```
+
+No `fxmanifest.lua` edit needed — same filename, already declared in stock
+`qbx_medical`. [Qbox-project/qbx_medical](https://github.com/Qbox-project/qbx_medical)
+is GPL-3.0 upstream, same as `qbx_core` and `qbx_vehiclekeys` above; no
+separate `LICENSE` file needed here since, like the other `patches/`
+entries, this is a hand-edit sitting on top of an install you already have,
+not a full copy. If your `qbx_medical` has diverged from this file's
+`[Rewritten, 2026-09-09]` / `[Fix, 2026-09-09]` / `[Changed, 2026-09-09]` /
+`[Removed, 2026-09-09]` baseline, hand-merge instead of overwriting.
 
 ## speedlimits
 

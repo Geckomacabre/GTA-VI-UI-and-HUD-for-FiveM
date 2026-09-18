@@ -12,6 +12,7 @@ client_scripts {
     'client/headshots.lua',
     'client/wheel.lua',
     'client/switch.lua',
+    'client/scenes.lua',
     'client/vice_theme.lua',
     'client/main.lua',
 }

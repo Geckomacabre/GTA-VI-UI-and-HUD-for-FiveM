@@ -1,0 +1,206 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+}
+
+#board {
+    position: fixed;
+    top: 1.6vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30vw;
+    min-width: 340px;
+    color: #f2f4f8;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#board.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-1.5vh);
+    pointer-events: none;
+}
+
+/* --- Scoreline ---------------------------------------------------------- */
+
+.scoreline {
+    display: flex;
+    align-items: stretch;
+    background: rgba(14, 16, 22, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    backdrop-filter: blur(6px);
+}
+
+.team {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0.55em 0.9em;
+    position: relative;
+}
+
+.team.away {
+    justify-content: flex-end;
+}
+
+/* Team colour strip down the outer edge. */
+.team::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent, #666);
+}
+
+.team.home::before { left: 0; }
+.team.away::before { right: 0; }
+
+.team .name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #aeb6c4;
+    white-space: nowrap;
+}
+
+.team .score {
+    font-size: 1.65rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent, #fff);
+}
+
+/* Highlight the side you're playing for. */
+.team.mine .name {
+    color: #fff;
+}
+
+.team.mine::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent, #fff);
+    opacity: 0.7;
+}
+
+.middle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4em 1.1em;
+    background: rgba(0, 0, 0, 0.28);
+    border-left: 1px solid rgba(255, 255, 255, 0.07);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    min-width: 5.6em;
+}
+
+.clock {
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.clock.urgent {
+    color: #ff6b4a;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.status {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8b93a3;
+    margin-top: 0.15em;
+    white-space: nowrap;
+}
+
+.status.live { color: #5bd97f; }
+.status.final { color: #ffc94a; }
+
+@keyframes pulse {
+    50% { opacity: 0.45; }
+}
+
+/* --- Roster ------------------------------------------------------------- */
+
+.roster {
+    list-style: none;
+    margin-top: 0.4em;
+    background: rgba(14, 16, 22, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    padding: 0.3em 0;
+    backdrop-filter: blur(6px);
+}
+
+.roster:empty {
+    display: none;
+}
+
+.roster li {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.18em 0.85em;
+    font-size: 0.74rem;
+}
+
+.roster .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent, #666);
+    flex-shrink: 0;
+}
+
+.roster .who {
+    flex: 1;
+    color: #c4cbd8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roster li.me .who {
+    color: #fff;
+    font-weight: 600;
+}
+
+.roster .pts {
+    font-variant-numeric: tabular-nums;
+    color: #8b93a3;
+    font-weight: 600;
+}
+
+.roster li.me .pts {
+    color: #fff;
+}
+
+/* Scoreboards get squeezed hard at 16:10 and on ultrawide; keep it readable. */
+@media (max-width: 1400px) {
+    #board { width: 34vw; }
+}
+
+@media (min-width: 2400px) {
+    #board { width: 22vw; }
+}
