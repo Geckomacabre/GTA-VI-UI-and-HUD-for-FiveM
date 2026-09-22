@@ -24,6 +24,9 @@ CyberLeek's videos and GTA VI Extended Look.
 
 ## Screenshots
 
+[![vice_hud: training raises max health](https://img.youtube.com/vi/SWMZpaayS3Q/0.jpg)](https://youtu.be/SWMZpaayS3Q)
+Training raising max health, status bar growing to match — click to watch
+
 | | |
 | --- | --- |
 | ![vice_hud status bars](docs/screenshots/status-bars.png) | ![vice_hud money close-up](docs/screenshots/money-closeup.png) |
