@@ -203,6 +203,67 @@ RegisterNetEvent('vice_hud:publish', function(payload)
     TriggerClientEvent('vice_hud:published', src, true)
 end)
 
+-- Lua ships no base64 decoder and this is the only place vice_hud needs one --
+-- not worth a cross-resource dependency for. Standard alphabet, '=' padding
+-- tolerant (accepts 0-2 trailing pad chars, ignores anything past them).
+local B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local B64_INDEX = {}
+for i = 1, #B64_CHARS do B64_INDEX[B64_CHARS:sub(i, i)] = i - 1 end
+
+local function base64decode(data)
+    data = data:gsub('[^' .. B64_CHARS .. '=]', '')
+    local out = {}
+    for i = 1, #data, 4 do
+        local a, b, c, d = data:byte(i, i + 3)
+        a, b = B64_INDEX[string.char(a)], B64_INDEX[string.char(b)]
+        if not a or not b then break end
+        c = (data:sub(i + 2, i + 2) ~= '=' and data:sub(i + 2, i + 2) ~= '') and B64_INDEX[data:sub(i + 2, i + 2)] or nil
+        d = (data:sub(i + 3, i + 3) ~= '=' and data:sub(i + 3, i + 3) ~= '') and B64_INDEX[data:sub(i + 3, i + 3)] or nil
+
+        out[#out + 1] = string.char(((a << 2) | (b >> 4)) & 0xFF)
+        if c then out[#out + 1] = string.char(((b << 4) | (c >> 2)) & 0xFF) end
+        if d then out[#out + 1] = string.char(((c << 6) | d) & 0xFF) end
+    end
+    return table.concat(out)
+end
+
+--- A B&W reference PNG of whatever minimap mask shape is live, dropped by
+--- /hudpublish alongside the layout it publishes. Same permission gate as
+--- the layout itself (mayPublish) -- the NUI side that renders this has no
+--- way to check the ace, so the check has to live here or not exist at all.
+--- Overwrites the same file every time; this is a snapshot of "the current
+--- shape", not a history.
+---
+--- Written to the RESOURCE ROOT, not a subfolder -- SaveResourceFile does not
+--- create missing directories (confirmed against community reports; a path
+--- under a folder that does not already exist on disk fails silently, which
+--- is exactly what happened here the first two times this was tested).
+--- layout.json/theme.json already live at the root for the same reason.
+RegisterNetEvent('vice_hud:publishMask', function(png_b64, radiusPct)
+    local src = source
+    if not mayPublish(src) then return end
+    if type(png_b64) ~= 'string' or png_b64 == '' then return end
+
+    -- DEBUG: same instrumentation as the client-side print in client.lua's
+    -- minimapMaskExport callback -- compare the two counts to tell a
+    -- client-side bug apart from a TriggerServerEvent transport issue.
+    print(('^3[vice_hud]^7 minimap mask: server received %d base64 chars'):format(#png_b64))
+
+    local ok, raw = pcall(base64decode, png_b64)
+    if not ok or raw == '' then
+        print('^1[vice_hud]^7 minimap mask export: base64 decode failed, not writing a file')
+        return
+    end
+
+    local wrote = SaveResourceFile(GetCurrentResourceName(), 'minimap-mask.png', raw, -1)
+    if wrote then
+        print(('^2[vice_hud]^7 %s (%s) exported the minimap mask (corner radius %s) to minimap-mask.png')
+            :format(GetPlayerName(src) or '?', src, tostring(radiusPct)))
+    else
+        print('^1[vice_hud]^7 minimap mask export: SaveResourceFile failed')
+    end
+end)
+
 --- Drop the published layout. Everyone falls back to Config.DefaultLayout at
 --- their next connect; anyone already on keeps what they have until then,
 --- because un-applying a layout in place would move the HUD under them with no

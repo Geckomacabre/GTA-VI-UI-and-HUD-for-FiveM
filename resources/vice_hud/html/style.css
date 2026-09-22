@@ -463,7 +463,9 @@ html, body {
        what made this bar read as a fat strip next to the real one. Mixing cqw
        for length with cqh for height also meant the proportion drifted with the
        display's aspect; it no longer does.) */
-    height: calc(0.655 * var(--w));
+    /* 0.626w = 17.5px on the 162px reference bar (image 1 of the training
+       request, dark border included): 0.108 of the bar length. Was 0.655. */
+    height: calc(0.626 * var(--w));
     /* Squared-off corners -- this used to switch between this and a fully
        rounded pill via /hudbars and a Config.StatusBarShape toggle. Pill was
        removed as a choice; square is now the only shape. Confirmed square in
@@ -512,10 +514,19 @@ html, body {
     background: rgba(28, 30, 32, 0.70);
 }
 
-#s-health  .strack { width: calc(9.6 * var(--w)); background: rgba(122, 86, 96, 0.62); }
-#s-stamina .strack { width: calc(5.6 * var(--w)); background: rgba(62, 92, 94, 0.62); }
+/* Bar lengths, in --w. FOCUS is the unit: 5.8.
+     health   = focus at the stock 200 hp, then LONGER as the Health skill raises
+              max health. --hp-len is (maxHp - 100) / 100, set by onStatus():
+              1.0 at 200 hp, 1.6 at 260 hp. Only health grows -- stamina and focus
+              never change length.
+     stamina  = 15% longer than focus (5.8 * 1.15).
+     oxygen   = the length of a fully trained health bar, so a diver's air reads
+              at the same scale as the longest health bar. --hp-max-len is
+              1 + healthMaxBonus / 100 (1.6), sent with every status payload. */
+#s-health  .strack { width: calc(5.8 * var(--w) * var(--hp-len, 1)); background: rgba(122, 86, 96, 0.62); }
+#s-stamina .strack { width: calc(6.67 * var(--w)); background: rgba(62, 92, 94, 0.62); }
 #s-focus   .strack { width: calc(5.8 * var(--w)); background: rgba(78, 70, 116, 0.62); }
-#s-oxygen  .strack { width: calc(6.0 * var(--w)); background: rgba(62, 92, 94, 0.62); }
+#s-oxygen  .strack { width: calc(5.8 * var(--w) * var(--hp-max-len, 1.6)); background: rgba(62, 92, 94, 0.62); }
 
 /* Engaged focus: the eye glows rather than sitting flat, so the one moment
    the world visibly slows down is also the one moment this row visibly says
@@ -552,7 +563,12 @@ html, body {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
+    /* Half of the STOCK bar (5.8 * --w), from the track's inner edge -- NOT 50%.
+       The bar grows to the right as max health rises, and the marker stays where
+       it was: it marks the stock bar's midpoint, so it reads as a fixed landmark
+       the extra length extends beyond. (Minus the track's own 0.065 border, since
+       `left` is measured from the padding edge.) */
+    left: calc(2.9 * var(--w) - 0.065 * var(--w));
     /* WHITE core with a dark line either side -- measured straight off the
        reference crop, which runs dark / white / dark left-to-right across a
        220px bar: ~2px each, i.e. 0.9% of bar length = 0.087cqw per line. This
@@ -2469,7 +2485,10 @@ html, body {
    produce a proportionate stack. Every fallback is the shipped gap, so an
    untouched element is unchanged.
    -------------------------------------------------------------------------- */
-#status    { gap: calc(1.6cqh  * var(--sp-status, 1)); }
+/* Row pitch = icon + gap = 1.45w, i.e. 0.25 of the focus bar (measured off the
+   reference: 40.5px pitch on a 162px bar). Was 1.6cqh (~0.9w), which made the
+   rows ~40% further apart than the reference. */
+#status    { gap: calc(0.28 * var(--w) * var(--sp-status, 1)); }
 #topright  { gap: calc(0.14cqh * var(--sp-topright, 1)); }
 #tells     { gap: calc(0.65 * var(--w) * var(--sp-tells, 1)); }
 #money     { gap: calc(0.45cqh * var(--sp-money, 1)); }
@@ -2481,7 +2500,7 @@ html, body {
 #reputation     { gap: calc(0.8 * var(--w) * var(--sp-reputation, 1)); }
 #reputation-pop { gap: calc(0.35 * var(--w) * var(--sp-reputationpop, 1)); }
 #prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
-.srow      { gap: calc(0.22 * var(--w) * var(--sp-status, 1)); }
+.srow      { gap: calc(0.145 * var(--w) * var(--sp-status, 1)); }   /* reference: 4px on a 162px bar */
 
 /* -----------------------------------------------------------------------------
    Per-element typeface and text rasterisation (HUD editor)

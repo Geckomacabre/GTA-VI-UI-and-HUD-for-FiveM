@@ -68,7 +68,10 @@ local function seedFor(src)
 
     local seeded = Skills.normalise(nil)
     local at = Skills.xpForLevel(level)
-    for i = 1, #Skills.List do seeded[Skills.List[i].id] = at end
+    for i = 1, #Skills.List do
+        -- noSeed skills (Health) are earned from zero: level 0 is the stock 200 hp.
+        if not Skills.List[i].noSeed then seeded[Skills.List[i].id] = at end
+    end
     return seeded, true
 end
 
@@ -160,7 +163,10 @@ exports('AddPlayerSkillXp', function(src, id, amount)
     current[id] = (current[id] or 0) + amount
     session[src] = { xp = current, at = os.time() }
     metaSet(src, current)
-    sendTo(src, current)
+    -- A grant, NOT a reload. Reloading would overwrite the client's unsaved XP
+    -- (up to saveMs of jogging) with the stored table plus this amount; the client
+    -- adds it on top of what it holds instead, and its next save agrees with ours.
+    TriggerClientEvent('vice_hud:skills:grant', src, id, amount)
     return true
 end)
 

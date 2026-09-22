@@ -968,6 +968,69 @@ Config.Skills = {
     -- character") so a brand-new character drives exactly stock. At 0.20,
     -- level 0 corners at 0.80x stock traction and level 100 at 1.20x.
     drivingGripBonus = 0.20,
+
+    -- Max health the Health skill adds at level 100, on top of the stock 200.
+    -- The HUD draws the health bar in proportion to max health, so this is also
+    -- how much longer the bar grows: 60 -> 260 hp -> a bar 1.6x its starting
+    -- length. Only the health bar grows; stamina and focus are untouched.
+    -- 0 turns the whole mechanic off (the bar stays fixed length).
+    healthMaxBonus = 60,
+
+    -- Jogging / running pace (not a sprint) also builds Stamina, at this fraction
+    -- of the sprint rate per metre. Stamina is what lengthens the sprint
+    -- (Config.Stamina.skillBonus) and slows fatigue (fitnessAffectsFatigue), so
+    -- this is what makes stamina drain slower. Winning a triathlon should call
+    -- exports.vice_hud:AddPlayerSkillXp(src, 'stamina', n) from the server.
+    jogStaminaFactor = 0.4,
+}
+
+-- =============================================================================
+-- Training  --  ways to earn the Health skill
+-- =============================================================================
+-- Jogging is tracked automatically (see the sampling loop in client_skills.lua).
+-- Everything below is a deliberate exercise: a scenario the ped plays while reps
+-- tick over. Push-ups / sit-ups / free weights work anywhere (/pushups, /situps,
+-- /weights); bench press, weight lifting and chin-ups are also offered on the
+-- real gym props via ox_target. Winning arm wrestling (gk_armwrestle) pays
+-- Health AND Strength XP from the server; the amounts are Config.Match.skillXp
+-- in gk_armwrestle/shared/config.lua.
+--
+-- XP curve reminder (skills.lua): level 1 costs 100 XP, a full 0 -> 100 is
+-- ~98,200. `xp` below is per rep, `secs` is how long one rep takes.
+Config.Training = {
+    enable = true,
+
+    -- ox_target reach, in metres, for the gym props.
+    targetDistance = 2.0,
+
+    -- Default target radius of a placed gym station, in metres.
+    stationRadius = 1.2,
+
+    -- Reps before the ped is winded and has to rest. Also what stops an AFK
+    -- ped farming XP: setReps x xp per rest period is the ceiling.
+    setReps = 25,
+    restSeconds = 60,
+
+    exercises = {
+        pushups  = { label = 'Push-ups',       scenario = 'WORLD_HUMAN_PUSH_UPS',          secs = 3.0, xp = 20 },
+        situps   = { label = 'Sit-ups',        scenario = 'WORLD_HUMAN_SIT_UPS',           secs = 3.0, xp = 18 },
+        -- station = true: only at a gym station placed from em_toolkit's Gym
+        -- builder (stored in data/gym.json), never as a command or on a prop model.
+        weights  = { label = 'Free weights',   scenario = 'WORLD_HUMAN_MUSCLE_FREE_WEIGHTS', secs = 4.0, xp = 28, station = true },
+        bench    = { label = 'Bench press',    scenario = 'PROP_HUMAN_SEAT_MUSCLE_BENCH_PRESS', secs = 4.5, xp = 34, atProp = true },
+        chinups  = { label = 'Chin-ups',       scenario = 'PROP_HUMAN_MUSCLE_CHIN_UPS',    secs = 4.0, xp = 30, atProp = true },
+    },
+
+    -- Real gym props (names from _tools/gtav_reference). Any placed copy of
+    -- these models gets the matching ox_target option, including the ones a gym
+    -- MLO places, as long as the MLO uses the stock models. Free weights are NOT
+    -- here: they are placed stations (see `station` above).
+    models = {
+        bench   = { 'prop_muscle_bench_01', 'prop_muscle_bench_02', 'prop_muscle_bench_03',
+                    'prop_muscle_bench_04', 'prop_muscle_bench_05', 'prop_muscle_bench_06',
+                    'prop_weight_bench_02', 'm25_2_prop_m52_gymbench_01a' },
+        chinups = { 'prop_beach_bars_01', 'prop_beach_bars_02', 'm25_2_prop_m52_gympullup_01a' },
+    },
 }
 
 -- =============================================================================

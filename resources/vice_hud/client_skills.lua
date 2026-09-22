@@ -68,7 +68,8 @@ local loaded = false
 --- get wrong and nothing that can drift between the panel and the engine.
 local function applyStat(id, level)
     local def = Skills.ById[id]
-    if not def then return end
+    -- No stat: Health lengthens max health instead (see syncMaxHealth below).
+    if not def or not def.stat then return end
     if appliedLevel[id] == level then return end
     appliedLevel[id] = level
 
@@ -154,6 +155,10 @@ local function awardUnits(id, units)
     award(id, units * def.rate)
 end
 
+-- Global so client_training.lua (its own chunk) can feed the same single award
+-- path instead of each file growing its own way to level a skill.
+function ViceSkillAward(id, amount) award(id, amount) end
+
 -- Other resources can grant XP too. A skills system nothing else can feed is
 -- one that only rewards the handful of activities this file happens to watch.
 exports('AddSkillXp', function(id, amount)
@@ -187,6 +192,15 @@ end
 -- Persistence
 -- =============================================================================
 
+-- A server-side grant (arm wrestling win, another resource's AddPlayerSkillXp).
+-- Added on top of local XP rather than replacing it -- see the export in
+-- server_skills.lua for why.
+RegisterNetEvent('vice_hud:skills:grant', function(id, amount)
+    amount = tonumber(amount)
+    if not amount or amount <= 0 or not Skills.ById[id] then return end
+    award(id, amount)
+end)
+
 RegisterNetEvent('vice_hud:skills:load', function(stored)
     xp = Skills.normalise(stored)
     loaded = true
@@ -218,6 +232,74 @@ end)
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
     if dirty and loaded then TriggerServerEvent('vice_hud:skills:save', xp) end
+end)
+
+-- =============================================================================
+-- Health skill -> maximum health
+-- =============================================================================
+-- The level raises the ped's max health from the stock 200 by up to
+-- CFG.healthMaxBonus, and the HUD draws the bar in proportion to it (client.lua
+-- sends hpLen). Other resources reset max health to a flat 200 on their own
+-- schedule (qbx_medical on load/revive, illenium-appearance on a stats
+-- refresh), so this re-asserts it rather than setting it once.
+local STOCK_MAX = 200
+local prevRaw, prevMax = nil, nil
+
+--- Max health the current Health level grants.
+function SkillMaxHealth()
+    local bonus = CFG.healthMaxBonus or 0
+    if bonus <= 0 or not loaded then return STOCK_MAX end
+    local level = (Skills.resolve(xp.health))
+    return STOCK_MAX + math.floor((level / Skills.MAX_LEVEL) * bonus + 0.5)
+end
+
+local function syncMaxHealth(ped)
+    if (CFG.healthMaxBonus or 0) <= 0 or not loaded then return end
+    if IsEntityDead(ped) then prevRaw, prevMax = nil, nil return end
+
+    local want = SkillMaxHealth()
+    local have = GetEntityMaxHealth(ped)
+    local raw = GetEntityHealth(ped)
+
+    if have ~= want then
+        -- Full stays full and hurt stays hurt.
+        --   · max is still what WE last set (the level changed): the ped's health
+        --     right now is the truth. The previous look may be half a second stale,
+        --     and a hit taken since must not be healed by a level-up.
+        --   · max is something else (another resource reset it to 200, and the
+        --     engine has already clamped `raw` down): only the previous look still
+        --     knows whether the ped was full.
+        --   · no previous look (first run, just revived): what the ped is at now.
+        local wasFull
+        local reset = prevMax and have ~= prevMax and prevRaw
+        if reset then
+            wasFull = prevRaw >= prevMax
+        else
+            wasFull = raw >= have
+        end
+        SetPedMaxHealth(ped, want)
+        SetEntityMaxHealth(ped, want)
+        local target
+        if wasFull then
+            target = want
+        elseif reset then
+            -- Clamped down by the reset: put back what the ped had.
+            target = math.min(want, math.max(raw, prevRaw))
+        else
+            target = raw
+        end
+        if target ~= raw then SetEntityHealth(ped, target) end
+        raw = target
+    end
+    prevRaw, prevMax = raw, want
+end
+
+CreateThread(function()
+    while true do
+        Wait(500)
+        local ped = cache.ped or PlayerPedId()
+        if ped and ped ~= 0 and DoesEntityExist(ped) then syncMaxHealth(ped) end
+    end
 end)
 
 -- =============================================================================
@@ -426,6 +508,18 @@ CreateThread(function()
                     awardUnits('lung', dtSec)
                 end
 
+                -- ---- health (jogging) ---------------------------------
+                -- Running pace, not a sprint: sprinting is the stamina skill's.
+                if IsPedRunning(ped) and not IsPedSprinting(ped) and step > 0.0 then
+                    awardUnits('health', step)
+                end
+
+                -- ---- stamina (jog / run) ------------------------------
+                -- Running pace builds Stamina too, more slowly than a sprint.
+                if IsPedRunning(ped) and not IsPedSprinting(ped) and step > 0.0 then
+                    awardUnits('stamina', step * (CFG.jogStaminaFactor or 0))
+                end
+
                 -- ---- stamina ------------------------------------------
                 -- Sprinting only. Jogging everywhere would otherwise max the
                 -- stat by accident, and the skill is supposed to be about
@@ -504,11 +598,17 @@ RegisterCommand('skillinfo', function()
     for i = 1, #Skills.List do
         local def = Skills.List[i]
         local level, into, need = Skills.resolve(xp[def.id])
-        local statName = (CFG.statPrefix or 'MP0_') .. def.stat
-        local okRead, engine = pcall(function() return StatGetInt(GetHashKey(statName), -1) end)
-        print(('  %-9s lvl %3d  xp %8d  (%d/%d to next)   %s = %s')
-            :format(def.id, level, xp[def.id], into, need, statName,
-                    okRead and tostring(engine) or 'unreadable'))
+        if def.stat then
+            local statName = (CFG.statPrefix or 'MP0_') .. def.stat
+            local okRead, engine = pcall(function() return StatGetInt(GetHashKey(statName), -1) end)
+            print(('  %-9s lvl %3d  xp %8d  (%d/%d to next)   %s = %s')
+                :format(def.id, level, xp[def.id], into, need, statName,
+                        okRead and tostring(engine) or 'unreadable'))
+        else
+            print(('  %-9s lvl %3d  xp %8d  (%d/%d to next)   max health %d (live %s)')
+                :format(def.id, level, xp[def.id], into, need, SkillMaxHealth(),
+                        tostring(GetEntityMaxHealth(cache.ped or PlayerPedId()))))
+        end
     end
     print('  A stat that does not match its level was refused by the engine —')
     print('  usually the wrong statPrefix for the ped model in use.')

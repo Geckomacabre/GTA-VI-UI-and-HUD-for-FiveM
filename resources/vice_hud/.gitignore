@@ -20,6 +20,14 @@ node_modules/
 # layout there is no shipped design here worth distributing.
 theme.json
 
+# Per-player training/gym progress, written at runtime. Per-server state,
+# not shipped content -- same category as theme.json above.
+data/gym.json
+
+# B&W reference PNG of the live minimap mask, written by /hudpublish. A
+# generated snapshot for feeding into external tooling, not shipped content.
+minimap-mask.png
+
 # Python build tooling leftovers.
 __pycache__/
 *.py[cod]

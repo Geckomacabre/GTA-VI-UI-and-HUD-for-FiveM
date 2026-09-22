@@ -50,6 +50,24 @@ Skills.List = {
         blurb = 'Hit harder, and take a little less from a beating.',
     },
     {
+        -- Not a GTA stat: there is no MP0_ stat for maximum health. The level
+        -- lengthens the health bar for real -- client_skills.lua raises the
+        -- ped's max health by up to Config.Skills.healthMaxBonus -- and the HUD
+        -- draws the longer bar. `stat` is nil, so applyStat/skillinfo skip it.
+        --
+        -- `noSeed`: every other skill starts a new character at startingLevel
+        -- because level IS the stat and 0 would be a penalty. Here level 0 is the
+        -- stock 200 hp, so a new character starts there, and the bar has to be
+        -- earned (jogging, push-ups, weights, chin-ups, arm wrestling wins).
+        id = 'health', label = 'Health', stat = nil, noSeed = true,
+        unit = 'metres jogged',
+        -- Jogging is the slow, always-available source (0.35 XP/m: ~285 m for the
+        -- first level). Reps at the gym, and arm wrestling wins, pay far more per
+        -- minute -- see Config.Training.
+        rate = 0.35,
+        blurb = 'A longer health bar: more punishment before you go down.',
+    },
+    {
         id = 'lung', label = 'Lung capacity', stat = 'LUNG_CAPACITY',
         unit = 'seconds underwater',
         rate = 12.0,

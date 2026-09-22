@@ -1258,6 +1258,24 @@ for tier, amount in pairs(focusRestoreAmounts) do
     registerRestoreExport(name, amount, restoreFocusMeter)
 end
 
+--- For anything that restores by a raw amount rather than through an item (um_yoga's
+--- breathing practice pays out this way): exports.vice_hud:RestoreStamina(30) and
+--- exports.vice_hud:RestoreFocus(20), amounts 0..100. The same effect as the tiered item
+--- exports above minus the item, so it goes through the same two functions.
+exports('RestoreStamina', function(amount)
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return false end
+    restoreStamina(math.min(100.0, amount))
+    return true
+end)
+
+exports('RestoreFocus', function(amount)
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return false end
+    restoreFocusMeter(math.min(100.0, amount))
+    return true
+end)
+
 -- =============================================================================
 -- Combo restores -- one item, two (or three) things restored in the same use.
 -- =============================================================================

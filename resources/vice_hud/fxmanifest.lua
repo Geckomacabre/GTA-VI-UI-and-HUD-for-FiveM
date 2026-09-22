@@ -32,6 +32,9 @@ client_scripts {
     -- actually break it. Nothing else is shared: client.lua's helpers are
     -- file-scoped locals and do not reach across.
     'client_skills.lua',
+    -- Gym exercises that pay the Health skill. Needs ViceSkillAward from the
+    -- file above, and quietly does nothing if that skills system is off.
+    'client_training.lua',
     -- Popup styling. Self-contained: publishes a state bag that ox_lib reads,
     -- and shares nothing with the two files above.
     'theme.lua',
@@ -42,6 +45,8 @@ client_scripts {
 server_scripts {
     'server.lua',
     'server_skills.lua',
+    -- Gym stations for free weights (data/gym.json), edited from em_toolkit.
+    'server_gym.lua',
     -- Server-wide popup theme (/themepublish). Independent of the layout above.
     'server_theme.lua',
 }

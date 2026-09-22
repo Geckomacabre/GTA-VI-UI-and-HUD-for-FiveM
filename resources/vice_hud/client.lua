@@ -3032,6 +3032,11 @@ CreateThread(function()
 
         ui('status', {
             health  = math.floor(math.max(0, math.min(100, health))),
+            -- Bar length in units of the stock (200 hp) bar: 1.0 at stock, 1.6 at
+            -- 260 max hp. hpMaxLen is the length at a fully trained Health skill,
+            -- which the oxygen bar is drawn to match.
+            hpLen    = (maxHp - 100) / 100,
+            hpMaxLen = 1 + ((Config.Skills and Config.Skills.healthMaxBonus) or 0) / 100,
             focus   = math.floor(ViceVitals.focusMeter()),
             focusActive = ViceVitals.focusActive(),
             stamina = math.floor(math.max(0, math.min(100, stamina))),
@@ -4502,7 +4507,33 @@ RegisterCommand('hudpublish', function()
     print('^3[vice_hud]^7 sent this layout to the server. If you have permission it')
     print('  becomes the default for everyone; if you do not, nothing changes and')
     print('  the server prints why.')
+
+    -- A B&W reference PNG of whatever mask shape is live right now, dropped
+    -- next to the published layout so there is always an up-to-date source
+    -- image to hand to an external tool (GfxForge) without going and
+    -- re-deriving the shape from maskRadius by hand. Gated the same as the
+    -- layout publish itself (server checks Config.PublishAce); the NUI side
+    -- has no way to know that, so it always renders -- the server silently
+    -- drops the file write for a player without the ace.
+    SendNUIMessage({ action = 'exportMinimapMask', radiusPct = maskRadius })
 end, false)
+
+-- The NUI side renders the mask and hands back a base64 PNG; this just
+-- forwards the bytes to the server, which is the only side that can
+-- actually write a file into the resource. cb(1) always -- there is nothing
+-- for the page to react to either way, it already drew and moved on.
+RegisterNUICallback('minimapMaskExport', function(data, cb)
+    if type(data) == 'table' and type(data.png) == 'string' and data.png ~= '' then
+        -- DEBUG: pin down where the payload shrinks -- the first attempt at
+        -- this wrote an 8-byte file (just the PNG magic bytes), which means
+        -- the base64 string was already down to ~12 chars by SOME point.
+        -- This print shows what the client Lua side actually received from
+        -- the NUI callback, before it goes anywhere near the network.
+        print(('^3[vice_hud]^7 minimap mask: NUI handed back %d base64 chars'):format(#data.png))
+        TriggerServerEvent('vice_hud:publishMask', data.png, tonumber(data.radiusPct))
+    end
+    cb(1)
+end)
 
 RegisterNetEvent('vice_hud:published', function(ok, why)
     lib.notify({

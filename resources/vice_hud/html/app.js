@@ -111,6 +111,17 @@
         }
         lastHealthVal = health;
 
+        // Bar LENGTH follows max health (client_skills.lua raises it with the
+        // Health skill). Only the health and oxygen rows read these; stamina and
+        // focus are fixed. Clamped so a bad payload cannot make a screen-wide bar.
+        var statusEl = $('status');
+        if (statusEl) {
+            var hpLen = Number(d.hpLen);
+            var hpMax = Number(d.hpMaxLen);
+            if (isFinite(hpLen) && hpLen > 0) statusEl.style.setProperty('--hp-len', Math.max(0.5, Math.min(3, hpLen)).toFixed(4));
+            if (isFinite(hpMax) && hpMax > 0) statusEl.style.setProperty('--hp-max-len', Math.max(1, Math.min(3, hpMax)).toFixed(4));
+        }
+
         setFill('s-health', health);
         setFill('s-focus', focus);
         if (focusRow) focusRow.classList.toggle('active', focusActive);
@@ -1668,6 +1679,53 @@
         // After it is displayable, so the panel has a width to measure the
         // names against.
         fitAll();
+    }
+
+    /* Minimap mask export (/hudpublish).
+       Draws the SAME rounded-rect the native mask texture is baked to --
+       identical W/H/INSET math to tools/make_masks.py's coverage() function,
+       just rasterised by the canvas's own anti-aliasing instead of 4x4
+       supersampling -- so the PNG that comes back is a faithful preview of
+       whatever corner radius is actually live right now, not a guess drawn
+       from the config number alone. White fill on black, no alpha: this is
+       for eyeballing the shape (and feeding an external tool a clean source
+       image), not for streaming back into the game as a texture. */
+    var MASK_W = 512, MASK_H = 256, MASK_INSET = 3.0;
+
+    function onExportMinimapMask(d) {
+        var canvas = document.createElement('canvas');
+        canvas.width = MASK_W;
+        canvas.height = MASK_H;
+        var ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, MASK_W, MASK_H);
+
+        var radiusPct = Number(d && d.radiusPct) || 0;
+        var r = Math.max(0, Math.min(MASK_H / 2, (radiusPct / 100) * MASK_H));
+        var x = MASK_INSET, y = MASK_INSET;
+        var w = MASK_W - MASK_INSET * 2, h = MASK_H - MASK_INSET * 2;
+
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(x, y, w, h, r);
+        } else {
+            // Safari/old-CEF fallback -- same shape, drawn by hand.
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y,     x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x,     y + h, r);
+            ctx.arcTo(x,     y + h, x,     y,     r);
+            ctx.arcTo(x,     y,     x + w, y,     r);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        var dataUrl = canvas.toDataURL('image/png');
+        post('minimapMaskExport', {
+            radiusPct: radiusPct,
+            png: dataUrl.slice(dataUrl.indexOf(',') + 1),
+        });
     }
 
     /* Badge diagnostic (/hudlogos).
@@ -3923,7 +3981,8 @@
         hudOffset: onOffset,
         layout: onLayout,
         openEditor: openEditor,
-        hudVisible: function (d) { if (stage) stage.style.display = d.show === false ? 'none' : ''; }
+        hudVisible: function (d) { if (stage) stage.style.display = d.show === false ? 'none' : ''; },
+        exportMinimapMask: onExportMinimapMask
     };
 
     /* Everything the editor preview draws itself. client.lua keeps polling the

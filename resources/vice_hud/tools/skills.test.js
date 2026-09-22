@@ -59,9 +59,13 @@ emit('max', Skills.MAX_LEVEL)
 local seenId, seenStat, dupes = {}, {}, 0
 for i = 1, #Skills.List do
   local s = Skills.List[i]
-  if seenId[s.id] or seenStat[s.stat] then dupes = dupes + 1 end
-  seenId[s.id], seenStat[s.stat] = true, true
-  if type(s.stat) ~= 'string' or s.stat == '' then dupes = dupes + 100 end
+  -- Health is the one skill with no GTA stat (its level raises max health
+  -- instead), and it must say so with noSeed rather than by omission.
+  local statless = s.stat == nil and s.noSeed == true and s.id == 'health'
+  if seenId[s.id] or (s.stat ~= nil and seenStat[s.stat]) then dupes = dupes + 1 end
+  seenId[s.id] = true
+  if s.stat ~= nil then seenStat[s.stat] = true end
+  if not statless and (type(s.stat) ~= 'string' or s.stat == '') then dupes = dupes + 100 end
   if type(s.rate) ~= 'number' or s.rate <= 0 then dupes = dupes + 1000 end
   if type(s.unit) ~= 'string' then dupes = dupes + 10000 end
 end
@@ -136,7 +140,7 @@ lines.forEach((l) => {
 });
 
 console.log('\n-- definitions --');
-ok(+got.count === 8, 'eight skills defined', got.count);
+ok(+got.count === 9, 'nine skills defined (the eight stat skills plus Health)', got.count);
 ok(+got.dupes === 0, 'each has a unique id and stat, a positive rate and a named unit', got.dupes);
 ok(got.byid === 'STAMINA', 'the id index is built', got.byid);
 ok(+got.max === 100, 'levels run 0..100, matching the GTA stat range exactly', got.max);
@@ -162,7 +166,7 @@ ok(+got.negative === 0, 'negative xp cannot produce a negative level', got.negat
 
 console.log('\n-- storage boundary --');
 ok(+got.norm_nil_stamina === 0, 'a missing store yields every skill at zero');
-ok(+got.norm_keys === 8, 'normalise always returns every skill', got.norm_keys);
+ok(+got.norm_keys === 9, 'normalise always returns every skill', got.norm_keys);
 ok(+got.norm_junk === 0, 'a non-numeric value becomes zero rather than propagating', got.norm_junk);
 ok(+got.norm_negative === 0, 'a negative value becomes zero', got.norm_negative);
 ok(+got.norm_float === 12, 'floats are floored, because xp is whole', got.norm_float);
