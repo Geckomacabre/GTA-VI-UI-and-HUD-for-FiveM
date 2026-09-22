@@ -25,10 +25,10 @@ CyberLeek's videos and GTA VI Extended Look.
 ## Screenshots
 
 [![vice_hud: main showcase](https://img.youtube.com/vi/SWMZpaayS3Q/0.jpg)](https://youtu.be/SWMZpaayS3Q)
- — click to watch
+ — vice_hud: main showcase
 
  [![vice_hud: character switcher showcase](https://img.youtube.com/vi/SWMZpaayS3Q/0.jpg)](https://youtu.be/GvZIX9Ym2t8?si=LRBV5hNFH9Yatn2g)
- — click to watch
+ — vice_hud: character switcher showcase
 
 | | |
 | --- | --- |
